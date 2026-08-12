@@ -15,8 +15,11 @@
       Slug uit norm + periode; bestaand id → leesbare fout, geen suffix
 - [x] 1.2 Periode-validatie: `YYYY-Qn` en `YYYY-Hn` toestaan met een leesbare fout
       bij vrije tekst, zodat sorteren op periode betrouwbaar blijft
-- [ ] 1.3 `AuditSession` per audit-id openen i.p.v. één keer bij app-start. De
-      klasse zelf niet wijzigen — alleen hoe hij wordt aangewezen
+- [x] 1.3 `AuditSession` per audit-id openen i.p.v. één keer bij app-start; de klasse
+      zelf ongewijzigd. **Let op:** de sessies worden per audit-id gecachet in
+      `api/deps.py`, want de voortgang van een lopende run leeft in het
+      sessie-object. Een verse sessie per request liet `GET /run/progress` altijd
+      `idle` zeggen terwijl de run draaide
 - [x] 1.4 `runs.jsonl`: append-only run-registratie met run-id, tijd, identiteit,
       modus, norm, bronnen, hoofdstuk, aantal toegevoegd, aantal overgeslagen. Ook
       mislukte runs, met hun fout
@@ -32,18 +35,18 @@
 
 ## 2. API audit-gescoped (capability: audit-api, MODIFIED)
 
-- [ ] 2.1 Routes omzetten naar `/audits`, `POST /audits`, `/audits/{id}`,
+- [x] 2.1 Routes omzetten naar `/audits`, `POST /audits`, `/audits/{id}`,
       `/audits/{id}/runs`, `/audits/{id}/findings`, `/audits/{id}/trail`,
       `/audits/{id}/memo/…`. `GET /config/health` en `/healthz` blijven ongescoped
-- [ ] 2.2 Geen impliciete "huidige audit" in servergeheugen. Onbekend id → 404 met
+- [x] 2.2 Geen impliciete "huidige audit" in servergeheugen. Onbekend id → 404 met
       leesbare melding, geen audit aanmaken
-- [ ] 2.3 Status afgeleid uit de bestanden (`nieuw` / `loopt` / `memo-klaar`); géén
+- [x] 2.3 Status afgeleid uit de bestanden (`nieuw` / `loopt` / `memo-klaar`); géén
       opgeslagen statusveld
-- [ ] 2.4 `GET /audits` levert de vier kolommen: norm+periode, status,
+- [x] 2.4 `GET /audits` levert de vier kolommen: norm+periode, status,
       triage-voortgang + memo-klaar, bronnen, laatste bewerker + tijdstip
-- [ ] 2.5 De actor in de trail blijft de geverifieerde identiteit (bestaand gedrag
+- [x] 2.5 De actor in de trail blijft de geverifieerde identiteit (bestaand gedrag
       uit `iso-portal` niet stukmaken); audit-log krijgt het audit-id erbij
-- [ ] 2.6 Tests: beslissing landt in de genoemde audit en niet in een andere; 404 op
+- [x] 2.6 Tests: beslissing landt in de genoemde audit en niet in een andere; 404 op
       onbekend id; status verandert mee met de bestanden
 
 ## 3. UI (capability: portal-dashboard, portal-config-view)

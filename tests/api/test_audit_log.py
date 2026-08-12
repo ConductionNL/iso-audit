@@ -6,12 +6,11 @@ import json
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
-from iso_audit.api.app import create_app
 from iso_audit.api.audit_log import log_event
 from iso_audit.api.auth_gate import DEV_IDENTITEIT, EMAIL_HEADER, REQUIRE_AUTH_ENV
-from iso_audit.api.session import AuditSession
+
+from .conftest import PortaalClient, maak_portaal
 
 _EX = Path("examples/auditmemo")
 _AUDITOR = "auditor@conduction.nl"
@@ -28,15 +27,8 @@ _FINDINGS = [
 ]
 
 
-def _client(tmp_path: Path, **kwargs: object) -> TestClient:
-    (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
-    session = AuditSession(
-        tmp_path,
-        profile=str(_EX / "conduction.profile.yaml"),
-        norms_dir="examples/norms",
-        memo_input_path=str(_EX / "memo-input.yaml"),
-    )
-    return TestClient(create_app(session), **kwargs)  # type: ignore[arg-type]
+def _client(tmp_path: Path, **kwargs: object) -> PortaalClient:
+    return maak_portaal(tmp_path, findings=_FINDINGS, headers=kwargs.get("headers", {}))  # type: ignore[arg-type]
 
 
 def _regels(caplog: pytest.LogCaptureFixture) -> list[dict[str, object]]:
@@ -95,7 +87,9 @@ def test_mutatie_wordt_gelogd_met_identiteit(
     mutaties = [r for r in _regels(caplog) if r["soort"] == "mutatie"]
     assert mutaties
     assert all(r["identiteit"] == _AUDITOR for r in mutaties)
-    assert any(r["pad"] == "/findings/f1" for r in mutaties)
+    # Het pad bevat nu het audit-id — dat is de winst van de audit-scoping: uit het
+    # log alleen is te zien in wélke audit iemand muteerde.
+    assert any(r["pad"] == f"/audits/{client.audit_id}/findings/f1" for r in mutaties)
 
 
 def test_leesverzoek_wordt_niet_gelogd(

@@ -1,235 +1,137 @@
-"""FastAPI-app voor de auditor-flow (MVP: triage + memo).
+"""FastAPI-app voor het auditportaal.
 
-Dunne schil op `AuditSession` (en daarmee de bestaande motor). De API is het
-contract; een frontend (web nu, Nextcloud later) consumeert dit. Beslissingen
-lopen via `POST /findings/{id}` en worden append-only vastgelegd.
+Dunne schil op de audit-registry en `AuditSession` (en daarmee op de bestaande
+motor). De API is het contract; `ui.html` consumeert het. Beslissingen lopen via
+`POST /audits/{id}/findings/{fid}` en worden append-only vastgelegd.
+
+**Audit-gescoped sinds change portal-dashboard.** Eerder kende de app precies één
+sessie, meegegeven bij het starten. Daarmee kon je een audit doen maar geen
+auditpraktijk draaien: een nieuwe audit vroeg een beheeractie en eerdere audits waren
+onvindbaar. Nu is een audit een eerste-klas object en noemt elk verzoek zijn audit.
+
+Audit-onafhankelijk blijven: `/healthz` (buiten de auth-gate, voor de kubelet-probe)
+en `/config/*` — of de bronnen gekoppeld zijn is geen eigenschap van één audit.
 """
 
 from __future__ import annotations
 
+import os
+from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from iso_audit.api import overzicht as ov
 from iso_audit.api.audit_log import log_event
 from iso_audit.api.auth_gate import identiteit_van, installeer_auth_gate
-from iso_audit.api.session import AuditSession, SessionError
-from iso_audit.memo.models import Finding, Severity, TriageStatus
+from iso_audit.api.deps import Audits
+from iso_audit.api.registry import AuditRegistry, RegistryError
+from iso_audit.api.routes_audit import maak_router as router_audit
+from iso_audit.api.routes_memo import maak_router as router_memo
+from iso_audit.api.routes_triage import maak_router as router_triage
+from iso_audit.api.session import bron_health
+from iso_audit.memo.norm_lookup import laad_norm_db
+
+AUDITS_ROOT_ENV = "ISO_AUDIT_AUDITS_ROOT"
+"""Root-directory met de audits. Expliciet, geen fallback — zie `audits_root()`."""
 
 
-class TriageUpdate(BaseModel):
-    """Reclassificatie/triage en/of redactie van de kop-NC-tekst, met reden."""
+class NieuweAudit(BaseModel):
+    """Een audit aanmaken: norm + periode, de rest is afgeleid."""
 
-    severity: Severity | None = None
-    triage_status: TriageStatus | None = None
-    title: str | None = None
-    deviation: str | None = None
-    corrective_measure: str | None = None  # NC: vereiste maatregel
-    suggestion: str | None = None  # OFI: aanbeveling
-    reason: str = ""
+    norm: str
+    periode: str
 
 
-class RunConfig(BaseModel):
-    """Stap 1-config: welke normen + bronnen in de run-scope."""
+def audits_root() -> Path:
+    """Root-directory met audits, uit de omgeving.
 
-    norms: list[str] = []
-    sources: list[str] = []
-
-
-class RunStartRequest(BaseModel):
-    """Stap 2-start: live pipeline of sim-timer, met chapter-scoping."""
-
-    mode: str = "sim"  # "sim" | "live"
-    norm: str = "9001"  # run-code: 9001 | 27001 | beide
-    sources: list[str] = []
-    chapter: str | None = None  # hoofdstuk-filter (scoping), bv. "8"
-    top_n: int = 0  # 0 = alle NC-kandidaten draften (geen cap)
-    pace: float = 0.05
+    Geen fallback naar een pad binnen de repo: dat zou in het portaal onder
+    `readOnlyRootFilesystem` alsnog falen, en auditdata op een vluchtig filesystem
+    zetten is erger dan een harde fout bij het starten.
+    """
+    waarde = os.environ.get(AUDITS_ROOT_ENV)
+    if not waarde:
+        raise RuntimeError(
+            f"{AUDITS_ROOT_ENV} niet gezet. Het portaal moet expliciet weten waar de "
+            "audits staan; er is bewust geen fallback."
+        )
+    return Path(waarde)
 
 
-class FindingSummary(BaseModel):
-    id: str
-    severity: Severity
-    clause: str
-    title: str
-    triage_status: TriageStatus
-    source: str | None = None  # bevinding berust op bron Y
-
-
-def create_app(session: AuditSession) -> FastAPI:
-    """Bouw de FastAPI-app rond één geladen auditsessie."""
-    app = FastAPI(title="iso-audit — auditor-API", version="0.1.0")
+def create_app(
+    registry: AuditRegistry,
+    *,
+    profile: str,
+    norms_dir: str | Path,
+) -> FastAPI:
+    """Bouw de app rond een audit-registry."""
+    app = FastAPI(title="iso-audit — auditorportaal", version="0.2.0")
     installeer_auth_gate(app)
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
-        """Probe-endpoint: bewust buiten de identiteits-gate.
+        """Probe-endpoint: bewust buiten de identiteits-gate en buiten elke audit.
 
         Liveness/readiness moet werken zonder sessie. Geeft geen auditdata terug —
         alleen dat het proces staat.
         """
         return {"status": "ok"}
 
-    @app.get("/findings", response_model=list[FindingSummary])
-    def lijst_findings(severity: Severity | None = None) -> list[FindingSummary]:
-        return [
-            FindingSummary(
-                id=f.id,
-                severity=f.severity,
-                clause=f.clause,
-                title=f.title,
-                triage_status=f.triage_status,
-                source=f.source,
-            )
-            for f in session.findings()
-            if severity is None or f.severity == severity
-        ]
+    # --- audits -------------------------------------------------------------
 
-    @app.post("/findings/{finding_id}", response_model=FindingSummary)
-    def triage(finding_id: str, update: TriageUpdate, request: Request) -> FindingSummary:
+    @app.get("/audits")
+    def lijst_audits() -> list[dict[str, object]]:
+        """Dashboard: één regel per audit, inclusief audits zonder run.
+
+        Een aangemaakte audit zonder run is een geldige toestand ("nog te starten");
+        hem verbergen tot er data is maakt het overzicht onbetrouwbaar als werklijst.
+        """
+        return [asdict(r) for r in ov.alles(registry)]
+
+    @app.post("/audits", status_code=201)
+    def maak_audit(nieuw: NieuweAudit, request: Request) -> dict[str, object]:
+        """Maak een audit aan. Een auditorhandeling, geen beheeractie."""
+        wie = identiteit_van(request)
         try:
-            f = session.apply_triage(
-                finding_id,
-                severity=update.severity,
-                triage_status=update.triage_status,
-                title=update.title,
-                deviation=update.deviation,
-                corrective_measure=update.corrective_measure,
-                suggestion=update.suggestion,
-                reason=update.reason,
-                # De geverifieerde identiteit, niet de default `"auditor"`: een
-                # append-only trail zonder toewijsbare actor beantwoordt de eerste
-                # vraag van een auditor niet (sec-bevinding 1 van change iso-portal).
-                actor=identiteit_van(request),
-            )
-        except SessionError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return FindingSummary(
-            id=f.id,
-            severity=f.severity,
-            clause=f.clause,
-            title=f.title,
-            triage_status=f.triage_status,
-            source=f.source,
-        )
+            aid = registry.maak(norm=nieuw.norm, periode=nieuw.periode, door=wie)
+        except RegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        log_event("audit_aangemaakt", wie, audit=aid, norm=nieuw.norm, periode=nieuw.periode)
+        return asdict(ov.regel(registry.pad(aid)))
 
-    @app.get("/findings/{finding_id}", response_model=Finding)
-    def finding_detail(finding_id: str) -> Finding:
-        """Volledige finding (incl. afwijking/maatregel) voor de editor."""
-        f = next((x for x in session.findings() if x.id == finding_id), None)
-        if f is None:
-            raise HTTPException(status_code=404, detail=f"Finding {finding_id!r} niet gevonden.")
-        return f
-
-    @app.get("/findings/{finding_id}/context")
-    def finding_context(finding_id: str) -> dict[str, object]:
-        """Hover-context: normtekst per clausule + redenatie (waarom NC-kandidaat)."""
-        try:
-            return session.finding_context(finding_id)
-        except SessionError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    @app.get("/trail")
-    def trail() -> list[dict[str, str]]:
-        """De append-only triage-trail (auditor-beslissingen)."""
-        return session.trail()
+    # --- audit-onafhankelijke configuratie ----------------------------------
 
     @app.get("/config/options")
     def config_options() -> dict[str, list[str]]:
-        """Stap 1: beschikbare normen + bronnen om de run te configureren."""
-        return session.config_options()
+        """Beschikbare normen (norm-DB) en geregistreerde bronnen."""
+        from iso_audit.ingest import beschikbare_bronnen
+
+        return {
+            "norms": laad_norm_db(norms_dir).standards(),
+            "sources": beschikbare_bronnen(),
+        }
 
     @app.get("/config/health")
     def config_health() -> dict[str, dict[str, object]]:
-        """Korte per-bron healthcheck; de UI greyt niet-gekoppelde bronnen uit."""
-        return session.source_health()
+        """Per-bron koppelstatus — één bron van waarheid, ook voor het configscherm.
 
-    @app.post("/run/start")
-    def run_start(request: Request, req: RunStartRequest | None = None) -> dict[str, object]:
-        """Stap 2: start de run (live pipeline of sim-timer); voortgang via /run/progress."""
-        r = req or RunStartRequest()
-        # Kosten-attributie (sec-bevinding 6, besluit "loggen, niet begrenzen"): de
-        # classifier houdt het token-verbruik al bij via `Kostenteller`; wat ontbrak
-        # is wie de run startte. Deze regel maakt kosten herleidbaar naar een mens.
-        log_event(
-            "run_gestart",
-            identiteit_van(request),
-            modus=r.mode,
-            norm=r.norm,
-            bronnen=",".join(r.sources),
-            hoofdstuk=r.chapter or "",
-        )
-        return session.start_run(
-            mode=r.mode,
-            norm=r.norm,
-            sources=r.sources,
-            chapter=r.chapter,
-            top_n=r.top_n,
-            pace_s=r.pace,
-        )
-
-    @app.get("/run/progress")
-    def run_progress() -> dict[str, object]:
-        """Voortgang stap 2: done/total + verstreken tijd + aftellende ETA."""
-        return session.run_progress()
-
-    @app.post("/run")
-    def run(config: RunConfig | None = None) -> dict[str, object]:
-        """Stap 2: samenvatting (config + tellingen) — toon na afronden van de run."""
-        c = config or RunConfig()
-        return session.run_summary(norms=c.norms, sources=c.sources)
-
-    @app.get("/triage/status")
-    def triage_status() -> dict[str, object]:
-        """Voortgang van de triage; de memo is gated tot dit compleet is."""
-        return session.triage_summary()
-
-    @app.get("/conclusion")
-    def conclusion() -> dict[str, object]:
-        """Saturatie-conclusie na triage: telling valide/niet-valide/follow-up + advies."""
-        return session.conclusion()
-
-    def _eis_triage_compleet() -> None:
-        s = session.triage_summary()
-        if not s["complete"]:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Triage niet compleet: {s['open']} kandidaat-NC('s) nog open.",
-            )
-
-    @app.get("/memo/input")
-    def memo_input_get() -> dict[str, object]:
-        """De bewerkbare memo-koptekst + context (voor de pre-generatie editor)."""
-        return session.memo_input_data()
-
-    @app.post("/memo/input")
-    def memo_input_post(data: dict[str, object]) -> dict[str, object]:
-        """Sla de aangepaste memo-input op (auditor past de memo aan vóór generatie)."""
-        try:
-            return session.update_memo_input(data)
-        except (ValueError, OSError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @app.get("/memo/preview", response_class=HTMLResponse)
-    def memo_preview() -> str:
-        _eis_triage_compleet()
-        try:
-            return session.render_html()
-        except (SessionError, ValueError, OSError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    @app.post("/memo/export")
-    def memo_export() -> dict[str, str]:
-        _eis_triage_compleet()
-        pad = session.export_pdf(session.dir / "Auditmemo_management.pdf")
-        return {"pdf": str(pad)}
+        Bewust géén tweede koppel-administratie ernaast: twee plekken die zeggen of
+        een bron werkt lopen uiteen, en deze bevraagt het echte systeem.
+        """
+        return bron_health()
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
         return _UI_HTML
 
+    # Drie routers op hetzelfde prefix, gescheiden per onderwerp zodat geen enkel
+    # route-bestand over de 200-regelgrens gaat.
+    audits = Audits(registry=registry, profile=profile, norms_dir=norms_dir)
+    for maak in (router_audit, router_triage, router_memo):
+        app.include_router(maak(audits))
     return app
 
 
@@ -237,18 +139,24 @@ _UI_HTML = (Path(__file__).resolve().parent / "ui.html").read_text(encoding="utf
 
 
 def serve(
-    session_dir: str | Path,
+    audits_dir: str | Path,
     *,
     profile: str,
     norms_dir: str | Path,
-    memo_input_path: str | Path,
     host: str = "127.0.0.1",
     port: int = 8000,
 ) -> None:
-    """Start de lokale server (gebonden aan 127.0.0.1)."""
+    """Start de server, default gebonden aan 127.0.0.1.
+
+    Die default is niet cosmetisch: in het portaal is oauth2-proxy de enige
+    netwerk-listener, en dat is wat de identity-header betrouwbaar maakt.
+    """
     import uvicorn
 
-    session = AuditSession(
-        session_dir, profile=profile, norms_dir=norms_dir, memo_input_path=memo_input_path
+    registry = AuditRegistry(audits_dir)
+    registry.root.mkdir(parents=True, exist_ok=True)
+    uvicorn.run(
+        create_app(registry, profile=profile, norms_dir=norms_dir),
+        host=host,
+        port=port,
     )
-    uvicorn.run(create_app(session), host=host, port=port)

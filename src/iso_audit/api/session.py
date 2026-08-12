@@ -69,6 +69,24 @@ def _check_source(naam: str) -> dict[str, object]:
     return {"connected": hc.get("status") == "ok", **hc}
 
 
+def bron_health() -> dict[str, dict[str, object]]:
+    """Koppelstatus van alle geregistreerde bronnen, zonder audit.
+
+    Of een bron gekoppeld is, is een eigenschap van de omgeving en niet van één
+    audit — daarom module-level en niet op `AuditSession`. Dit is de **enige** bron
+    van waarheid voor het configuratiescherm: een tweede, opgeslagen koppel-
+    administratie ernaast zou uit de pas gaan lopen, en dan vertelt zij wat iemand
+    ooit dacht in plaats van wat het systeem doet.
+
+    Boring & auditable: geen geheime connectiviteitslogica — elke bron rapporteert
+    zijn eigen status. Een exception geldt als niet-gekoppeld; een falende
+    healthcheck mag de UI nooit breken.
+    """
+    from iso_audit.ingest import beschikbare_bronnen
+
+    return {naam: _check_source(naam) for naam in beschikbare_bronnen()}
+
+
 @dataclass
 class _RunState:
     """Voortgang van de stap-2-run (indexatie/timer of live pipeline)."""
@@ -194,15 +212,10 @@ class AuditSession:
     def source_health(self) -> dict[str, dict[str, object]]:
         """Korte healthcheck per bron — de UI greyt niet-gekoppelde bronnen uit.
 
-        Per bron: ``connected`` (bool) plus de ruwe healthcheck-velden (status,
-        reden, tenant, …). Een bron die niet instantieerbaar is of waarvan
-        ``healthcheck()`` faalt, geldt als **niet-gekoppeld** en is niet
-        selecteerbaar voor een run. Boring & auditable: geen geheime
-        connectiviteitslogica — elke bron rapporteert zijn eigen status.
+        Dunne doorgifte naar :func:`bron_health`; de koppelstatus van een bron is
+        geen eigenschap van één audit.
         """
-        from iso_audit.ingest import beschikbare_bronnen
-
-        return {naam: _check_source(naam) for naam in beschikbare_bronnen()}
+        return bron_health()
 
     def start_run(
         self,

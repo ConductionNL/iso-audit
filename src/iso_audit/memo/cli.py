@@ -129,25 +129,25 @@ def draft_cmd(
 
 @app.command("ui")
 def ui_cmd(
-    session_dir: Path = typer.Option(..., "--session", help="Working-dir met findings.json."),
+    audits: Path = typer.Option(
+        ..., "--audits", help="Root-directory met de audits (elke audit een submap)."
+    ),
     profile: str = typer.Option(..., "--profile", help="Profiel-slug of pad."),
     norms: Path = typer.Option(..., "--norms", help="Directory met norm-DB <slug>.yaml."),
-    memo_input: Path = typer.Option(..., "--memo-input", help="Memo-koptekst + context (YAML)."),
     host: str = typer.Option("127.0.0.1", "--host", help="Bind-host (lokaal-only default)."),
     port: int = typer.Option(8000, "--port", help="Poort."),
 ) -> None:
-    """Start de lokale auditor-API + minimale UI (triage + memo)."""
+    """Start het auditorportaal: dashboard, triage en memo.
+
+    Twee vlaggen zijn gewijzigd door change `portal-dashboard`: `--session` is
+    `--audits` geworden omdat het portaal nu meerdere audits kent, en
+    `--memo-input` is vervallen — de memo-input hoort bij één audit en staat in de
+    audit-directory, niet in een globale vlag.
+    """
     from iso_audit.api.app import serve
 
-    _console.print(f"[green]auditor-API op[/green] http://{host}:{port}  (Ctrl-C om te stoppen)")
-    serve(
-        session_dir,
-        profile=profile,
-        norms_dir=norms,
-        memo_input_path=memo_input,
-        host=host,
-        port=port,
-    )
+    _console.print(f"[green]auditorportaal op[/green] http://{host}:{port}  (Ctrl-C om te stoppen)")
+    serve(audits, profile=profile, norms_dir=norms, host=host, port=port)
 
 
 @profile_app.command("new")

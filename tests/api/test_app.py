@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
-from iso_audit.api.app import create_app
 from iso_audit.api.session import AuditSession
+
+from .conftest import PortaalClient, maak_portaal
 
 _EX = Path("examples/auditmemo")
 _FINDINGS = [
@@ -38,26 +38,12 @@ _AUDITOR = "auditor@conduction.nl"
 tests de bewáákte route lopen in plaats van een uitgezette gate."""
 
 
-def _client(tmp_path: Path) -> TestClient:
-    (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
-    session = AuditSession(
-        tmp_path,
-        profile=str(_EX / "conduction.profile.yaml"),
-        norms_dir="examples/norms",
-        memo_input_path=str(_EX / "memo-input.yaml"),
-    )
-    return TestClient(create_app(session), headers={"X-Forwarded-Email": _AUDITOR})
+def _client(tmp_path: Path) -> PortaalClient:
+    return maak_portaal(tmp_path, findings=_FINDINGS)
 
 
-def _client_met(tmp_path: Path, findings: list[dict[str, object]]) -> TestClient:
-    (tmp_path / "findings.json").write_text(json.dumps(findings), encoding="utf-8")
-    session = AuditSession(
-        tmp_path,
-        profile=str(_EX / "conduction.profile.yaml"),
-        norms_dir="examples/norms",
-        memo_input_path=str(_EX / "memo-input.yaml"),
-    )
-    return TestClient(create_app(session), headers={"X-Forwarded-Email": _AUDITOR})
+def _client_met(tmp_path: Path, findings: list[dict[str, object]]) -> PortaalClient:
+    return maak_portaal(tmp_path, findings=findings)
 
 
 def test_conclusion_ofi_themes(tmp_path: Path) -> None:
@@ -108,20 +94,9 @@ def test_conclusion_ofi_themes(tmp_path: Path) -> None:
     assert {t["thema"] for t in themes} == {"Documentbeheer", "Monitoring en meting"}  # NC niet
 
 
-def _client_writable_memo(tmp_path: Path) -> TestClient:
-    """Sessie met een schrijfbare kopie van memo-input (mag de repo niet muteren)."""
-    import shutil
-
-    (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
-    mi = tmp_path / "memo-input.yaml"
-    shutil.copy(_EX / "memo-input.yaml", mi)
-    session = AuditSession(
-        tmp_path,
-        profile=str(_EX / "conduction.profile.yaml"),
-        norms_dir="examples/norms",
-        memo_input_path=str(mi),
-    )
-    return TestClient(create_app(session), headers={"X-Forwarded-Email": _AUDITOR})
+def _client_writable_memo(tmp_path: Path) -> PortaalClient:
+    """`maak_portaal` kopieert memo-input al naar de audit-dir, dus inherent schrijfbaar."""
+    return maak_portaal(tmp_path, findings=_FINDINGS)
 
 
 def test_memo_input_edit_roundtrip(tmp_path: Path) -> None:
@@ -387,7 +362,7 @@ def test_run_progress_idle(tmp_path: Path) -> None:
 def test_live_run_worker_draft_en_status(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """Live-worker: pipeline + draft gemockt → findings vervangen + status done."""
     import iso_audit.api.run_job as rj
-    from iso_audit.api.session import AuditSession, _RunState
+    from iso_audit.api.session import _RunState
     from iso_audit.memo.models import Finding
 
     monkeypatch.setattr(rj, "run_live_pipeline", lambda **kw: kw["on_log"]("Stap 7/7: klaar"))
