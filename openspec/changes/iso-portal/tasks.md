@@ -172,8 +172,12 @@
 - [x] 6.3 Erfelijke afwijking gedocumenteerd in `deploy/README.md` onder "Bekende
       openstaande punten": de Google identity provider is handmatig in de
       Keycloak-UI aangemaakt en staat niet in de realm-import
-- [ ] 6.4 Rollout + verificatie: `rollout status`, `/healthz` zonder login,
-      `/` geeft de Keycloak-login, trail-persistentie na pod-delete
+- [ ] 6.4 Rollout + verificatie via `scripts/rollout-portal.sh`. **Let op:**
+      `/healthz` is extern NIET bereikbaar — er is geen `skip_auth_routes`, dus
+      oauth2-proxy onderschept elk pad. Extern check je `/ping` (van de proxy zelf);
+      het app-endpoint check je binnen de pod. Verder: `/` geeft 302 naar Keycloak,
+      en trail-persistentie na een pod-delete
+
 
 ## 7. Vooruitwijzing — de bron-changes (niet in deze change)
 
