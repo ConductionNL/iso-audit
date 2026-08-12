@@ -6,6 +6,29 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Security — 2026-08-12 — 23 dependabot-alerts gedicht (lockfile-bump)
+
+`uv.lock` bijgewerkt met de bump uit dependabot-PR #17, die exact de vijf
+pakketten raakt die alarm sloegen: `cryptography` → 50.0.0, `pillow` → 12.3.0,
+`httplib2` → 0.32.0, `pyasn1` → 0.6.4, `soupsieve` → 2.8.4. Samen 19 high en
+4 moderate alerts.
+
+Deze alerts stonden er al, maar werden pas zichtbaar toen de repo bij de
+org-transfer public werd — `secret_scanning` en de dependabot-rapportage komen
+met public mee. Relevant voor de ISO-scope omdat het portaal-image uit deze
+lockfile bouwt: deze versies gaan naar productie.
+
+`cryptography` 50.0.0 is een major bump onder `google-auth`, dus vóór het mergen
+apart getest in plaats van op de CI-uitslag te vertrouwen:
+
+- volledige suite groen (792 passed, 1 skipped) met de nieuwe lockfile;
+- WeasyPrint rendert een geldige PDF onder pillow 12.3.0 + soupsieve 2.8.4 (die
+  twee zijn render-dependencies, dus de meest waarschijnlijke breukplek);
+- `google-auth` en de Drive-client importeren onder cryptography 50.0.0.
+
+De bump hing sinds 11 augustus op de kapotte bandit-gate; met de fix in deze
+zelfde wijziging kon hij mee.
+
 ### Fixed — 2026-08-12 — de kwaliteitsgates werkten niet meer (sinds 17 juni rood)
 
 CI faalde bij élke run sinds 2026-06-17, en `pre-commit run --all-files` net zo.
