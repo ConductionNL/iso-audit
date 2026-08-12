@@ -6,6 +6,35 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-12 — login gaf 500: audience-mapper ontbrak; Argo-wacht keek niet naar de revisie
+
+**Login faalde na een geslaagde inlog.** Keycloak zet de client niet als `aud` in
+het token — in de claims stond alleen `azp: iso-audit-portal` — en oauth2-proxy eist
+die audience-claim. Resultaat: inlogportaal werkt, login lukt, daarna een 500 met
+`audience claims [aud] do not exist in claims` in de proxy-log. De bekende
+Keycloak/oauth2-proxy-valkuil.
+
+De benodigde `oidc-audience-mapper` staat nu in `keycloak-client.example.yaml` en in
+de import-JSON, plus in de prerequisites van `deploy/README.md` met de foutmelding
+erbij zodat niemand dit opnieuw hoeft te debuggen. Toevoegen aan een bestaande client
+gaat via de UI (Client scopes → dedicated → Audience); een herstart is niet nodig.
+
+Bijkomende observatie voor het dossier: `openwoo-provisioner` heeft dezelfde mapper
+nodig en werkt, dus die is daar eerder met de hand toegevoegd. Daarmee is dit het
+derde stuk Keycloak-configuratie dat alleen in Keycloak bestaat en niet in Git — na
+de clients zelf en de Google identity provider. `keycloak-config-cli` als sync-stap
+zou dat hele patroon opheffen en is nu de duidelijkste openstaande verbetering.
+
+**`rollout-portal.sh` wachtte op de verkeerde voorwaarde.** `wacht_op_argo` keek
+alleen of Argo `Synced` was, niet op *welke* revisie. Argo stond al Synced op de
+vorige commit, dus de wacht viel er meteen door en de herstart liep met het oude
+manifest — zonder de nieuwe initContainer. Argo pollt standaard om de ~3 minuten. De
+functie forceert nu een refresh en vergelijkt de revisie met `git rev-parse HEAD`.
+
+Dat is de derde aanname over "het staat er wel" die onderweg omviel, na de
+non-numerieke `USER` en het cookie-secret. Alle drie zijn nu een check in het script
+of in een manifest, in plaats van iets dat je moet onthouden.
+
 ### Fixed — 2026-08-12 — portaal start nu op een verse PVC (initContainer `seed-sessie`)
 
 Na de USER- en cookie-secret-fix startte `oauth2-proxy` wel, maar viel de app om met

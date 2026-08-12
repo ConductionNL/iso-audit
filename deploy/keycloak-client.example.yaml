@@ -52,3 +52,24 @@
   optionalClientScopes:
     - "groups"
     - "offline_access"
+  protocolMappers:
+    # ZONDER DEZE MAPPER FAALT DE LOGIN MET EEN 500.
+    #
+    # Keycloak zet de client niet als `aud` in het token; er staat alleen `azp`.
+    # oauth2-proxy eist de audience-claim en faalt in de callback met
+    #   "audience claims [aud] do not exist in claims"
+    # De gebruiker ziet dan het inlogportaal, logt in, en krijgt daarna een 500.
+    # Gemeten 2026-08-12 bij de eerste echte login.
+    #
+    # Dit is de bekende Keycloak/oauth2-proxy-valkuil. `openwoo-provisioner` heeft
+    # dezelfde mapper nodig en werkt, dus die is daar met de hand toegevoegd —
+    # net als de Google-IdP. Ook dit staat dus in Keycloak en niet in Git, tenzij
+    # deze regels bij een verse realm-import meekomen.
+    - name: audience
+      protocol: openid-connect
+      protocolMapper: oidc-audience-mapper
+      config:
+        "included.client.audience": "iso-audit-portal"
+        "id.token.claim": "false"
+        "access.token.claim": "true"
+        "introspection.token.claim": "true"

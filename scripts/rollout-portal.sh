@@ -144,17 +144,29 @@ push_en_merge() {
   doe gh pr merge "$nr" --repo "$REPO" --merge --delete-branch
 }
 
+# Wacht tot Argo gesynct is OP DE COMMIT DIE WE NET GEPUSHT HEBBEN.
+#
+# Alleen op "Synced" wachten is niet genoeg en dat is precies wat er misging op
+# 2026-08-12: Argo stond al Synced op de vórige revisie, dus de wacht viel er
+# meteen door, waarna de herstart met het oude manifest liep en de nieuwe
+# initContainer ontbrak. Argo pollt standaard om de ~3 minuten; we forceren een
+# refresh en vergelijken de revisie.
 wacht_op_argo() {
-  local sync health
-  stap "wachten tot Argo gesynct is"
+  local want="$1" rev sync health
+  stap "wachten tot Argo gesynct is op ${want:0:12}"
+  doe kubectl annotate application "$DEPLOY" -n argocd \
+    argocd.argoproj.io/refresh=normal --overwrite
   for _ in $(seq 1 40); do
+    rev="$(kubectl get application "$DEPLOY" -n argocd -o jsonpath='{.status.sync.revision}' 2>/dev/null || true)"
     sync="$(kubectl get application "$DEPLOY" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || true)"
     health="$(kubectl get application "$DEPLOY" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || true)"
-    echo "  sync=${sync:-?} health=${health:-?}"
-    [[ "$sync" == "Synced" ]] && return 0
+    echo "  rev=${rev:0:12} sync=${sync:-?} health=${health:-?}"
+    if [[ "$sync" == "Synced" && "$rev" == "$want" ]]; then
+      return 0
+    fi
     sleep 15
   done
-  err "Argo is na 10 minuten niet Synced. Check: kubectl describe application ${DEPLOY} -n argocd"
+  err "Argo staat na 10 minuten niet op ${want:0:12}. Check: kubectl describe application ${DEPLOY} -n argocd"
   exit 1
 }
 
@@ -222,7 +234,7 @@ main() {
 
   push_en_merge "$branch"
   wacht_op_image "$versie"
-  wacht_op_argo
+  wacht_op_argo "$(git rev-parse HEAD)"
   if [[ "$SKIP_SECRET" == true ]]; then
     echo "  --skip-secret: cookie-secret ongemoeid"
   else

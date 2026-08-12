@@ -63,6 +63,21 @@ defect kopiëren).
       Doen: Keycloak-UI → realm `commonground` → Clients → **Import client** met
       `keycloak-client.example.yaml` als bron (of de JSON-variant daarvan).
 
+   c. **De audience-mapper is niet optioneel.** Keycloak zet de client niet als
+      `aud` in het token — er staat alleen `azp` — en oauth2-proxy eist die claim.
+      Zonder de mapper zie je het inlogportaal, log je in, en volgt een **500**,
+      met in de proxy-log `audience claims [aud] do not exist in claims`. Gemeten
+      2026-08-12 bij de eerste echte login.
+
+      Doen: Clients → `iso-audit-portal` → Client scopes →
+      `iso-audit-portal-dedicated` → Configure a new mapper → **Audience** →
+      Included Client Audience `iso-audit-portal`, *Add to access token* aan. Geen
+      herstart nodig; opnieuw inloggen volstaat.
+
+      Bij een import met het bestand hierboven komt de mapper mee — hij staat er
+      sinds 2026-08-12 in. `openwoo-provisioner` heeft hem nodig en werkt, dus daar
+      is hij eerder met de hand toegevoegd; ook dat staat niet in Git.
+
    **Wat dit betekent voor het auditspoor:** de realm-YAML is in deze opstelling
    *gewenste* staat, niet *toegepaste* staat. Er kan dus drift bestaan tussen Git
    en Keycloak die niemand ziet. Datzelfde geldt al voor de Google identity
