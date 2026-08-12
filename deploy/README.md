@@ -115,6 +115,28 @@ Daarna: verwijder de pod en controleer dat `GET /trail` dezelfde beslissingen
 teruggeeft. Dat is de PVC-test, en het is de enige die telt voor de
 append-only-belofte.
 
+### Wat een lokale containertest níet dekt
+
+Bij de eerste rollout (2026-08-12) viel de pod om op twee dingen die lokaal
+allebei groen waren. Dat is geen toeval maar een systematisch gat, dus het staat
+hier:
+
+- **Numerieke uid.** Een lokale test met `docker run --user 10001:10001` geeft de
+  uid van búiten mee, waardoor een `USER <naam>` in het image onzichtbaar blijft.
+  De kubelet kijkt naar de USER ín het image en weigert met *"cannot verify user is
+  non-root"*. Controleer dus het image zelf:
+
+      docker inspect <image> --format '{{.Config.User}}'   # moet numeriek zijn
+
+- **Secret-inhoud.** Een lokale run zonder oauth2-proxy zegt niets over of het
+  cookie-secret door de proxy geaccepteerd wordt. Dat blijkt pas uit de
+  proxy-logs. Bij een crashloop op de proxy: `kubectl logs … -c oauth2-proxy`
+  eerst, want de foutmelding is expliciet.
+
+Algemener: `kubectl describe pod` en de `Failed`-events zeggen hier meer dan de
+containerlogs, omdat een container die de kubelet weigert aan te maken geen logs
+heeft.
+
 ## Credential-herleidbaarheid
 
 Elke credential die het portaal gebruikt, met eigenaar als **rol** en niet als
