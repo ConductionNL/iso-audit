@@ -62,7 +62,7 @@ het is precies wat het sidecar-patroon vraagt.
 | `deploy/secret.example.yaml` | idem | template; echte Secrets out-of-band |
 | `deploy/README.md`, `docs/explanation/portal-auth.md`, `docs/how-to/verify-portal-auth.md` | `deploy/README.md` + `webgui/auth/README.md` | het fail-closed trust-model als proza. Dat is het auditbewijs — een reviewer moet kunnen nalezen *waarom* de header te vertrouwen is |
 | `Dockerfile` | nieuw | `uv sync --frozen` (nooit pip), non-root, compatibel met `readOnlyRootFilesystem`, uvicorn op `127.0.0.1:8081`. WeasyPrint-systeemlibs meenemen — anders faalt de PDF-render pas in productie |
-| `.github/workflows/image.yml` | openwoo's variant | merge-is-deploy: `sha-<short>` bouwen, pullbaarheid verifiëren, `newTag` terugcommitten met `[skip ci]` |
+| `.github/workflows/image.yml` | openwoo's variant, maar **omgezet** | bouwt op de PR en verifieert dat `newTag` gelijk is aan de projectversie. Géén bot-commit naar main: dat vroeg `contents: write` en daarmee een uitzondering op branch-bescherming (sec-bevinding 3) |
 
 **Niet gekloond:** `rbac-argo.yaml` en `rbac-secrets.yaml` (openwoo-specifiek:
 Argo-status-poll en nextcloud-secrets-reveal — het portaal heeft geen
@@ -123,6 +123,16 @@ cluster.
 
 ## Keycloak — buiten deze repo
 
+**Let op, gemeten 2026-08-12:** `KeycloakRealmImport` is **create-once**. De
+operator importeert een realm die nog niet bestaat, maar werkt een bestaande realm
+niet bij. Argo synct de CR wel — de live resource kreeg de nieuwe client — maar er
+werd geen import-job gestart; de laatste bleef die van 3 augustus. De client moet
+dus met de hand in Keycloak aangemaakt worden (UI → Import client).
+
+Gevolg: de realm-YAML is in deze opstelling gewenste staat, niet toegepaste staat,
+en Git en Keycloak kunnen stil uiteenlopen. Dat gold al voor de Google identity
+provider. Een reconciliërende oplossing (`keycloak-config-cli`) is eigen werk.
+
 Eén client toevoegen aan
 `KeyCloak/clusters/prod/keycloak/20-keycloak/realm-commonground.yaml`, als kopie
 van het `openwoo-provisioner`-blok (regels 244-270):
@@ -134,12 +144,8 @@ van het `openwoo-provisioner`-blok (regels 244-270):
 - `defaultClientScopes: openid profile email`, optioneel `groups`
 
 Prod-pad-edit → aparte PR met expliciete confirmatie. Client secret niet in Git.
-
-**Erfelijke afwijking, te documenteren en niet hier op te lossen:** de Google
-identity provider is handmatig via de Keycloak-UI aangemaakt en staat expliciet
-niet in de realm-import (`realm-commonground.yaml:198-201`, met reden). De nieuwe
-client erft die situatie; hem hier rechttrekken zou de scope van deze change
-verdubbelen.
+De Google identity provider is om dezelfde reden handmatig aangemaakt
+(`realm-commonground.yaml:198-201`); de nieuwe client erft die situatie.
 
 ## Migratiebesluit per bron
 

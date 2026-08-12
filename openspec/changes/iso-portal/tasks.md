@@ -31,7 +31,7 @@
       `secret_scanning` en `secret_scanning_push_protection` staan hierdoor aan
 - [ ] 0.6 Branch-bescherming op `main` van de org-repo. **Gemeten met
       admin-rechten 2026-08-12: `"Branch not protected"`** — de eerdere 404 was
-      geen rechtenkwestie. Onbeschermd + merge-is-deploy betekent dat een
+      geen rechtenkwestie. Kan nu zonder uitzondering aan (zie 3.3): een
       workflow-commit de gedeployde tag ongereviewd kan verleggen; dat is
       sec-bevinding 3 in levende lijve. Hoort bij taak 3.5
 
@@ -103,16 +103,20 @@
       fail-closed, actor in de trail, herstart-persistentie). Details in de
       CHANGELOG. Base-images op **digest** gepind: `ghcr.io/astral-sh/uv` heeft geen
       versie-specifieke tag, alleen een floating tag
-- [x] 3.3 `.github/workflows/image.yml`: merge-is-deploy — `sha-<short>` bouwen,
-      pullbaarheid verifiëren, `newTag` terugcommitten met `[skip ci]`.
-      **Bouwen vóór bumpen**: een tag zetten die nog niet bestaat richt Argo op
-      een niet-pullbaar image
+- [x] 3.3 `.github/workflows/image.yml`: bouwt op de PR en verifieert dat
+      `newTag` in `deploy/kustomization.yaml` gelijk is aan `version` in
+      `pyproject.toml`. **Omgezet 2026-08-12:** géén bot-commit naar main meer.
+      Merge-is-deploy vroeg `contents: write` en daarmee een uitzondering op
+      branch-bescherming; nu heeft de workflow geen schrijfrechten op de repo en is
+      sec-bevinding 3 gedicht in plaats van gemitigeerd. Ordening klopt vanzelf:
+      het image bestaat vóór de merge
+
 - [x] 3.4 Deploy-keten in het credential-model: `ghcr-push` en
       `tag-bump-commit` staan in de herleidbaarheidstabel van `deploy/README.md`,
       beide als kortlevend `GITHUB_TOKEN` per run
-- [ ] 3.5 Zie taak 0.6 — dezelfde branch-bescherming. Documenteer daarbij het
-      gedrag bij een geweigerde bot-push: het image bestaat dan wél en alleen de
-      rollout staat stil, wat de veilige kant van die fout is
+- [x] 3.5 Vervallen — opgelost door de omzetting in 3.3. Er is geen automatisering
+      meer die naar main schrijft, dus branch-bescherming heeft geen uitzondering
+      nodig. Zie taak 0.6 voor het aanzetten zelf
 
 
 ## 4. Manifests (capability: portal-deployment, portal-auth)

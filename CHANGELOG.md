@@ -6,6 +6,41 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-12 — geen bot-commits naar main; realm-import blijkt create-once
+
+Twee correcties op de deploy-aannames van change `iso-portal`, beide gemeten en
+niet aangenomen.
+
+**`image.yml` schrijft niet meer naar de repo.** De merge-is-deploy-opzet committe
+de image-tag zelf terug naar main en had daarvoor `contents: write` nodig. Dat
+maakte branch-bescherming onmogelijk zonder uitzondering voor de bot, en een
+gecompromitteerde workflow-stap kon zo de gedeployde tag verleggen — sec-bevinding
+3 van de change. Nu bouwt de workflow op de PR, verifieert dat `newTag` in
+`deploy/kustomization.yaml` gelijk is aan `version` in `pyproject.toml`, en heeft
+alleen nog `contents: read`. De ordening klopt vanzelf: het image bestaat vóór de
+merge, dus Argo vindt de tag direct. Fork-PR's kunnen niet naar de registry pushen.
+
+Release-flow wordt daarmee: één nummer op twee plekken (version + newTag), in
+dezelfde PR. Lopen ze uiteen, dan faalt de check met een leesbare melding. Naast
+de versietag wordt `sha-<short>` gepusht als immutabel spoor per commit.
+
+Hiermee is sec-bevinding 3 gedicht in plaats van gemitigeerd: er is geen
+automatisering meer die naar main schrijft, dus branch-bescherming heeft geen
+uitzondering nodig.
+
+**`KeycloakRealmImport` is create-once — de docs beweerden iets anders.** De
+prerequisites en `design.md` stelden dat de Keycloak-client via de realm-import
+komt. Dat is in deze opstelling niet zo: de operator importeert een realm die nog
+niet bestaat, maar werkt een bestaande realm niet bij. Argo synct de CR wel (de
+live resource kreeg `iso-audit-portal` erin), maar er werd geen import-job gestart
+— gemeten 2026-08-12: na de merge bleef de laatste job die van 3 augustus. De
+client moet met de hand worden aangemaakt via de UI.
+
+Gevolg dat nu vastligt in plaats van in iemands hoofd te zitten: de realm-YAML is
+gewenste staat, niet toegepaste staat, en Git en Keycloak kunnen stil uiteenlopen.
+Datzelfde gold al voor de Google identity provider. Een reconciliërende oplossing
+(`keycloak-config-cli`) is eigen werk.
+
 ### Security — 2026-08-12 — 23 dependabot-alerts gedicht (lockfile-bump)
 
 `uv.lock` bijgewerkt met de bump uit dependabot-PR #17, die exact de vijf

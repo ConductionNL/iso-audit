@@ -45,14 +45,46 @@ defect kopiëren).
 
 ## Prerequisites
 
-1. **Keycloak-client** `iso-audit-portal` in realm `commonground` (KeyCloak-repo,
-   `clusters/prod/keycloak/20-keycloak/realm-commonground.yaml`), redirect
-   `https://iso.commonground.nu/oauth2/callback`, met het
-   `post.logout.redirect.uris`-attribuut. Kopie van het `openwoo-provisioner`-blok.
+1. **Keycloak-client** `iso-audit-portal` in realm `commonground`. Twee stappen, en
+   de tweede is niet optioneel:
+
+   a. Het clientblok staat in de KeyCloak-repo,
+      `clusters/prod/keycloak/20-keycloak/realm-commonground.yaml` (kopie van
+      `openwoo-provisioner`, met `https://iso.commonground.nu/oauth2/callback` en
+      het `post.logout.redirect.uris`-attribuut).
+
+   b. **De client moet daarna met de hand worden aangemaakt in Keycloak.**
+      `KeycloakRealmImport` is create-once: de operator importeert een realm die
+      nog niet bestaat, maar werkt een bestaande realm níet bij. Argo synct de CR
+      wel — de live resource bevat de nieuwe client — maar er wordt geen
+      import-job meer gestart. Gemeten 2026-08-12: na de merge van het clientblok
+      bleef de laatste import-job die van 3 augustus.
+
+      Doen: Keycloak-UI → realm `commonground` → Clients → **Import client** met
+      `keycloak-client.example.yaml` als bron (of de JSON-variant daarvan).
+
+   **Wat dit betekent voor het auditspoor:** de realm-YAML is in deze opstelling
+   *gewenste* staat, niet *toegepaste* staat. Er kan dus drift bestaan tussen Git
+   en Keycloak die niemand ziet. Datzelfde geldt al voor de Google identity
+   provider, die expliciet handmatig is aangemaakt. Een reconciliërende oplossing
+   (`keycloak-config-cli` als sync-stap) is eigen werk; tot die tijd is deze
+   handmatige stap de afspraak en hoort ze hier te staan in plaats van in iemands
+   hoofd.
 2. **Secrets** out-of-band aangemaakt — zie `secret.example.yaml` voor de
    commando's. Alleen `iso-audit-portal-oauth` is verplicht.
 3. **Image** gebouwd en gepusht, en de ghcr-package op **public** (anders heeft de
    namespace een pull-secret nodig).
+
+   Release-flow: één nummer op twee plekken. Bump `version` in `pyproject.toml` en
+   zet dezelfde waarde als `newTag` in `kustomization.yaml`, in dezelfde PR.
+   `.github/workflows/image.yml` bouwt het image op die PR — dus de tag bestaat
+   vóór de merge — en faalt als versie en tag uiteenlopen.
+
+   Dit was eerder merge-is-deploy, waarbij de workflow de tag zelf terugcommitte
+   naar main. Dat is per 2026-08-12 weg: die workflow had `contents: write` nodig,
+   waardoor branch-bescherming een uitzondering voor de bot vroeg en een
+   gecompromitteerde stap de gedeployde tag kon verleggen. De workflow heeft nu
+   geen schrijfrechten op de repo.
 4. **Sessie-inhoud op de PVC.** `iso-audit ui` heeft geen env-fallbacks: het
    verwacht `/var/lib/iso-audit/sessie/findings.json`,
    `/var/lib/iso-audit/sessie/memo-input.yaml` en
@@ -110,8 +142,12 @@ een intentie zonder datum.
 ## Bekende openstaande punten
 
 - **`main` van de repo is onbeschermd** (`"Branch not protected"`, gemeten
-  2026-08-12). Gecombineerd met merge-is-deploy kan een gecompromitteerde
-  workflow-stap de gedeployde tag verleggen. Zie taak 0.6 / 3.5.
+  2026-08-12). Kan nu wél zonder uitzondering aan: sinds het bot-commit uit
+  `image.yml` verdwenen is, hoeft geen enkele automatisering naar main te schrijven.
+  Zie taak 0.6.
+- **De realm-YAML in de KeyCloak-repo reconcilieert niet.** `KeycloakRealmImport`
+  is create-once, dus Git en Keycloak kunnen stil uiteenlopen. Zie prerequisite 1;
+  een oplossing (`keycloak-config-cli`) is eigen werk.
 - **Geen rate limit op de LLM-key** — besluit "loggen, niet begrenzen"
   (2026-08-12). Runs staan met identiteit in het audit-log; een limiet is een
   eigen change als het gaat knijpen.
