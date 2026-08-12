@@ -21,14 +21,25 @@ repos:
         name: ruff format --check
         args: [--check]
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.0.0
+  # Lokale hook i.p.v. mirrors-mypy (2026-08-12). De mirror draait mypy in een
+  # geïsoleerde venv, en met `additional_dependencies: []` had die geen pydantic,
+  # python-docx of de markdown-stubs. Deze hook faalde dus altijd op
+  # `import-not-found` — nooit op een echt typefout. Wie pre-commit lokaal draaide,
+  # zag een rode gate die niets zei, en de enige uitweg was hem negeren.
+  #
+  # `uv run` gebruikt de project-venv, dus dit is exact wat CI draait
+  # (`uv run mypy --strict src`). Parity is hier het hele punt.
+  # `pass_filenames: false` omdat --strict het hele pakket nodig heeft, niet losse
+  # gewijzigde bestanden.
+  - repo: local
     hooks:
       - id: mypy
         name: mypy --strict
+        entry: uv run mypy --strict src
+        language: system
+        types: [python]
         files: ^src/
-        args: [--strict]
-        additional_dependencies: []
+        pass_filenames: false
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
@@ -39,5 +50,19 @@ repos:
     rev: 1.9.4
     hooks:
       - id: bandit
-        args: [-c, pyproject.toml, -r, src]
+        # Twee dingen gerepareerd (2026-08-12), beide pre-existing:
+        #
+        #  1. `-r src` is weg. pre-commit plakt de gewijzigde bestanden achter de
+        #     args, en `-r <dir>` samen met expliciete targets laat bandit afbreken
+        #     met "unrecognized arguments". Deze hook faalde dus altijd, op elke
+        #     commit — niet op bevindingen maar op een argumentfout. `files: ^src/`
+        #     doet nu de scope-begrenzing, wat óók gelijk is aan wat CI scant.
+        #  2. `--severity-level medium` erbij. Bandit geeft exitcode 1 bij élke
+        #     bevinding; zonder drempel blokkeerden vier pre-existing low-meldingen
+        #     alles.
+        #
+        # Houd deze args gelijk aan de bandit-stap in .github/workflows/ci.yml,
+        # anders lopen CI en lokaal weer stil uit elkaar.
+        args: [-c, pyproject.toml, --severity-level, medium]
+        files: ^src/
         additional_dependencies: ["bandit[toml]"]
