@@ -29,11 +29,12 @@
       EUPL-1.2-besluit van juni blijft daarmee geldig. De transfer nam de
       zichtbaarheid mee, dus er was niets te wijzigen. Bijkomend voordeel:
       `secret_scanning` en `secret_scanning_push_protection` staan hierdoor aan
-- [ ] 0.6 Branch-bescherming op `main` van de org-repo. **Gemeten met
-      admin-rechten 2026-08-12: `"Branch not protected"`** — de eerdere 404 was
-      geen rechtenkwestie. Kan nu zonder uitzondering aan (zie 3.3): een
-      workflow-commit de gedeployde tag ongereviewd kan verleggen; dat is
-      sec-bevinding 3 in levende lijve. Hoort bij taak 3.5
+- [x] 0.6 Branch-bescherming op `main`: **bewust niet aangezet, besluit 2026-08-12.**
+      Reden van de eigenaar: hij is in de praktijk de enige maintainer. Gemeten
+      tegenwicht, voor het dossier: 9 accounts hebben push, 4 daarvan admin. Sinds
+      3.3 is er geen automatisering meer die naar main schrijft, dus aanzetten kan
+      alsnog zonder uitzondering wanneer dat gewenst is
+
 
 ## 1. Auth-gate (capability: portal-auth)
 
