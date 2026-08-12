@@ -32,4 +32,4 @@ configMapGenerator:
 # die nog niet bestaat richt Argo op een niet-pullbaar image.
 images:
   - name: ghcr.io/conductionnl/iso-audit
-    newTag: "latest"
+    newTag: "sha-4a63f85bb9ed"
