@@ -6,6 +6,30 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-12 — login-500 opgelost in Git in plaats van in de Keycloak-UI
+
+De 500 na een geslaagde login kwam doordat Keycloak deze client niet als `aud` in
+het token zet; er staat alleen `azp: iso-audit-portal`. oauth2-proxy verifieert de
+audience en faalde met `audience claims [aud] do not exist in claims`.
+
+De gangbare remedie is een `oidc-audience-mapper` in Keycloak. **Bewust niet
+gekozen.** Die mapper leeft dan in de Keycloak-UI en niet in Git, en dat is precies
+de onzichtbare drift die in deze opstelling al drie keer is opgetreden: de clients
+zelf, de Google identity provider, en dezelfde mapper bij `openwoo-provisioner`.
+
+In plaats daarvan `--oidc-audience-claim=azp` in `deployment.yaml`. Die vlag staat in
+een manifest dat Argo synct, dus de fix is reviewbaar, reproduceerbaar en verdwijnt
+niet als iemand de realm opnieuw importeert. Semantisch klopt het: `azp` is de client
+waaraan het token is uitgegeven, en oauth2-proxy vergelijkt de claim met zijn eigen
+`client_id` — de check blijft "is dit token voor mij bedoeld", alleen via de claim die
+Keycloak hier daadwerkelijk levert.
+
+Geverifieerd dat oauth2-proxy v7.7.1 de vlag kent (`--oidc-audience-claim strings —
+which OIDC claims are used as audience to verify against client id`) en hem accepteert.
+
+De audience-mapper blijft als alternatief in `keycloak-client.example.yaml` staan, met
+beide token-claims aan, voor wie de realm ooit vers importeert.
+
 ### Fixed — 2026-08-12 — login gaf 500: audience-mapper ontbrak; Argo-wacht keek niet naar de revisie
 
 **Login faalde na een geslaagde inlog.** Keycloak zet de client niet als `aud` in

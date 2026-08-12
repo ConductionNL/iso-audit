@@ -65,11 +65,16 @@
     # dezelfde mapper nodig en werkt, dus die is daar met de hand toegevoegd —
     # net als de Google-IdP. Ook dit staat dus in Keycloak en niet in Git, tenzij
     # deze regels bij een verse realm-import meekomen.
+    #
+    # BEIDE claims op true, bewust. Het token dat oauth2-proxy in de callback
+    # valideert had `typ: Bearer`, dus het access-token, maar de proxy kan
+    # afhankelijk van de provider-flow ook het id-token nemen. Één van de twee op
+    # false zetten laat precies dat verschil open en dat is de fout niet waard.
     - name: audience
       protocol: openid-connect
       protocolMapper: oidc-audience-mapper
       config:
         "included.client.audience": "iso-audit-portal"
-        "id.token.claim": "false"
+        "id.token.claim": "true"
         "access.token.claim": "true"
         "introspection.token.claim": "true"

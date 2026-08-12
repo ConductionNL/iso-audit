@@ -183,7 +183,27 @@ spec:
         # X-Forwarded-Email door naar de app op localhost.
         - name: oauth2-proxy
           image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
-          args: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+          args:
+            - "--config=/etc/oauth2-proxy/oauth2-proxy.cfg"
+            # Verifieer de audience tegen `azp` in plaats van `aud`.
+            #
+            # Keycloak zet deze client niet als `aud` in het token — er staat alleen
+            # `azp: iso-audit-portal`. Zonder deze vlag faalt de callback met
+            # "audience claims [aud] do not exist in claims" en krijgt de gebruiker
+            # een 500 ná een geslaagde login (gemeten 2026-08-12).
+            #
+            # De gangbare remedie is een `oidc-audience-mapper` in Keycloak. Bewust
+            # NIET gekozen: die mapper leeft dan in de Keycloak-UI en niet in Git, en
+            # dat is precies de onzichtbare drift die in deze opstelling al drie keer
+            # is opgetreden (de clients zelf, de Google-IdP, en deze mapper bij
+            # openwoo-provisioner). Deze vlag staat in een manifest dat Argo synct,
+            # dus de fix is reviewbaar en reproduceerbaar.
+            #
+            # Semantisch klopt het: `azp` is de client waaraan het token is uitgegeven,
+            # en oauth2-proxy vergelijkt de claim met zijn eigen client_id. De check
+            # blijft dus "is dit token voor mij bedoeld" — alleen via de claim die
+            # Keycloak hier daadwerkelijk levert.
+            - "--oidc-audience-claim=azp"
           env:
             - name: OAUTH2_PROXY_CLIENT_SECRET
               valueFrom:
