@@ -105,15 +105,57 @@ het patroon dat `cluster-infra` ook gebruikt:
 Daarna synct Argo `deploy/` zelf. Handmatig kan ook: `kubectl apply -k deploy`
 (nadat de Secrets bestaan).
 
+## Uitrollen
+
+Eén script doet de hele keten — pushen, wachten tot het image gebouwd is, mergen,
+wachten tot Argo gesynct is, het cookie-secret roteren, herstarten en verifiëren:
+
+    ./scripts/rollout-portal.sh              # volledig
+    ./scripts/rollout-portal.sh --dry-run    # alleen tonen wat het zou doen
+
+Het rotteert alléén de key `cookie-secret` met een patch, dus het
+Keycloak-clientsecret dat al in het cluster staat blijft ongemoeid.
+
 ## Verifiëren
 
     kubectl -n iso-platform rollout status deploy/iso-audit-portal
-    curl -sS https://iso.commonground.nu/healthz     # ok, zonder login
-    # / vraagt een Google-login via Keycloak
+    curl -sS https://iso.commonground.nu/ping        # "OK" — van oauth2-proxy zelf
+    # / geeft 302 naar Keycloak: de auth-gate doet zijn werk
+
+**`/healthz` is extern níet bereikbaar, en dat is opzet.** Er staat geen
+`skip_auth_routes` in `oauth2-proxy.cfg`, dus de proxy onderschept élk pad — ook
+`/healthz` — en stuurt je naar Keycloak. Het app-endpoint bestaat voor de
+kubelet-probe binnen de pod. Extern check je `/ping`, het eigen health-endpoint van
+oauth2-proxy, dat buiten de auth-gate valt. Binnen de pod:
+
+    kubectl -n iso-platform exec deploy/iso-audit-portal -c app -- \
+      python -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8081/healthz').status)"
 
 Daarna: verwijder de pod en controleer dat `GET /trail` dezelfde beslissingen
 teruggeeft. Dat is de PVC-test, en het is de enige die telt voor de
 append-only-belofte.
+
+### Wat een lokale containertest níet dekt
+
+Bij de eerste rollout (2026-08-12) viel de pod om op twee dingen die lokaal
+allebei groen waren. Dat is geen toeval maar een systematisch gat, dus het staat
+hier:
+
+- **Numerieke uid.** Een lokale test met `docker run --user 10001:10001` geeft de
+  uid van búiten mee, waardoor een `USER <naam>` in het image onzichtbaar blijft.
+  De kubelet kijkt naar de USER ín het image en weigert met *"cannot verify user is
+  non-root"*. Controleer dus het image zelf:
+
+      docker inspect <image> --format '{{.Config.User}}'   # moet numeriek zijn
+
+- **Secret-inhoud.** Een lokale run zonder oauth2-proxy zegt niets over of het
+  cookie-secret door de proxy geaccepteerd wordt. Dat blijkt pas uit de
+  proxy-logs. Bij een crashloop op de proxy: `kubectl logs … -c oauth2-proxy`
+  eerst, want de foutmelding is expliciet.
+
+Algemener: `kubectl describe pod` en de `Failed`-events zeggen hier meer dan de
+containerlogs, omdat een container die de kubelet weigert aan te maken geen logs
+heeft.
 
 ## Credential-herleidbaarheid
 

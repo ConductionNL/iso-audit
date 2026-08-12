@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-12 — de eerste rollout viel om op twee fouten in mijn manifests
+
+Beide pas gevonden door het echt uit te rollen; het image bouwde en draaide lokaal
+prima. Versie naar `0.1.0a1` zodat de fix ook daadwerkelijk uitgerold wordt.
+
+- **`app`-container werd niet eens aangemaakt.** De Dockerfile deed `USER app` —
+  een naam. In combinatie met `runAsNonRoot: true` weigert de kubelet de container:
+  hij kan niet vaststellen dat de user geen root is en faalt met *"image has
+  non-numeric user (app), cannot verify user is non-root"*. Er is dan geen
+  container om te zien starten, alleen een `Failed`-event — vandaar "niet eens aan
+  het initialiseren". Nu `USER 10001:10001` in het image, én expliciet
+  `runAsUser`/`runAsGroup` in de pod-securityContext zodat het manifest niet
+  afhankelijk is van de image-inhoud.
+- **`oauth2-proxy` crashloopte op het cookie-secret.** Het script genereerde
+  `openssl rand -base64 32`. oauth2-proxy decodeert met `base64.RawURLEncoding`, en
+  die verwerpt de tekens `+` en `/` uit standaard-base64; mislukt het decoderen, dan
+  leest het de string als 44 ruwe bytes en faalt met *"cookie_secret must be 16, 24,
+  or 32 bytes ..., but is 44 bytes"*. Nu URL-safe (`tr -- '+/' '-_'`) plus een
+  vormcontrole in het script, zodat een fout secret in het script faalt en niet in
+  het cluster.
+
+**Actie bij bijwerken:** het script moet opnieuw gedraaid worden om het
+cookie-secret te vervangen — een secret dat met de oude versie is aangemaakt blijft
+fout. Draai het uit een checkout die deze fix bevat.
+
+Geverifieerd op het herbouwde image, met exact de cluster-constraints
+(`--read-only`, `--user 10001:10001`, PVC-mount): `USER` is numeriek `10001:10001`,
+de app start, `/healthz` geeft 200, `/findings` 403 zonder identity-header en 200
+met. De cookie-secret-generatie is 5x nagelopen op vorm en decodeert naar 32 bytes.
+
 ### Changed — 2026-08-12 — geen bot-commits naar main; realm-import blijkt create-once
 
 Twee correcties op de deploy-aannames van change `iso-portal`, beide gemeten en

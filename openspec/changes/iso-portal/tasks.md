@@ -20,20 +20,20 @@
 - [x] 0.2 `pyproject.toml`: `authors` + `maintainers` → Conduction
       (`info@conduction.nl`), `Repository`-URL → ConductionNL. `CODEOWNERS`
       toegevoegd, met de deploy-/auth-paden expliciet benoemd
-- [ ] 0.3 Vaststellen: ghcr-package `ghcr.io/conductionnl/iso-audit` moet **public**
-      staan, anders heeft de namespace een pull-secret nodig (les uit openwoo's
-      `deploy/README.md`). Vergt `admin:packages` — niet te doen met de huidige
-      `write:packages`-scope
+- [x] 0.3 ghcr-package staat **public** (gemeten 2026-08-12), conform de
+      org-conventie: 168 van de 172 container-packages zijn public; alleen de vier
+      `hydra-*` zijn private
 
 - [x] 0.5 Zichtbaarheid: **public**, en dat is de gewenste stand — het
       EUPL-1.2-besluit van juni blijft daarmee geldig. De transfer nam de
       zichtbaarheid mee, dus er was niets te wijzigen. Bijkomend voordeel:
       `secret_scanning` en `secret_scanning_push_protection` staan hierdoor aan
-- [ ] 0.6 Branch-bescherming op `main` van de org-repo. **Gemeten met
-      admin-rechten 2026-08-12: `"Branch not protected"`** — de eerdere 404 was
-      geen rechtenkwestie. Kan nu zonder uitzondering aan (zie 3.3): een
-      workflow-commit de gedeployde tag ongereviewd kan verleggen; dat is
-      sec-bevinding 3 in levende lijve. Hoort bij taak 3.5
+- [x] 0.6 Branch-bescherming op `main`: **bewust niet aangezet, besluit 2026-08-12.**
+      Reden van de eigenaar: hij is in de praktijk de enige maintainer. Gemeten
+      tegenwicht, voor het dossier: 9 accounts hebben push, 4 daarvan admin. Sinds
+      3.3 is er geen automatisering meer die naar main schrijft, dus aanzetten kan
+      alsnog zonder uitzondering wanneer dat gewenst is
+
 
 ## 1. Auth-gate (capability: portal-auth)
 
@@ -172,8 +172,12 @@
 - [x] 6.3 Erfelijke afwijking gedocumenteerd in `deploy/README.md` onder "Bekende
       openstaande punten": de Google identity provider is handmatig in de
       Keycloak-UI aangemaakt en staat niet in de realm-import
-- [ ] 6.4 Rollout + verificatie: `rollout status`, `/healthz` zonder login,
-      `/` geeft de Keycloak-login, trail-persistentie na pod-delete
+- [ ] 6.4 Rollout + verificatie via `scripts/rollout-portal.sh`. **Let op:**
+      `/healthz` is extern NIET bereikbaar — er is geen `skip_auth_routes`, dus
+      oauth2-proxy onderschept elk pad. Extern check je `/ping` (van de proxy zelf);
+      het app-endpoint check je binnen de pod. Verder: `/` geeft 302 naar Keycloak,
+      en trail-persistentie na een pod-delete
+
 
 ## 7. Vooruitwijzing — de bron-changes (niet in deze change)
 
