@@ -66,8 +66,19 @@ controleer_vereisten() {
 
 maak_oauth_secret() {
   local cookie_secret
-  # 32 bytes base64 — de lengte die oauth2-proxy verwacht voor AES-256.
-  cookie_secret="$(openssl rand -base64 32)"
+  # 32 bytes, URL-SAFE base64. De `tr` is niet cosmetisch: oauth2-proxy decodeert
+  # het cookie-secret met base64.RawURLEncoding, en die verwerpt de tekens `+` en
+  # `/` uit standaard-base64. Mislukt het decoderen, dan leest oauth2-proxy de
+  # string als 44 ruwe bytes en faalt met
+  #   "cookie_secret must be 16, 24, or 32 bytes ..., but is 44 bytes".
+  # Dat duwde de eerste rollout om (2026-08-12) en is niet aan het secret te zien —
+  # alleen aan de crashloop van de proxy.
+  cookie_secret="$(openssl rand -base64 32 | tr -- '+/' '-_')"
+  # 32 bytes → 43 tekens data + één '='-padding. Faal hier, niet in het cluster.
+  if [[ ! "$cookie_secret" =~ ^[A-Za-z0-9_-]{43}=$ ]]; then
+    err "gegenereerd cookie-secret heeft een onverwachte vorm; niets toegepast"
+    exit 3
+  fi
   apply_secret "iso-audit-portal-oauth" \
     --from-literal="client-secret=${KEYCLOAK_CLIENT_SECRET}" \
     --from-literal="cookie-secret=${cookie_secret}"

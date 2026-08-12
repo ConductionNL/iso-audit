@@ -64,7 +64,13 @@ ENV PATH="/app/.venv/bin:$PATH" \
     # Fail closed is de default, ook als het manifest hem zou vergeten.
     REQUIRE_AUTH=true
 
-USER app
+# NUMERIEK, niet `USER app`. Met `runAsNonRoot: true` in de pod-securityContext
+# weigert de kubelet een container waarvan de user een naam is: hij kan dan niet
+# vaststellen dat het geen root is, en faalt met
+# "image has non-numeric user (app), cannot verify user is non-root".
+# Gemeten bij de eerste rollout op 2026-08-12 — het image bouwde en draaide lokaal
+# prima, en viel pas in het cluster om.
+USER 10001:10001
 
 # 8081 is waar oauth2-proxy naartoe praat. Puur documentatie: de app bindt
 # 127.0.0.1 (zie de --host in deployment.yaml), dus deze poort is niet vanaf het

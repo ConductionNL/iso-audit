@@ -32,6 +32,13 @@ spec:
       serviceAccountName: iso-audit-portal
       securityContext:
         runAsNonRoot: true
+        # Expliciet numeriek. Zonder dit leunt de kubelet op de USER uit het image;
+        # is die een naam in plaats van een uid, dan weigert hij de container met
+        # "cannot verify user is non-root". Het image zet nu ook `USER 10001:10001`,
+        # maar dat hier herhalen maakt het manifest onafhankelijk van de image-inhoud
+        # — en dit is exact de fout die de eerste rollout omduwde (2026-08-12).
+        runAsUser: 10001
+        runAsGroup: 10001
         fsGroup: 10001          # zodat de non-root app op de PVC mag schrijven
         seccompProfile:
           type: RuntimeDefault
