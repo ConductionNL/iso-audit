@@ -1,0 +1,19 @@
+# Code-eigendom. Volgt de conventie van de zuster-repo's (openwoo-app-config,
+# KeyCloak): een functioneel adres, geen natuurlijk persoon.
+#
+# LET OP: de e-mailvorm werkt in GitHub alléén als dat adres aan een
+# GitHub-account met toegang tot deze repo hangt. Is dat niet zo, dan doet
+# CODEOWNERS stil niets. Een org-team (`@ConductionNL/<team>`) is de vorm die
+# gegarandeerd afdwingt; welke team dat moet zijn is een keuze voor de eigenaar,
+# niet iets om hier te verzinnen.
+
+*                       info@conduction.nl
+
+# De deploy- en auth-paden zijn het trust-anker van het portaal: elke wijziging
+# hier verandert wie erbij kan. Expliciet benoemd zodat ze niet meeliften op een
+# functionele PR.
+/deploy/                info@conduction.nl
+/argo/                  info@conduction.nl
+/.github/workflows/     info@conduction.nl
+/src/iso_audit/api/auth_gate.py   info@conduction.nl
+/src/iso_audit/api/audit_log.py   info@conduction.nl

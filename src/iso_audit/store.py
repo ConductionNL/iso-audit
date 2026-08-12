@@ -42,9 +42,33 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_DB_PATH = str(_REPO_ROOT / "output" / "audit.db")
 
 
+_fallback_gemeld = False
+
+
 def db_pad() -> str:
-    """Lokatie van de SQLite-database; override via `AUDIT_DB_PATH`-env."""
-    return os.environ.get("AUDIT_DB_PATH", DEFAULT_DB_PATH)
+    """Lokatie van de SQLite-database; override via `AUDIT_DB_PATH`-env.
+
+    Zonder die env-var valt de functie terug op een pad **binnen de repo**. Dat is
+    prima voor een lokale CLI-run, maar in het portaal is het fout: het image draait
+    met `readOnlyRootFilesystem` en een append-only audit-trail op een vluchtig
+    filesystem is geen audit-trail. Conform de repo-conventie ("env-var-fallbacks
+    bestaan, maar loggen expliciet dat er fallback wordt gebruikt") wordt het
+    gebruik van de fallback één keer per proces gemeld in plaats van stil te
+    gebeuren.
+    """
+    global _fallback_gemeld
+    expliciet = os.environ.get("AUDIT_DB_PATH")
+    if expliciet:
+        return expliciet
+    if not _fallback_gemeld:
+        logger.warning(
+            "AUDIT_DB_PATH niet gezet — fallback naar %s (binnen de repo/het image). "
+            "In het portaal MOET dit op persistente opslag staan; zie change "
+            "iso-portal, capability portal-deployment.",
+            DEFAULT_DB_PATH,
+        )
+        _fallback_gemeld = True
+    return DEFAULT_DB_PATH
 
 
 def verbinding(pad: str | None = None) -> sqlite3.Connection:

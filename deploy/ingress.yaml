@@ -1,0 +1,40 @@
+---
+# nginx + cert-manager (letsencrypt-prod). DNS vraagt geen handmatige stap:
+# external-dns kijkt cluster-breed naar Ingresses met domain-filter
+# `commonground.nu` en maakt het record uit deze resource.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iso-audit-portal
+  namespace: iso-platform
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Een classificatie-run duurt minuten en /run/progress polt ondertussen; de
+    # memo-render (WeasyPrint) is ook geen sub-secondezaak. Zonder deze timeouts
+    # kapt nginx de langste runs af met een 504.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/hsts: "true"
+    nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
+    # oauth2-proxy-sessiecookies kunnen groot zijn; geef nginx headroom zodat
+    # split-cookie-requests geen 502 geven.
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - iso.commonground.nu
+      secretName: iso-audit-portal-tls
+  rules:
+    - host: iso.commonground.nu
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: iso-audit-portal
+                port:
+                  number: 80

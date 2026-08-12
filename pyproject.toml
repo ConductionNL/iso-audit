@@ -4,7 +4,10 @@ version = "0.1.0a0"
 description = "ISO 9001 + 27001 audit pipeline with pluggable source-adapters and human-in-the-loop modes"
 readme = "README.md"
 authors = [
-    { name = "Mark Westerweel", email = "mwesterweel@hotmail.com" },
+    { name = "Conduction", email = "info@conduction.nl" },
+]
+maintainers = [
+    { name = "Conduction", email = "info@conduction.nl" },
 ]
 requires-python = ">=3.12"
 license = { text = "EUPL-1.2" }
@@ -45,7 +48,7 @@ dependencies = [
 iso-audit = "iso_audit.cli:main"
 
 [project.urls]
-Repository = "https://github.com/MWest2020/iso-audit"
+Repository = "https://github.com/ConductionNL/iso-audit"
 
 [build-system]
 requires = ["uv_build>=0.10.4,<0.11.0"]

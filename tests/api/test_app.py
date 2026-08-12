@@ -33,6 +33,11 @@ _FINDINGS = [
 ]
 
 
+_AUDITOR = "auditor@conduction.nl"
+"""Identiteit die oauth2-proxy in productie zet. Hier expliciet meegegeven zodat de
+tests de bewáákte route lopen in plaats van een uitgezette gate."""
+
+
 def _client(tmp_path: Path) -> TestClient:
     (tmp_path / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
     session = AuditSession(
@@ -41,7 +46,7 @@ def _client(tmp_path: Path) -> TestClient:
         norms_dir="examples/norms",
         memo_input_path=str(_EX / "memo-input.yaml"),
     )
-    return TestClient(create_app(session))
+    return TestClient(create_app(session), headers={"X-Forwarded-Email": _AUDITOR})
 
 
 def _client_met(tmp_path: Path, findings: list[dict[str, object]]) -> TestClient:
@@ -52,7 +57,7 @@ def _client_met(tmp_path: Path, findings: list[dict[str, object]]) -> TestClient
         norms_dir="examples/norms",
         memo_input_path=str(_EX / "memo-input.yaml"),
     )
-    return TestClient(create_app(session))
+    return TestClient(create_app(session), headers={"X-Forwarded-Email": _AUDITOR})
 
 
 def test_conclusion_ofi_themes(tmp_path: Path) -> None:
@@ -116,7 +121,7 @@ def _client_writable_memo(tmp_path: Path) -> TestClient:
         norms_dir="examples/norms",
         memo_input_path=str(mi),
     )
-    return TestClient(create_app(session))
+    return TestClient(create_app(session), headers={"X-Forwarded-Email": _AUDITOR})
 
 
 def test_memo_input_edit_roundtrip(tmp_path: Path) -> None:

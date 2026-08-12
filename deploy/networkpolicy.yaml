@@ -1,0 +1,31 @@
+---
+# Pod-ingress ALLEEN uit de ingress-nginx-namespace, en alleen op de proxy-poort.
+#
+# Dit is niet cosmetisch: samen met de localhost-bind van de app is dit het
+# trust-anker onder X-Forwarded-Email. Zonder deze policy kan elke pod in het
+# cluster de proxy omzeilen door rechtstreeks te connecten en de header zelf te
+# zetten, en dan is de fail-closed-check in auth_gate.py schijnzekerheid.
+#
+# Er is bewust GEEN egress-policy. Het openwoo-origineel
+# (webgui/deploy/networkpolicy-egress.yaml) staat sinds 2026-07-13 uitgeschakeld
+# omdat het tweemaal DNS brak onder Gardener/Calico. Die meenemen zou een bekend
+# defect kopiëren; opnieuw proberen is een eigen change met eigen testronde.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: iso-audit-portal-ingress
+  namespace: iso-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: iso-audit-portal
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 4180

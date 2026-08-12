@@ -1,0 +1,32 @@
+---
+# Persistente opslag voor de audit-trail.
+#
+# Dit is auditbewijs, geen cache: de sessie-dir bevat `findings.json` en de
+# append-only `triage_log.jsonl`, en de SQLite-DB (`AUDIT_DB_PATH`) houdt de
+# append-only `decisions`- en `classifications`-tabellen. Verlies bij een
+# pod-restart zou de append-only-garantie uit CLAUDE.md leeg maken. Daarom een PVC
+# en géén emptyDir — dat laatste is wat openwoo-provisioner gebruikt, maar diens
+# state leeft in Git en die van dit portaal niet.
+#
+# Keuzes (vastgesteld 2026-08-12):
+#  - storageClass `tier-1` (cinder-block). Bewust NIET `nfs`/`nfs-v4`: SQLite-
+#    locking over NFS is een bekende bron van corruptie, en de trail is precies
+#    het bestand dat je niet corrupt wil hebben.
+#  - `ReadWriteOnce` volstaat: één replica (zie deployment.yaml).
+#  - 8Gi, dezelfde maat die de fleet voor zijn postgres-volumes gebruikt. De trail
+#    is JSONL + SQLite en groeit langzaam; `allowVolumeExpansion` staat aan op deze
+#    class, dus vergroten kan later zonder migratie.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: iso-audit-portal-data
+  namespace: iso-platform
+  labels:
+    app.kubernetes.io/name: iso-audit-portal
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: tier-1
+  resources:
+    requests:
+      storage: 8Gi

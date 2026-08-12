@@ -1,0 +1,18 @@
+---
+# ClusterIP :80 → :4180 (oauth2-proxy). De app-poort 8081 staat hier bewust NIET
+# in: die luistert alleen op localhost binnen de pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: iso-audit-portal
+  namespace: iso-platform
+  labels:
+    app.kubernetes.io/name: iso-audit-portal
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: iso-audit-portal
+  ports:
+    - name: http
+      port: 80
+      targetPort: 4180
