@@ -1,19 +1,34 @@
 ---
-# Merge-is-deploy: elke push naar main bouwt `sha-<short>`, verifieert dat de tag
-# echt pullbaar is, en commit die tag terug in deploy/kustomization.yaml. Argo pakt
-# het daarna op. Niets te taggen, niets te bumpen, geen tweede PR.
+# Bouwt en publiceert het portaal-image, en verifieert dat de tag in
+# deploy/kustomization.yaml overeenkomt met de projectversie.
 #
-# De volgorde is niet vrij: BOUWEN EN VERIFIËREN, DAN BUMPEN. Een tag zetten die
-# nog niet bestaat richt Argo op een niet-pullbaar image. Een eerdere variant
-# hiervan bij openwoo liet een mens taggen en een follow-up-PR openen; dat voegde
-# geen veiligheid toe en één ordeningsfout om te maken.
+# GEEN BOT-COMMITS NAAR MAIN (omgezet 2026-08-12).
 #
-# LET OP (sec-bevinding 3, taak 3.5): deze workflow commit naar main. Zolang main
-# onbeschermd is, kan een compromis hier de gedeployde tag verleggen. De
-# branch-bescherming is de tegenmaatregel en staat nog open.
+# De vorige opzet was merge-is-deploy: de workflow bouwde op main en committe de
+# nieuwe tag terug in kustomization.yaml. Dat werkte, maar het betekende dat een
+# gecompromitteerde workflow-stap de gedeployde image-tag kon verleggen — en het
+# maakte branch-bescherming op main onmogelijk zonder uitzondering voor de bot.
+# Dat is sec-bevinding 3 van change `iso-portal`; een uitzondering mitigeert die,
+# ze dicht hem niet.
+#
+# Nu staat de tag in git omdát een mens hem daar heeft gezet, in dezelfde PR als
+# de wijziging. De workflow bouwt het image op de PR — dus vóór de merge bestaat
+# het al, en Argo vindt het meteen — en controleert alleen of versie en tag
+# kloppen. `contents: write` is hiermee verdwenen: deze workflow kan niets meer in
+# de repo veranderen.
+#
+# Gevolg voor de release-flow: één nummer op twee plekken.
+#   1. bump `version` in pyproject.toml
+#   2. zet dezelfde waarde als `newTag` in deploy/kustomization.yaml
+# Vergeet je één van de twee, dan faalt de check met een leesbare melding.
 name: image
 
 on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "openspec/**"
+      - "**.md"
   push:
     branches: [main]
     paths-ignore:
@@ -21,13 +36,9 @@ on:
       - "openspec/**"
       - "**.md"
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Extra tag om te publiceren (release-marker, verandert de rollout niet)"
-        required: false
 
 permissions:
-  contents: write
+  contents: read
   packages: write
 
 concurrency:
@@ -35,14 +46,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  image:
     runs-on: ubuntu-latest
+    # Fork-PR's mogen niet naar onze registry pushen. Zonder deze guard kan een
+    # externe PR een image onder ghcr.io/conductionnl publiceren.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v4
 
-      - name: Bepaal tag
+      - name: Versie en tag uitlezen en vergelijken
         id: meta
-        run: echo "tag=sha-$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          set -euo pipefail
+          versie="$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
+          tag="$(grep -m1 'newTag:' deploy/kustomization.yaml | cut -d'"' -f2)"
+          echo "versie=${versie}" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+          if [[ "$versie" != "$tag" ]]; then
+            echo "::error::pyproject version (${versie}) en deploy/kustomization.yaml newTag (${tag}) lopen uiteen." >&2
+            echo "Zet beide op dezelfde waarde in deze PR." >&2
+            exit 1
+          fi
+          echo "versie en tag kloppen: ${versie}"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -52,40 +79,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Twee tags: de versie is wat Argo pullt, `sha-<short>` is het immutabele
+      # spoor per commit. De versietag kan tijdens PR-iteratie bewegen; de sha-tag
+      # nooit, dus die blijft het bewijs van wat er precies gebouwd is.
       - name: Build + push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/conductionnl/iso-audit:${{ steps.meta.outputs.tag }}
-            ${{ inputs.tag && format('ghcr.io/conductionnl/iso-audit:{0}', inputs.tag) || '' }}
+            ghcr.io/conductionnl/iso-audit:${{ steps.meta.outputs.versie }}
+            ghcr.io/conductionnl/iso-audit:${{ steps.meta.outputs.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Verifieer dat de tag pullbaar is
         run: |
           set -euo pipefail
-          tag="ghcr.io/conductionnl/iso-audit:${{ steps.meta.outputs.tag }}"
+          tag="ghcr.io/conductionnl/iso-audit:${{ steps.meta.outputs.versie }}"
           if ! docker buildx imagetools inspect "$tag" >/dev/null 2>&1; then
-            echo "error: ${tag} is niet pullbaar. Staat de ghcr-package op public?" >&2
+            echo "::error::${tag} is niet pullbaar. Staat de ghcr-package op public?" >&2
             echo "Een 401 leest hier als 'nog private', niet als 'tag ontbreekt'." >&2
             exit 1
           fi
-
-      - name: Bump de tag in kustomization.yaml
-        run: |
-          set -euo pipefail
-          tag="${{ steps.meta.outputs.tag }}"
-          sed -i -E "s|^(    newTag: ).*|\1\"${tag}\"|" deploy/kustomization.yaml
-          if git diff --quiet deploy/kustomization.yaml; then
-            echo "tag stond al goed; niets te committen"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add deploy/kustomization.yaml
-          git commit -m "chore(image): rollout ${tag} [skip ci]"
-          # Faalt dit door branch-bescherming, dan bestaat het image wél en staat
-          # alleen de rollout stil. Dat is de veilige kant van deze fout.
-          git push
+          echo "pullbaar: ${tag}"

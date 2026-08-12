@@ -27,9 +27,17 @@ configMapGenerator:
     files:
       - oauth2-proxy.cfg
 
-# De image-tag wordt door .github/workflows/image.yml teruggecommit na een
-# geverifieerde push. LET OP: eerst bouwen en pushen, dan de tag zetten — een tag
-# die nog niet bestaat richt Argo op een niet-pullbaar image.
+# De image-tag wordt met de hand gezet, in dezelfde PR als de wijziging, en MOET
+# gelijk zijn aan `version` in pyproject.toml. `.github/workflows/image.yml`
+# controleert dat en faalt met een leesbare melding als de twee uiteenlopen.
+#
+# Waarom niet automatisch: de workflow committe deze tag eerder zelf terug naar
+# main. Dat maakte branch-bescherming onmogelijk zonder uitzondering voor de bot,
+# en een gecompromitteerde workflow-stap kon zo de gedeployde tag verleggen. De
+# workflow heeft nu geen schrijfrechten meer op de repo.
+#
+# De ordening klopt vanzelf: het image wordt op de PR gebouwd en gepusht, dus de
+# tag bestaat vóór de merge en Argo vindt hem direct.
 images:
   - name: ghcr.io/conductionnl/iso-audit
-    newTag: "sha-69df9f18da07"
+    newTag: "0.1.0a0"

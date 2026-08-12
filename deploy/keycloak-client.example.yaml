@@ -10,9 +10,17 @@
 # organisatie introduceren.
 #
 # LET OP bij het toevoegen:
-#  1. Dit is een PROD-PAD in een andere repo. Aparte PR, expliciete review.
-#  2. De KeyCloak-repo stond op 2026-08-12 op branch `chore/argocd-hygiene` —
-#     verifieer eerst de staat van `main` voordat je hierop verdergaat.
+#  0. TOEVOEGEN AAN DE YAML IS NIET GENOEG. `KeycloakRealmImport` is create-once:
+#     de operator importeert een realm die nog niet bestaat, maar werkt een
+#     bestaande realm niet bij. Argo synct de CR wel — de live resource krijgt de
+#     client erin — maar er wordt geen import-job gestart. Gemeten 2026-08-12: na
+#     de merge van dit blok bleef de laatste import-job die van 3 augustus.
+#     Maak de client dus daarna met de hand aan:
+#     Keycloak-UI → realm commonground → Clients → Import client.
+#     Gevolg: deze YAML is gewenste staat, niet toegepaste staat.
+#  1. Dit is een prod-pad in een andere repo. Aparte PR, expliciete review.
+#  2. Verifieer eerst de staat van `main` van de KeyCloak-repo; een lokale
+#     feature-branch is geen repo-staat.
 #  3. Het client SECRET komt niet in Git. Na de sync: in de Keycloak-UI naar de
 #     client, "Regenerate Secret", en die waarde in het cluster-Secret zetten via
 #     scripts/create-portal-secrets.sh (KEYCLOAK_CLIENT_SECRET).
