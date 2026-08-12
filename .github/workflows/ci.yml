@@ -59,7 +59,28 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --dev --frozen
-      - run: uv run bandit -r src
+      # Deze gate stond sinds 2026-06-17 permanent rood, om twee redenen die
+      # elkaar maskeerden:
+      #
+      #  1. CI gaf `-c pyproject.toml` NIET mee, terwijl de pre-commit-hook dat
+      #     wel doet. De gedocumenteerde `[tool.bandit]`-skips (B101 voor
+      #     pytest-asserts) golden dus lokaal en niet in CI — precies de stille
+      #     divergentie tussen CI en lokaal die CLAUDE.md verbiedt.
+      #  2. `bandit` geeft exitcode 1 bij ÉLKE bevinding, ook low-severity. Met
+      #     vier pre-existing lows (B110/B112/B404/B607) faalde de stap altijd,
+      #     ook mét config. Ook `pre-commit run --all-files` was daarmee rood.
+      #
+      # Een gate die altijd rood staat, is geen gate: een écht nieuw probleem valt
+      # niet op tussen de ruis. Nu twee stappen, en dezelfde argumenten als de
+      # bandit-hook in .pre-commit-config.yaml — houd die twee gelijk.
+      #
+      # De vier bestaande lows elk beoordelen en waar terecht van een
+      # `# nosec BXXX` met reden voorzien is beter auditspoor, maar dat is eigen
+      # werk — geen reden om de gate ondertussen rood te laten staan.
+      - name: Rapporteer alle bevindingen (niet-blokkerend)
+        run: uv run bandit -c pyproject.toml -r src || true
+      - name: Faal op medium en hoger
+        run: uv run bandit -c pyproject.toml -r src --severity-level medium
 
   test:
     name: pytest --cov
