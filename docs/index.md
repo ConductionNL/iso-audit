@@ -23,6 +23,7 @@ project overview, setup, and current milestone status, start at the
 - **how-to/** — task-oriented guides:
   - [Set up a Miro auditor board via Miro-AI](how-to/miro-auditor-bord-prompt.md)
   - [Interview flow without Python automation](how-to/miro-interview-prompt.md)
+  - [Verify portal fail-closed auth without a cluster](how-to/verify-portal-auth.md)
 - **reference/** — facts about protocols, adapters, and configuration:
   - [Pipeline modes (autonoom / integer)](reference/modes.md)
   - Sources: [Drive](reference/source-drive.md) · [Planning](reference/source-planning.md) · [Jira](reference/source-jira.md) · [MCP](reference/source-mcp.md) · [REST](reference/source-rest.md)
@@ -32,3 +33,4 @@ project overview, setup, and current milestone status, start at the
   - [Missie — why this tool exists (three capabilities)](explanation/missie.md)
   - [Auditmemo architecture](explanation/memo-architecture.md)
   - [Compensating control — audit log](explanation/compensating-control.md)
+  - [Portal auth — why the identity header is trustworthy](explanation/portal-auth.md)

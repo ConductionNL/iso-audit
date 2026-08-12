@@ -9,10 +9,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from iso_audit.api.audit_log import log_event
+from iso_audit.api.auth_gate import identiteit_van, installeer_auth_gate
 from iso_audit.api.session import AuditSession, SessionError
 from iso_audit.memo.models import Finding, Severity, TriageStatus
 
@@ -59,6 +61,16 @@ class FindingSummary(BaseModel):
 def create_app(session: AuditSession) -> FastAPI:
     """Bouw de FastAPI-app rond één geladen auditsessie."""
     app = FastAPI(title="iso-audit — auditor-API", version="0.1.0")
+    installeer_auth_gate(app)
+
+    @app.get("/healthz")
+    def healthz() -> dict[str, str]:
+        """Probe-endpoint: bewust buiten de identiteits-gate.
+
+        Liveness/readiness moet werken zonder sessie. Geeft geen auditdata terug —
+        alleen dat het proces staat.
+        """
+        return {"status": "ok"}
 
     @app.get("/findings", response_model=list[FindingSummary])
     def lijst_findings(severity: Severity | None = None) -> list[FindingSummary]:
@@ -76,7 +88,7 @@ def create_app(session: AuditSession) -> FastAPI:
         ]
 
     @app.post("/findings/{finding_id}", response_model=FindingSummary)
-    def triage(finding_id: str, update: TriageUpdate) -> FindingSummary:
+    def triage(finding_id: str, update: TriageUpdate, request: Request) -> FindingSummary:
         try:
             f = session.apply_triage(
                 finding_id,
@@ -87,6 +99,10 @@ def create_app(session: AuditSession) -> FastAPI:
                 corrective_measure=update.corrective_measure,
                 suggestion=update.suggestion,
                 reason=update.reason,
+                # De geverifieerde identiteit, niet de default `"auditor"`: een
+                # append-only trail zonder toewijsbare actor beantwoordt de eerste
+                # vraag van een auditor niet (sec-bevinding 1 van change iso-portal).
+                actor=identiteit_van(request),
             )
         except SessionError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -131,9 +147,20 @@ def create_app(session: AuditSession) -> FastAPI:
         return session.source_health()
 
     @app.post("/run/start")
-    def run_start(req: RunStartRequest | None = None) -> dict[str, object]:
+    def run_start(request: Request, req: RunStartRequest | None = None) -> dict[str, object]:
         """Stap 2: start de run (live pipeline of sim-timer); voortgang via /run/progress."""
         r = req or RunStartRequest()
+        # Kosten-attributie (sec-bevinding 6, besluit "loggen, niet begrenzen"): de
+        # classifier houdt het token-verbruik al bij via `Kostenteller`; wat ontbrak
+        # is wie de run startte. Deze regel maakt kosten herleidbaar naar een mens.
+        log_event(
+            "run_gestart",
+            identiteit_van(request),
+            modus=r.mode,
+            norm=r.norm,
+            bronnen=",".join(r.sources),
+            hoofdstuk=r.chapter or "",
+        )
         return session.start_run(
             mode=r.mode,
             norm=r.norm,
