@@ -20,10 +20,9 @@
 - [x] 0.2 `pyproject.toml`: `authors` + `maintainers` → Conduction
       (`info@conduction.nl`), `Repository`-URL → ConductionNL. `CODEOWNERS`
       toegevoegd, met de deploy-/auth-paden expliciet benoemd
-- [ ] 0.3 Vaststellen: ghcr-package `ghcr.io/conductionnl/iso-audit` moet **public**
-      staan, anders heeft de namespace een pull-secret nodig (les uit openwoo's
-      `deploy/README.md`). Vergt `admin:packages` — niet te doen met de huidige
-      `write:packages`-scope
+- [x] 0.3 ghcr-package staat **public** (gemeten 2026-08-12), conform de
+      org-conventie: 168 van de 172 container-packages zijn public; alleen de vier
+      `hydra-*` zijn private
 
 - [x] 0.5 Zichtbaarheid: **public**, en dat is de gewenste stand — het
       EUPL-1.2-besluit van juni blijft daarmee geldig. De transfer nam de
