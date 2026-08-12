@@ -1,0 +1,46 @@
+# Keycloak-client voor het portaal — hoort NIET in deze repo thuis.
+#
+# Dit blok moet worden toegevoegd aan de `clients:`-lijst in de KeyCloak-repo:
+#   clusters/prod/keycloak/20-keycloak/realm-commonground.yaml
+#
+# Het staat hier als voorbereid artefact zodat de PR in die repo een kopieerklaar
+# blok heeft en niemand de velden opnieuw hoeft te bedenken. Het is een kopie van
+# het bestaande `openwoo-provisioner`-blok met alleen de host en de client-id
+# gewijzigd — bewust geen nieuwe velden, want dat zou een tweede auth-variant in de
+# organisatie introduceren.
+#
+# LET OP bij het toevoegen:
+#  1. Dit is een PROD-PAD in een andere repo. Aparte PR, expliciete review.
+#  2. De KeyCloak-repo stond op 2026-08-12 op branch `chore/argocd-hygiene` —
+#     verifieer eerst de staat van `main` voordat je hierop verdergaat.
+#  3. Het client SECRET komt niet in Git. Na de sync: in de Keycloak-UI naar de
+#     client, "Regenerate Secret", en die waarde in het cluster-Secret zetten via
+#     scripts/create-portal-secrets.sh (KEYCLOAK_CLIENT_SECRET).
+#  4. De Google identity provider is in deze realm handmatig via de UI aangemaakt
+#     en staat expliciet niet in de import (zie de comment op regel ~198 van dat
+#     bestand). Deze client erft die situatie; hier oplossen valt buiten scope.
+
+- clientId: iso-audit-portal
+  name: ISO Audit Portaal
+  protocol: openid-connect
+  publicClient: false
+  standardFlowEnabled: true
+  directAccessGrantsEnabled: false
+  redirectUris:
+    - https://iso.commonground.nu/oauth2/callback
+  webOrigins:
+    - https://iso.commonground.nu
+  attributes:
+    # Post-logout redirect voor RP-initiated logout (oauth2-proxy hopt hierheen via
+    # het end-session-endpoint). Zonder dit attribuut weigert Keycloak de
+    # post_logout_redirect_uri en komt de gebruiker niet terug op het portaal.
+    # "##" scheidt meerdere URI's; beide vormen staan erin omdat de app de
+    # trailing-slash-variant stuurt.
+    "post.logout.redirect.uris": "https://iso.commonground.nu/##https://iso.commonground.nu"
+  defaultClientScopes:
+    - "openid"
+    - "profile"
+    - "email"
+  optionalClientScopes:
+    - "groups"
+    - "offline_access"
