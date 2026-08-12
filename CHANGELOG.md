@@ -6,6 +6,30 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-12 — portaal start nu op een verse PVC (initContainer `seed-sessie`)
+
+Na de USER- en cookie-secret-fix startte `oauth2-proxy` wel, maar viel de app om met
+`SessionError: Geen findings.json in sessie-dir`. Dat is geen bug — het is precies
+het gedrag uit de spec: de app verzint geen lege sessie. Maar het legde wel een
+ontwerpgat bloot: een portaal dat alleen draait als er al een auditsessie op de PVC
+staat, kun je niet online laten staan. Prerequisite 4 was handwerk dat niemand had
+gedaan.
+
+Opgelost met een initContainer die een **lege maar geldige** sessie neerzet als die
+er niet is: `findings.json` met `[]`, plus profiel en memo-input uit het image. Geen
+fixture-bevindingen — leeg is leeg, en dat is een eerlijke startstand voor een
+auditwerktuig. Idempotent: bestaande bestanden worden nooit overschreven, dus een
+echte auditsessie blijft ongemoeid.
+
+Het onderscheid staat nu expliciet in de spec: de **applicatie** verzint niets, het
+**deployment** mag provisioneren. Dat is een zichtbare deploy-stap, geen stille
+fallback in de app.
+
+Geverifieerd tegen het gepubliceerde image `0.1.0a1`, in containers met een named
+volume (de eerdere hosttest struikelde op de uid-mapping van rootless podman): seed
+werkt, overschrijft bestaande data niet, en de app start daarna met `/healthz` 200,
+`/findings` `[]` en `/config/health` 200.
+
 ### Fixed — 2026-08-12 — de eerste rollout viel om op twee fouten in mijn manifests
 
 Beide pas gevonden door het echt uit te rollen; het image bouwde en draaide lokaal

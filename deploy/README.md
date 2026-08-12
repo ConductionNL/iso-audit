@@ -85,11 +85,17 @@ defect kopiëren).
    waardoor branch-bescherming een uitzondering voor de bot vroeg en een
    gecompromitteerde stap de gedeployde tag kon verleggen. De workflow heeft nu
    geen schrijfrechten op de repo.
-4. **Sessie-inhoud op de PVC.** `iso-audit ui` heeft geen env-fallbacks: het
-   verwacht `/var/lib/iso-audit/sessie/findings.json`,
-   `/var/lib/iso-audit/sessie/memo-input.yaml` en
-   `/var/lib/iso-audit/conduction.profile.yaml`. Ontbreekt de findings, dan stopt de
-   app met een leesbare fout in plaats van een lege sessie te verzinnen.
+4. **Sessie-inhoud op de PVC — gaat automatisch.** Een initContainer
+   (`seed-sessie`) zet bij het starten een *lege maar geldige* sessie neer als die
+   er nog niet is: `findings.json` met `[]`, plus profiel en memo-input uit het
+   image. Idempotent — bestaande bestanden worden nooit overschreven, dus een echte
+   auditsessie blijft ongemoeid.
+
+   Dit was eerst handwerk, en dat brak de eerste rollout: `iso-audit ui` weigert te
+   starten zonder `findings.json` (bewust — zie de spec `portal-deployment`), dus met
+   een verse PVC crashloopte de app op precies die fout. De initContainer haalt die
+   spanning eruit zonder de discipline op te geven: hij verzint geen bevindingen,
+   `[]` is een eerlijke startstand.
 
 **DNS vraagt geen stap.** external-dns kijkt cluster-breed naar Ingresses met
 domain-filter `commonground.nu` en maakt het record uit `ingress.yaml`.

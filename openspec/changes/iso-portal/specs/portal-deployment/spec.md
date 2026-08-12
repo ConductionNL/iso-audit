@@ -68,6 +68,11 @@ Het portaal MUST expliciet één auditsessie serveren, overeenkomstig
 `create_app(session)` dat één `AuditSession` aanneemt. Een tweede gelijktijdige
 sessie MUST NOT stilzwijgend gedeelde state krijgen.
 
+De **applicatie** MUST NOT zelf een sessie verzinnen. Het **deployment** MAY een
+lege maar geldige sessie provisioneren via een initContainer; dat is een expliciete,
+zichtbare deploy-stap en geen stille fallback in de app. Zonder die stap start het
+portaal niet op een verse PVC — dat was de eerste rollout.
+
 #### Scenario: Sessie-pad is expliciete configuratie
 
 - **WHEN** het portaal start zonder geconfigureerde sessie-directory

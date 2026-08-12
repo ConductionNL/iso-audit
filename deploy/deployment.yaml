@@ -42,6 +42,51 @@ spec:
         fsGroup: 10001          # zodat de non-root app op de PVC mag schrijven
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        # Zet een LEGE maar geldige sessie op de PVC als die er nog niet is.
+        #
+        # `iso-audit ui` weigert te starten zonder findings.json — bewust, want een
+        # verzonnen lege sessie in een auditwerktuig is erger dan een harde fout
+        # (spec portal-deployment). Gevolg was wel dat het portaal niet online kón
+        # staan zonder dat er al een audit liep: de eerste rollout crashloopte op
+        # precies die fout met een verse PVC (2026-08-12).
+        #
+        # Deze initContainer haalt die spanning eruit zonder de discipline op te
+        # geven: hij verzint geen bevindingen maar schrijft `[]` — leeg is leeg, en
+        # dat is een eerlijke startstand. Profiel en memo-input komen uit het image.
+        # Idempotent: bestaande bestanden worden nooit overschreven, dus een echte
+        # auditsessie op de PVC blijft ongemoeid.
+        - name: seed-sessie
+          image: ghcr.io/conductionnl/iso-audit:latest  # override via kustomize images:
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              mkdir -p /var/lib/iso-audit/sessie
+              [ -f /var/lib/iso-audit/sessie/findings.json ] || \
+                printf '[]\n' > /var/lib/iso-audit/sessie/findings.json
+              [ -f /var/lib/iso-audit/sessie/memo-input.yaml ] || \
+                cp /app/examples/auditmemo/memo-input.yaml /var/lib/iso-audit/sessie/
+              [ -f /var/lib/iso-audit/conduction.profile.yaml ] || \
+                cp /app/examples/auditmemo/conduction.profile.yaml /var/lib/iso-audit/
+              echo "sessie-dir gereed:"
+              ls -la /var/lib/iso-audit /var/lib/iso-audit/sessie
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/iso-audit
       containers:
         # De FastAPI-app: uvicorn op 127.0.0.1:8081. NIET op het pod-netwerk —
         # alleen de oauth2-proxy-sidecar (zelfde netns) kan hem bereiken. Die
