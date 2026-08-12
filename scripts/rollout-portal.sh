@@ -210,9 +210,17 @@ herstart_en_verifieer() {
   # /ping is het eigen health-endpoint van oauth2-proxy en staat buiten de
   # auth-gate. /healthz van de app NIET: er is geen skip_auth_routes, dus extern
   # wordt die naar Keycloak geleid. Die check hoort daarom binnen de pod.
-  local ping code
-  ping="$(curl -fsS --max-time 15 "https://${HOST}/ping" 2>&1 || echo FAIL)"
-  echo "  https://${HOST}/ping -> ${ping}"
+  # POLLEN, niet één keer proberen. `rollout status` keert terug zodra de nieuwe
+  # replica available is, maar de ingress-controller heeft dan nog niet
+  # noodzakelijk het nieuwe endpoint. Eén losse curl gaf daardoor twee keer een
+  # valse 503 terwijl het portaal gewoon aan het opkomen was (2026-08-12).
+  local code=""
+  for _ in $(seq 1 20); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://${HOST}/ping" 2>/dev/null || echo 000)"
+    [[ "$code" == "200" ]] && break
+    sleep 6
+  done
+  echo "  https://${HOST}/ping -> ${code}$([[ "$code" == "200" ]] && echo "" || echo "  (na 2 minuten nog niet 200 — check de proxy-logs)")"
 
   code="$(kubectl -n "$NS" exec "deploy/${DEPLOY}" -c app -- \
     python -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8081/healthz').status)" \
