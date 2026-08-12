@@ -1,0 +1,28 @@
+---
+# Argo CD Application voor het iso-audit-portaal. Synct deploy/ uit deze repo naar
+# de iso-platform-namespace.
+#
+# `prune: true` is veilig hier omdat het project geen Secrets mag beheren: een
+# prune raakt de out-of-band credentials dus niet.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iso-audit-portal
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: iso-platform
+spec:
+  project: iso-platform
+  source:
+    repoURL: https://github.com/ConductionNL/iso-audit.git
+    targetRevision: main
+    path: deploy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: iso-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

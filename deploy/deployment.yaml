@@ -1,0 +1,193 @@
+---
+# Eén pod, twee containers. De app bindt UITSLUITEND localhost; oauth2-proxy is de
+# enige netwerk-listener. Samen met networkpolicy.yaml (ingress alleen uit
+# ingress-nginx) is dat het trust-anker onder X-Forwarded-Email — code en manifest,
+# geen proza. Zie docs/explanation/portal-auth.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iso-audit-portal
+  namespace: iso-platform
+  labels:
+    app.kubernetes.io/name: iso-audit-portal
+    app.kubernetes.io/part-of: iso-platform
+spec:
+  # Eén replica, en dat is geen tijdelijke keuze: de PVC is ReadWriteOnce en
+  # `create_app()` neemt één AuditSession. Meerdere replicas zouden dezelfde
+  # SQLite-DB en dezelfde append-only trail beschrijven. Opschalen vraagt eerst de
+  # sessie-selectie-change (zie proposal.md, Scope-grens).
+  replicas: 1
+  strategy:
+    # Recreate i.p.v. RollingUpdate: bij RWO kan de nieuwe pod het volume niet
+    # mounten zolang de oude het vasthoudt, dus een rolling update blijft hangen.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: iso-audit-portal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: iso-audit-portal
+    spec:
+      serviceAccountName: iso-audit-portal
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 10001          # zodat de non-root app op de PVC mag schrijven
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        # De FastAPI-app: uvicorn op 127.0.0.1:8081. NIET op het pod-netwerk —
+        # alleen de oauth2-proxy-sidecar (zelfde netns) kan hem bereiken. Die
+        # localhost-bind is wat X-Forwarded-Email betrouwbaar maakt.
+        - name: app
+          image: ghcr.io/conductionnl/iso-audit:latest  # override via kustomize images:
+          # `iso-audit ui` heeft geen env-fallbacks: --session/--profile/--norms/
+          # --memo-input zijn alle vier verplicht. Dat is de expliciete-config-
+          # discipline van de repo en die houden we hier vast: de paden staan hier,
+          # zichtbaar in het manifest, niet verstopt in een image-default.
+          # --host 127.0.0.1 is essentieel: de app mag niet op het pod-netwerk
+          # luisteren, want dat is het trust-anker onder X-Forwarded-Email.
+          args:
+            - "ui"
+            - "--session=/var/lib/iso-audit/sessie"
+            - "--profile=/var/lib/iso-audit/conduction.profile.yaml"
+            - "--norms=/app/examples/norms"
+            - "--memo-input=/var/lib/iso-audit/sessie/memo-input.yaml"
+            - "--host=127.0.0.1"
+            - "--port=8081"
+          env:
+            - name: REQUIRE_AUTH
+              value: "true"
+            # Audit-trail en rapporten op de PVC. Zonder deze vallen ze terug op
+            # paden binnen het image — dat faalt onder readOnlyRootFilesystem, en
+            # zou anders auditbewijs op een vluchtig filesystem zetten.
+            - name: AUDIT_DB_PATH
+              value: /var/lib/iso-audit/audit.db
+            - name: LOCAL_REPORT_DIR
+              value: /var/lib/iso-audit/rapporten
+            # Google Workspace via het org-service-account (change
+            # gsuite-service-account-sources). Tot die change draait het portaal
+            # zonder Drive/Planning-bron; de healthcheck meldt ze als
+            # niet-gekoppeld in plaats van te crashen.
+            - name: GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE
+              value: /etc/iso-audit/google/service-account.json
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: iso-audit-portal-llm
+                  key: api-key
+                  optional: true
+            # Bron-credentials. `optional: true` op alle: een ontbrekende bron moet
+            # de healthcheck rood maken, niet de pod in CrashLoopBackOff duwen.
+            - name: JIRA_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: iso-audit-portal-sources
+                  key: jira-base-url
+                  optional: true
+            - name: JIRA_USER_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: iso-audit-portal-sources
+                  key: jira-user-email
+                  optional: true
+            - name: JIRA_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: iso-audit-portal-sources
+                  key: jira-api-token
+                  optional: true
+            - name: MIRO_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: iso-audit-portal-sources
+                  key: miro-api-token
+                  optional: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              # 1Gi: WeasyPrint houdt bij het renderen van de memo de hele
+              # pagina-boom in geheugen. 512Mi was bij openwoo al te krap voor
+              # zwaarder werk.
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/iso-audit
+            - name: tmp
+              mountPath: /tmp
+            - name: google-creds
+              mountPath: /etc/iso-audit/google
+              readOnly: true
+        # De auth-voorkant: de ENIGE netwerk-listener. Valideert de auditor tegen
+        # Keycloak (dat Google brokert) en stuurt de identiteit als
+        # X-Forwarded-Email door naar de app op localhost.
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+          args: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: iso-audit-portal-oauth
+                  key: client-secret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: iso-audit-portal-oauth
+                  key: cookie-secret
+          ports:
+            - name: http
+              containerPort: 4180
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          # Probes op de proxy zelf (/ping). De app-probe hieronder gaat
+          # rechtstreeks naar :8081/healthz binnen de pod — die route staat buiten
+          # de identity-gate, precies zodat dit werkt zonder sessie.
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 5
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 4180
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: oauth2-cfg
+              mountPath: /etc/oauth2-proxy
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: iso-audit-portal-data
+        - name: tmp
+          emptyDir: {}
+        - name: google-creds
+          secret:
+            secretName: iso-audit-portal-google
+            optional: true
+        - name: oauth2-cfg
+          configMap:
+            name: oauth2-proxy-cfg

@@ -6,6 +6,145 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-12 — portaal-deployment: image, manifests, Argo (taak 3-5)
+
+- **`Dockerfile`**: twee stages, `uv sync --frozen` tegen de gecommitte `uv.lock`
+  (nooit pip), non-root uid 10001, werkt onder `readOnlyRootFilesystem`.
+  WeasyPrint-systeemlibs in de runtime-stage — zonder die faalt de memo-render pas
+  wanneer een auditor op exporteren drukt, dus in productie.
+- **`deploy/`** (9 manifests + README): namespace `iso-platform`, SA met
+  token-automount uit, PVC `tier-1`/8Gi/RWO, deployment met app op `127.0.0.1:8081`
+  + oauth2-proxy-sidecar, ClusterIP, Ingress met `letsencrypt-prod`, en de
+  NetworkPolicy die ingress tot `ingress-nginx` beperkt. `kubectl kustomize deploy`
+  rendert; de proxy-config wordt een gehashte ConfigMap zodat een edit de pod rolt.
+- **Twee dingen bewust níet gekloond** uit openwoo: `rbac-*.yaml` (dit portaal
+  pollt geen Argo-status en heeft dus geen kube-API-toegang nodig) en
+  `networkpolicy-egress.yaml` (staat daar sinds 2026-07-13 uitgeschakeld wegens
+  DNS-breuk onder Gardener/Calico — meenemen zou een bekend defect kopiëren).
+- **`Recreate`-strategie** i.p.v. rolling update: bij een RWO-volume kan de nieuwe
+  pod niet mounten zolang de oude het vasthoudt, dus een rolling update blijft
+  hangen. Eén replica is trouwens geen tijdelijke keuze — `create_app()` neemt één
+  `AuditSession` en meerdere replicas zouden dezelfde SQLite-DB beschrijven.
+- **`argo/`**: AppProject `iso-platform` (één repo, één namespace,
+  `clusterResourceWhitelist` alleen `Namespace`) + Application die `deploy/` synct.
+  Bewust een eigen project: `cluster-infra` is voor cluster-brede infra en
+  `nextcloud-platform` is de verkeerde grens. `Secret` staat niet in de whitelist,
+  zodat Argo de out-of-band credentials niet kan beheren of prunen.
+- **`.github/workflows/image.yml`**: merge-is-deploy — `sha-<short>` bouwen,
+  pullbaarheid verifiëren, dan pas `newTag` terugcommitten met `[skip ci]`. Die
+  volgorde is niet vrij: een tag zetten die nog niet bestaat richt Argo op een
+  niet-pullbaar image.
+- **`deploy/README.md`** met de **credential-herleidbaarheidstabel**: per credential
+  het systeem, de Secret-key, het org-account, de eigenaar-rol
+  (`info@conduction.nl`) en een maximale leeftijd — inclusief de deploy-keten
+  (ghcr-push, tag-bump). De 12-maandstermijn is een keuze, want de meeste van deze
+  credentials verlopen niet uit zichzelf.
+- **Secret-mechanisme gekozen: out-of-band, geen ESO en geen SOPS.** ESO draait wel
+  in dit cluster, maar de bestaande `nextcloud-shared-store` bestaat om één
+  seed-Secret naar véél tenant-namespaces te distribueren. `iso-platform` is één
+  namespace — er valt niets uit te delen, dus ESO zou een extra hop en een extra te
+  auditen component toevoegen zonder dat er iets geheimer wordt.
+- **`pyproject.toml`**: `authors`/`maintainers` → Conduction, `Repository` → de
+  org-URL. **`CODEOWNERS`** toegevoegd met de deploy-, argo-, workflow- en
+  auth-paden expliciet benoemd.
+- **Kosten-attributie** (sec-bevinding 6, besluit "loggen, niet begrenzen"):
+  `POST /run/start` logt wie de run startte plus de config. `Kostenteller` hield het
+  token-verbruik al bij, maar niet de opdrachtgever — zonder die koppeling is een
+  kostenpiek niet te adresseren. Er komt géén rate limit; het restrisico staat
+  benoemd in de spec.
+- **`src/iso_audit/api/audit_log.py`** (nieuw): JSONL-toegangslog naar stdout, apart
+  van de inhoudelijke trail. Logt auth-weigeringen, mutaties en run-starts met
+  identiteit. Een credential kan er structureel niet in lekken: de functie krijgt
+  het request-object nooit te zien en accepteert alleen scalars — geen
+  redactie-lijst die iemand moet onderhouden.
+- Baseline groen: 792 passed / 1 skipped, ruff + `mypy --strict` clean, bandit
+  onveranderd op 5 pre-existing meldingen (geen in nieuwe code).
+
+### Changed — 2026-08-12 — auditor-API is fail-closed (taak 1 + 2 van `iso-portal`)
+
+> **Gedragswijziging voor lokale runs.** `iso-audit ui` weigert vanaf nu elk
+> request zonder geverifieerde identiteit met een 403; alleen `/healthz` blijft
+> open. Voor lokaal werken zonder proxy: `REQUIRE_AUTH=false uv run iso-audit ui
+> …`. Dat is bewust de niet-default — een verkeerd geconfigureerde ingress
+> moet naar "op slot" degraderen, niet naar "open".
+
+- **`src/iso_audit/api/auth_gate.py`** (nieuw): fail-closed identity-gate die
+  `X-Forwarded-Email` / `X-Forwarded-User` leest, met `REQUIRE_AUTH` default aan.
+  Onbekende waarden (`REQUIRE_AUTH=maybe`) betekenen **aan** — een typfout mag geen
+  portaal openzetten. Geïmplementeerd als HTTP-middleware en niet als `Depends()`
+  per route: een dependency moet bij élk nieuw endpoint opnieuw worden aangezet en
+  vergeten betekent stil een open route. `OPEN_PADEN` is de expliciete
+  uitzonderingenlijst en bevat alleen `/healthz`.
+- **`GET /healthz`** (nieuw): ongeauthenticeerd probe-endpoint voor liveness/
+  readiness; geeft geen auditdata terug.
+- **Trail is toewijsbaar** (sec-bevinding 1): `POST /findings/{id}` geeft de
+  geverifieerde identiteit door als `actor` aan `apply_triage()`. Het veld bestond
+  al en werd al weggeschreven, maar de API gaf het niet mee — élke trail-regel
+  bevatte daardoor de default `"auditor"`. Met de gate uit is de actor de
+  onmiskenbare waarde `dev:auth-uitgeschakeld`, nooit een leeg veld.
+- **`store.db_pad()`**: de fallback naar `<repo>/output/audit.db` is niet langer
+  stil — één waarschuwing per proces die het pad noemt, conform de repo-conventie
+  voor env-var-fallbacks. Een harde fout zou de lokale CLI breken en valt buiten
+  deze change; het portaal zet `AUDIT_DB_PATH` expliciet.
+- **Docs** volgens het docs-contract van `66f4309` (Diátaxis):
+  `docs/explanation/portal-auth.md` (waarom de header te vertrouwen is: topologie +
+  fail-closed, en wat het model níet oplost) en
+  `docs/how-to/verify-portal-auth.md` (fail-closed aantonen zonder cluster, plus de
+  offboarding-handeling die toegang direct beëindigt). Beide in `docs/index.md`.
+- **Tests**: `tests/api/test_auth_gate.py` (15) en `tests/api/test_persistentie.py`
+  (5) — 403 zonder header, header-fallback, lege header telt niet, `/healthz` open,
+  UI-route bewaakt, actor in de trail, geen beslissing zonder identiteit, trail
+  identiek na herstart, append-only over herstarts heen. De bestaande api-tests
+  sturen nu de identity-header mee zodat ze de bewaakte route lopen.
+- Baseline groen: 785 passed / 1 skipped, ruff + `mypy --strict` clean, geen
+  nieuwe bandit-meldingen.
+
+### Added — 2026-08-12 — OpenSpec-change `iso-portal` + repo naar ConductionNL
+
+- **`openspec/changes/iso-portal/`**: voorstel voor een portaal op
+  `iso.commonground.nu` en voor het ontpersoonlijken van alle credentials, vóór
+  het vertrek van de huidige beheerder eind augustus 2026.
+- **Provisioner-hergebruik**: het Keycloak/oauth2-proxy-patroon van
+  `openwoo-app-provisioner` wordt gekloond (realm `commonground`, nieuwe client
+  `iso-audit-portal`); geen nieuwe auth-laag. `rbac-argo`/`rbac-secrets` en de
+  bewust uitgeschakelde egress-policy worden expliciet niet overgenomen.
+- **Drie nieuwe capability-specs**: `portal-deployment` (image, Argo-manifests,
+  audit-trail op PVC i.p.v. emptyDir), `portal-auth` (fail-closed identity-gate,
+  proxy als enige listener), `credential-model` (geen persoonsgebonden
+  credential, eigenaar is een rol, herleidbaarheidstabel).
+- **Migratiebesluit per bron vastgelegd**: `drive`/`planning` van de persoonlijke
+  `gws`-sessie naar het bestaande `auth.py`-service-account, `jira` naar een
+  functioneel Atlassian-account, `miro` naar een org-token, notifiers naar
+  org-owned Slack/SMTP/Anthropic. Netto **nul** bronnen naar MCP, met de reden
+  per bron — de beschikbare MCP-connectors authenticeren per gebruiker via OAuth
+  en zouden de persoonlijke credential verplaatsen, niet opheffen.
+- **Ongewijzigd**: de Source/Mode/Notifier-architectuur, de registries, de
+  `Document`/`Finding`-shapes en de append-only trail. De migratie vraagt geen
+  interface-wijziging; alleen de auth-implementatie binnen een adapter wisselt.
+- **Security-audit op de specs** (`/opsx:sec`) leverde zeven gaps, alle als eis
+  opgenomen. Materieel: de geverifieerde identiteit landt als `actor` in de trail
+  (het veld bestaat al in `api/session.py:134` maar de API geeft het niet mee, dus
+  élke regel zegt nu de placeholder `"auditor"`); toegang eindigt binnen een
+  gedocumenteerd venster i.p.v. pas bij cookie-verval; de deploy-keten staat in
+  het credential-model en is niet ongereviewd te verleggen; auth-events gelogd en
+  credentials niet. Verder: maximale leeftijd per machine-credential,
+  run-begrenzing op de org-LLM-key, en vaststellen welke trust-paths na migratie
+  resteren (lokale artefacten, repo-toegang na transfer).
+- **Repo verhuisd naar `ConductionNL/iso-audit`** (uitgevoerd 2026-08-12, taak 0.1
+  route B). De org-naam was bezet door een private scaffold-repo van 2026-05-26
+  (staand op `dee54989`, een voorouder van `main` — niets unieks); die is hernoemd
+  naar `ConductionNL/iso-audit-scaffold-2026-05`, niets verwijderd. Daarna
+  transfer van `MWest2020/iso-audit`, waarmee de historie, alle 15 branches, de
+  **public**-zichtbaarheid (EUPL-1.2 blijft dus geldig) en een permanente redirect
+  vanaf het oude pad meeverhuisden. `secret_scanning` en
+  `secret_scanning_push_protection` staan hierdoor nu aan.
+- **Nog open op de org-repo:** `main` is `"Branch not protected"`. Onbeschermd in
+  combinatie met merge-is-deploy is sec-bevinding 3 in levende lijve — zie taak
+  0.6 en 3.5.
+- Implementatie volgt in aparte changes (`iso-portal` zelf, daarna één change per
+  bron), pas na akkoord op dit voorstel. `openspec validate iso-portal --strict`
+  groen.
+
 ### Added — 2026-06-17 — brondocument-links in de memo + redigeerbare maatregel/aanbeveling
 
 - **Brondocument-links in de gerenderde memo**: `NCBlock` + `ImprovementBlock`

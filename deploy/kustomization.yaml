@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: iso-platform
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  # secret.example.yaml is een TEMPLATE — de echte Secrets out-of-band aanmaken.
+  # Bewust NIET in resources: dan zou Argo placeholders over echte secrets heen
+  # syncen.
+  #
+  # Geen rbac-*.yaml: dit portaal heeft geen kube-API-toegang nodig (anders dan
+  # openwoo-provisioner, dat Argo-status pollt).
+  #
+  # Geen networkpolicy-egress: het openwoo-origineel staat sinds 2026-07-13
+  # uitgeschakeld wegens DNS-breuk onder Gardener/Calico. Zie networkpolicy.yaml.
+
+# De oauth2-proxy-config wordt een gehashte ConfigMap, zodat een edit de pod rolt.
+# Kustomize herschrijft de volume-referentie in deployment.yaml naar de hash-naam.
+configMapGenerator:
+  - name: oauth2-proxy-cfg
+    files:
+      - oauth2-proxy.cfg
+
+# De image-tag wordt door .github/workflows/image.yml teruggecommit na een
+# geverifieerde push. LET OP: eerst bouwen en pushen, dan de tag zetten — een tag
+# die nog niet bestaat richt Argo op een niet-pullbaar image.
+images:
+  - name: ghcr.io/conductionnl/iso-audit
+    newTag: "latest"

@@ -1,0 +1,50 @@
+---
+# AppProject voor het iso-audit-portaal.
+#
+# Waarom een eigen project en niet een bestaand: `cluster-infra` is expliciet voor
+# cluster-brede infra (external-dns, cert-manager, ESO) en `nextcloud-platform` is
+# de verkeerde grens — dit is geen Nextcloud-component. Eén project met één repo en
+# één namespace houdt de blast radius zo klein als de app zelf.
+#
+# Bootstrap is eenmalig met de hand, het patroon dat cluster-infra ook gebruikt:
+#   kubectl apply -f argo/projects/iso-platform.yaml
+#   kubectl apply -f argo/applications/iso-audit-portal.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: iso-platform
+  namespace: argocd
+spec:
+  description: ISO 9001/27001 audit-portaal (iso.commonground.nu)
+
+  sourceRepos:
+    - "https://github.com/ConductionNL/iso-audit.git"
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: iso-platform
+
+  # Alleen de Namespace zelf is cluster-scoped; verder niets. Dit portaal heeft
+  # geen ClusterRole, geen CRD's, geen webhooks nodig.
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: Service
+    - group: ""
+      kind: ConfigMap
+    - group: ""
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+
+  # Secret staat er bewust NIET bij: de credentials worden out-of-band aangemaakt
+  # en Argo mag ze niet beheren of overschrijven. Zie deploy/secret.example.yaml.

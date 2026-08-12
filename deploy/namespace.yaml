@@ -1,0 +1,9 @@
+---
+# Namespace voor het iso-audit-portaal. Los van nextcloud-platform: dit is geen
+# Nextcloud-component en hoort niet onder die AppProject-grens.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iso-platform
+  labels:
+    app.kubernetes.io/part-of: iso-platform
