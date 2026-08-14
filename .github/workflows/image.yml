@@ -55,6 +55,10 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Volledige historie: de bump-check hieronder vergelijkt met de vorige
+          # commit, en dat kan niet met de default depth van 1.
+          fetch-depth: 0
 
       - name: Versie en tag uitlezen en vergelijken
         id: meta
@@ -70,6 +74,48 @@ jobs:
             exit 1
           fi
           echo "versie en tag kloppen: ${versie}"
+
+      # De check hierboven vangt alleen dat versie en tag ÚITEENLOPEN, niet dat de
+      # versie is blijven staan terwijl de inhoud van het image wijzigde. Dan
+      # herbouwt deze workflow dezelfde tag met andere inhoud: een mutable tag die
+      # onder je handen beweegt. Argo ziet geen manifest-wijziging, de node heeft de
+      # tag al gecacht, en de pod draait stil oude code. Precies dat gebeurde op
+      # 2026-08-14.
+      - name: Versie moet mee bewegen met de image-inhoud
+        run: |
+          set -euo pipefail
+          # Paden die daadwerkelijk in het image landen.
+          paden=(src Dockerfile uv.lock pyproject.toml examples)
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            basis="${{ github.event.pull_request.base.sha }}"
+          else
+            basis="${{ github.event.before }}"
+          fi
+
+          if [[ -z "$basis" || "$basis" =~ ^0+$ ]] || ! git cat-file -e "$basis^{commit}" 2>/dev/null; then
+            echo "geen bruikbare vergelijkingsbasis (${basis:-leeg}) — check overgeslagen"
+            exit 0
+          fi
+
+          gewijzigd="$(git diff --name-only "$basis" HEAD -- "${paden[@]}")"
+          if [[ -z "$gewijzigd" ]]; then
+            echo "image-inhoud ongewijzigd sinds ${basis:0:12} — versie hoeft niet te bewegen"
+            exit 0
+          fi
+
+          oude_versie="$(git show "${basis}:pyproject.toml" 2>/dev/null | grep -m1 '^version = ' | cut -d'"' -f2 || true)"
+          nieuwe_versie="${{ steps.meta.outputs.versie }}"
+
+          if [[ "$oude_versie" == "$nieuwe_versie" ]]; then
+            echo "::error::Image-inhoud wijzigde maar de versie bleef ${nieuwe_versie}." >&2
+            echo "Dat zou tag ${nieuwe_versie} herbouwen met andere inhoud — een mutable tag." >&2
+            echo "Bump 'version' in pyproject.toml EN 'newTag' in deploy/kustomization.yaml." >&2
+            echo "Gewijzigd:" >&2
+            echo "$gewijzigd" | sed 's/^/  /' >&2
+            exit 1
+          fi
+          echo "versie bewoog ${oude_versie:-onbekend} -> ${nieuwe_versie} bij gewijzigde image-inhoud"
 
       - uses: docker/setup-buildx-action@v3
 

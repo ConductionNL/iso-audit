@@ -6,6 +6,24 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-14 — CI faalt als de image-inhoud wijzigt zonder versiebump
+
+De bestaande check vergeleek alleen of `version` en `newTag` gelijk waren. Die vangt
+niet dat de versie is blijven staan terwijl de inhoud van het image wijzigde — en dan
+herbouwt de workflow dezelfde tag met andere inhoud. Argo ziet geen manifest-wijziging,
+de node heeft die tag al gecacht, en de pod draait stil oude code.
+
+Dat gebeurde vandaag: commit `9f8dc26` wijzigde `src/` zonder bump, waardoor tag
+`0.2.0a0` onder onze handen bewoog.
+
+De nieuwe stap vergelijkt met de vorige commit (PR-basis of `github.event.before`) en
+faalt als een van `src/`, `Dockerfile`, `uv.lock`, `pyproject.toml` of `examples/`
+wijzigde terwijl de versie gelijk bleef. Logica nagerekend tegen echte historie: faalt
+op `9f8dc26`, laat de bump `d19f291` door, en laat een docs-only commit door.
+
+`.github/` zit bewust niet in die padenlijst — een workflow-wijziging landt niet in het
+image, dus die hoeft geen versie te bewegen. Deze commit is daar zelf het bewijs van.
+
 ### Changed — 2026-08-14 — audit over meerdere normen; normenlijst uit de norm-DB
 
 Twee correcties op mijn eigen ontwerp, beide op aanwijzing van de eigenaar.
