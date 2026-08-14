@@ -6,6 +6,56 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-14 — agentische laag: doorvragen, met afdwingbare grenzen
+
+`iso_audit.agent` voegt toe wat de vaste keten niet kan: **doorvragen**. `pipeline.py`
+leest alle bronnen, classificeert en stopt. Een auditor die ziet dat een beleidsdocument
+verwijst naar een procedure die niet in de auditmap staat, gaat die procedure zoeken — en
+dat is capability 2 (patroondetectie), geen extraatje.
+
+**Twee harde grenzen, geen adviserend budget.** `max_iterations` én een kostenplafond op de
+gecorrigeerde prijzentabel. Bij overschrijding stopt de lus en staat de reden
+(`rondelimiet` / `kostenplafond`) in de trail. `task_budget` is bewust **niet** gebruikt:
+dat is adviserend — het model ziet een aftelling maar wordt niet gestopt — en het hangt aan
+een beta die de gepinde SDK (0.102.0) niet typeert. Voor een auditor is "de lus stopte
+gegarandeerd" bruikbaar; "het model wist van een budget" niet.
+
+**Geen tool schrijft.** Niet naar `findings.json`, niet naar `runs.jsonl`, niet naar de
+database. Twee tests lezen de broncode van elke tool en falen op elke schrijf-operatie. Kan
+een bevinding de trail bereiken zonder door de join, dan is de trail geen bewijs meer maar
+een verzameling losse beweringen.
+
+**De join blijft deterministisch.** De agent *stelt voor*; `api/runs.py:dedup_sleutel`
+bepaalt wat één bevinding is. `voeg_toe_via_join` staat als aparte functie zodat die
+scheiding in de code te zien is en niet alleen in een docstring. Een test laat de agent twee
+voorstellen doen die alleen in schrijfwijze verschillen en controleert dat er één bevinding
+uitkomt.
+
+**Bewijs is verplicht.** `stel_bevinding_voor` weigert een voorstel zonder document- of
+ticket-id: een observatie zonder bewijs is een vraag, en die hoort als vraag in het memo.
+
+**Elke tool-aanroep levert een trail-regel** met tool, bron, model en prompt-versie
+(`agent-v1`). Zonder die velden is een agentische run een zwarte doos en een oude run niet
+te reproduceren.
+
+**Nog niet aangesloten** op de UI of op `pipeline.py` als runmodus — dat is de volgende
+increment. Half aansluiten is erger dan niet aansluiten, want dan bestaat er een pad dat
+niemand kent.
+
+**Managed Agents beoordeeld en voor nu afgewezen.** De cloud-sandbox valt af omdat
+auditbewijs dan in een door Anthropic gehoste container terechtkomt; dat is een
+verwerkersvraag die dit project niet kan beantwoorden en die het tool onleverbaar maakt aan
+een partij die dat niet wil. De self-hosted-sandbox-variant is de interessante upgrade —
+lus bij Anthropic, tools in onze pod via uitgaand pollen — maar kost een tweede proces, een
+tweede credential-soort en een beta-platformafhankelijkheid. Zie `openspec/changes/
+agent-runtime/design.md` voor de afweging.
+
+**Consequentie voor credentials:** een runtime in het cluster is headless en kan dus niet op
+de `sso`-modus draaien (geen browser, refresh-token verloopt hard). Een org-workspace-key is
+voor autonome runs een voorwaarde, geen verbetering.
+
+961 passed, 1 skipped; ruff + mypy --strict clean. Versie `0.2.0a6`.
+
 ### Security — 2026-08-14 — leveranciersfouten lekten naar de browser
 
 `api/session.py:_check_source` gaf `str(exc)[:200]` door aan het configuratiescherm. Die
