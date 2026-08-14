@@ -15,7 +15,14 @@ from pathlib import Path
 UI = Path("src/iso_audit/api/ui.html")
 
 # Paden die bewust NIET onder een audit vallen.
-ONGESCOPED = {"/audits", "/config/health", "/config/options"}
+ONGESCOPED = {
+    "/audits",
+    "/config/health",
+    "/config/options",
+    "/config/bronnen",
+    "/config/wijzigingen",
+    "/me",
+}
 
 
 def _bron() -> str:
@@ -39,7 +46,7 @@ def test_alle_auditcalls_lopen_via_de_prefix_helper() -> None:
     for m in re.finditer(r'(?:fetch|j)\(\s*(["`])(/[^"`]*)\1', bron):
         pad = m.group(2)
         basis = pad.split("?")[0]
-        if basis not in ONGESCOPED:
+        if not any(basis == o or basis.startswith(o + "/") for o in ONGESCOPED):
             losse.add(pad)
     assert not losse, f"deze paden missen de audit-prefix: {sorted(losse)}"
 
@@ -66,11 +73,25 @@ def test_dashboard_toont_de_vier_gevraagde_kolommen() -> None:
         assert f"<th>{kolom}</th>" in kop
 
 
-def test_configscherm_heeft_geen_schrijfroute() -> None:
-    """Alleen-lezen is de eis; een POST naar /config zou die stilzwijgend breken."""
+def test_configscherm_kan_een_bron_koppelen() -> None:
+    """Zapier-achtig: kies een bron, klik, configureer. Zonder cluster of beheerder."""
     bron = _bron()
-    assert not re.search(r'fetch\(\s*["`]/config[^"`]*["`]\s*,\s*\{[^}]*POST', bron)
     assert 'id="view-config"' in bron
+    assert "toonBronForm" in bron and "bewaarBron" in bron
+    assert "/config/bronnen/" in bron
+
+
+def test_geheime_velden_worden_als_wachtwoord_getoond() -> None:
+    bron = _bron()
+    assert 'type="${v.geheim ? "password" : "text"}"' in bron
+
+
+def test_configscherm_noemt_geen_env_vars_of_secrets() -> None:
+    """De auditor hoeft niets te weten van env-vars, Secrets of een cluster."""
+    bron = _bron()
+    blok = bron.split('id="view-config"')[1].split("</section>")[0]
+    for jargon in ("env-var", "Secret", "cluster", "manifest", "JIRA_", "MIRO_"):
+        assert jargon not in blok, f"implementatiejargon in het configscherm: {jargon}"
 
 
 def test_audit_wissel_maakt_de_vorige_audit_leeg() -> None:
@@ -85,3 +106,27 @@ def test_gelijktijdigheidswaarschuwing_wordt_getoond() -> None:
     bron = _bron()
     assert "andere_actief" in bron
     assert "audit-warn" in bron
+
+
+def test_uitlogknop_bestaat() -> None:
+    """Een portaal zonder uitlogknop kun je alleen verlaten door je browser te sluiten."""
+    bron = _bron()
+    assert 'id="uitloggen"' in bron
+    assert "/oauth2/sign_out" in bron
+    assert 'j("/me")' in bron
+
+
+def test_normkeuze_is_een_enum_zonder_jargon() -> None:
+    """De auditor kiest een norm of beide; slugs, id-formaat en YAML horen niet in de UI."""
+    bron = _bron()
+    formulier = bron.split('id="nieuw-audit"')[1].split("</div>")[0]
+    assert "select" in formulier and "na-norm" in formulier
+    assert "checkbox" not in formulier, "vinkjes: je kiest een auditscope, geen verzameling"
+    for jargon in ("YAML", "yaml", "norm-DB", "9001_27001", "JJJJ-Qn"):
+        assert jargon not in formulier, f"implementatiejargon in het formulier: {jargon}"
+
+
+def test_normlabel_verbergt_de_slug() -> None:
+    bron = _bron()
+    assert "function normLabel" in bron
+    assert "ISO ${m[1]}" in bron

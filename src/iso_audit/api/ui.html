@@ -70,6 +70,11 @@
   .mini { font-size:.78rem; color:var(--muted); }
   #nieuw-audit { display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap; }
   #nieuw-audit input, #nieuw-audit select { border:1px solid var(--border); border-radius:4px; padding:.3rem; }
+  .bronkaart { border:1px solid var(--border); border-radius:6px; padding:.6rem .8rem; margin:.5rem 0; }
+  .bronkop { display:flex; gap:.6rem; align-items:center; }
+  .bronkop button { margin-left:auto; }
+  .veld { display:block; margin:.4rem 0; font-size:.85rem; color:var(--muted); }
+  .veld input { border:1px solid var(--border); border-radius:4px; padding:.3rem; color:#1a1a1a; }
 </style>
 </head>
 <body onload="boot()">
@@ -81,20 +86,18 @@
   <a href="#/config" id="nav-config">Configuratie</a>
   <span class="spacer"></span>
   <span id="wie"></span>
+  <a href="#" id="uitloggen" hidden onclick="return uitloggen()">Uitloggen</a>
 </nav>
 
 <!-- ============ dashboard ============ -->
 <section id="view-dashboard" hidden>
   <div class="step">
     <h2>Nieuwe audit</h2>
-    <p class="note">Normen + periode bepalen het id: <code>9001-2026-Q3</code>, of
-      <code>9001_27001-2026-Q3</code> als je beide toetst. Periode als
-      <code>JJJJ-Qn</code> of <code>JJJJ-Hn</code>, zodat sorteren klopt.
-      De normenlijst komt uit de norm-DB — een norm-YAML erbij zetten maakt hem hier
-      kiesbaar.</p>
     <div id="nieuw-audit">
-      <div><span class="mini">Normen (één of meer)</span><br><span id="na-normen">laden…</span></div>
-      <label>Periode<br><input id="na-periode" placeholder="2026-Q3" style="width:9rem"></label>
+      <label>Norm<br><select id="na-norm" data-tip="Kies één norm, of beide als je ze in dezelfde audit toetst.">
+        <option value="">laden…</option></select></label>
+      <label>Periode<br><input id="na-periode" placeholder="2026-Q3" style="width:9rem"
+        data-tip="Kwartaal of halfjaar, bv. 2026-Q3 of 2026-H2."></label>
       <button onclick="maakAudit()">Aanmaken</button>
       <span id="na-msg" class="ok"></span>
     </div>
@@ -109,10 +112,7 @@
 <section id="view-config" hidden>
   <div class="step">
     <h2>Bronnen</h2>
-    <p class="note">Per bron: gekoppeld of niet, en wat er ontbreekt. Koppelen vanuit
-      dit scherm is in aanbouw; tot dan komen bron-credentials uit de omgeving van de
-      deployment. Dat is een tijdelijke beperking, geen ontwerpkeuze — een auditor
-      hoort een bron zelf te kunnen koppelen.</p>
+    <p class="note">Kies een bron en vul in wat hij nodig heeft.</p>
     <div id="config-wrap"><p class="note">laden…</p></div>
   </div>
 </section>
@@ -198,7 +198,25 @@ let AUDIT = null;
 const A = p => `/audits/${encodeURIComponent(AUDIT)}${p}`;
 
 // ============ routing ============
-function boot(){ window.addEventListener("hashchange", route); route(); }
+let LOGOUT_URL = null;
+async function boot(){
+  try{
+    const me = await j("/me");
+    LOGOUT_URL = me.logout_url || null;
+    document.getElementById("wie").textContent = me.identiteit ? `ingelogd als ${me.identiteit}` : "";
+    document.getElementById("uitloggen").hidden = false;
+  }catch(e){ /* geen identiteit: de gate heeft het request al geweigerd */ }
+  window.addEventListener("hashchange", route);
+  route();
+}
+function uitloggen(){
+  // Altijd de proxy-sessie wissen. Is er een logout-URL van de identity-provider
+  // geconfigureerd, dan hoppen we daarheen zodat je ook daar uitlogt — anders ben je
+  // uit het portaal maar zou een volgende login stil doorlopen.
+  const basis = "/oauth2/sign_out";
+  location.href = LOGOUT_URL ? `${basis}?rd=${encodeURIComponent(LOGOUT_URL)}` : basis;
+  return false;
+}
 
 function toon(id){
   for(const v of ["view-dashboard","view-audit","view-config"]){
@@ -224,13 +242,23 @@ async function route(){
 // ============ dashboard ============
 const STATUS_LABEL = {nieuw:"nieuw", loopt:"loopt", "memo-klaar":"memo klaar"};
 
+// Leesbaar label voor een norm: "iso-9001-2015" -> "ISO 9001". De auditor hoeft de
+// interne slug nooit te zien.
+function normLabel(n){
+  const m = String(n).match(/(\d{4,5})/);
+  return m ? `ISO ${m[1]}` : String(n);
+}
 async function loadNormKeuze(){
-  const el = document.getElementById("na-normen");
+  const el = document.getElementById("na-norm");
   if(el.dataset.loaded) return;
-  const o = await j("/config/options");
-  el.innerHTML = (o.norms||[]).map(n =>
-    `<label style="margin-right:.6rem"><input type="checkbox" class="na-norm" value="${esc(n)}"> ${esc(n)}</label>`
-  ).join("") || `<span class="mini">geen normen in de norm-DB</span>`;
+  const normen = (await j("/config/options")).norms || [];
+  // Eén keuze: per norm een optie, plus "Beide" wanneer er precies twee zijn. Een
+  // enum in plaats van vinkjes — je kiest een auditscope, geen verzameling.
+  const opties = normen.map(n => `<option value="${esc(n)}">${esc(normLabel(n))}</option>`);
+  if(normen.length === 2){
+    opties.push(`<option value="${esc(normen.join("|"))}">Beide (${normen.map(normLabel).join(" + ")})</option>`);
+  }
+  el.innerHTML = opties.join("") || `<option value="">geen normen beschikbaar</option>`;
   el.dataset.loaded = "1";
 }
 
@@ -252,7 +280,7 @@ async function loadDashboard(){
       : `<span class="mini">nog niemand</span>`;
     return `<tr>
       <td><a class="aid" href="#/audit/${encodeURIComponent(a.id)}">${esc(a.id)}</a><br>
-          <span class="mini">${a.normen.map(esc).join(" + ")} · ${esc(a.periode)}</span></td>
+          <span class="mini">${a.normen.map(normLabel).map(esc).join(" + ")} · ${esc(a.periode)}</span></td>
       <td><span class="st st-${a.status}">${STATUS_LABEL[a.status]||a.status}</span><br>
           <span class="mini">${a.runs} run(s)</span></td>
       <td>${voortgang}<br>${memo}</td>
@@ -267,9 +295,10 @@ async function loadDashboard(){
 
 async function maakAudit(){
   const msg = document.getElementById("na-msg");
-  const normen = [...document.querySelectorAll(".na-norm:checked")].map(e=>e.value);
+  const keuze = document.getElementById("na-norm").value;
+  const normen = keuze ? keuze.split("|") : [];
   const periode = document.getElementById("na-periode").value.trim();
-  if(!normen.length){ msg.textContent = "⚠ kies minstens één norm"; return; }
+  if(!normen.length){ msg.textContent = "⚠ kies een norm"; return; }
   msg.textContent = "bezig…";
   const r = await fetch("/audits", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({normen, periode})});
@@ -284,22 +313,73 @@ async function maakAudit(){
 }
 
 // ============ configuratie ============
+let _bronnen = [];
 async function loadConfigView(){
-  const health = await j("/config/health");
-  const rijen = Object.entries(health).map(([naam, h]) => `
-    <tr>
-      <td><strong>${esc(naam)}</strong></td>
-      <td>${h.connected ? `<span class="badge-on">● gekoppeld</span>`
-                        : `<span class="badge-off">⚠ niet gekoppeld</span>`}</td>
-      <td>${h.connected ? `<span class="mini">${esc(h.tenant||"")}</span>`
-                        : esc(h.reden||"geen reden gemeld")}</td>
-    </tr>`).join("");
-  document.getElementById("config-wrap").innerHTML =
-    `<table><thead><tr><th>Bron</th><th>Status</th><th>Wat ontbreekt / context</th></tr></thead>
-     <tbody>${rijen}</tbody></table>
-     <p class="note">Deze status komt uit dezelfde healthcheck die een run gebruikt —
-     er is geen tweede administratie die uit de pas kan lopen. Welke bronnen een run
-     heeft geraadpleegd staat per run vastgelegd in de run-historie.</p>`;
+  const [health, bronnen] = await Promise.all([j("/config/health"), j("/config/bronnen")]);
+  _bronnen = bronnen;
+  const kaarten = bronnen.map(b => {
+    const h = health[b.naam] || {};
+    const badge = h.connected
+      ? `<span class="badge-on">● gekoppeld</span>`
+      : `<span class="badge-off">⚠ niet gekoppeld</span>`;
+    const reden = h.connected ? "" : `<div class="mini">${esc(h.reden||"")}</div>`;
+    return `<div class="bronkaart">
+      <div class="bronkop">
+        <strong>${esc(b.label)}</strong> ${badge}
+        <button class="alt" onclick="toonBronForm('${esc(b.naam)}')">Configureer</button>
+      </div>
+      <div class="mini">${esc(b.uitleg||"")}</div>
+      ${reden}
+      <div id="bf-${esc(b.naam)}" hidden></div>
+    </div>`;
+  }).join("");
+  document.getElementById("config-wrap").innerHTML = kaarten +
+    `<p class="note">De koppelstatus komt uit dezelfde healthcheck die een run gebruikt.
+     Welke bronnen een run heeft geraadpleegd staat per run in de run-historie.</p>`;
+}
+
+function toonBronForm(naam){
+  const doel = document.getElementById("bf-"+naam);
+  const b = _bronnen.find(x=>x.naam===naam);
+  if(!doel || !b) return;
+  if(!doel.hidden){ doel.hidden = true; return; }
+  doel.hidden = false;
+  doel.innerHTML = b.velden.map(v => {
+    const tip = v.hint ? ` data-tip="${esc(v.hint)}"` : "";
+    const status = v.geheim && v.ingesteld ? ` <span class="ok">ingesteld</span>` : "";
+    const ph = v.geheim && v.ingesteld ? "laat leeg om te behouden" : (v.verplicht ? "" : "optioneel");
+    return `<label class="veld"${tip}>${esc(v.label)}${status}<br>
+      <input id="v-${esc(naam)}-${esc(v.naam)}" style="width:100%"
+        type="${v.geheim ? "password" : "text"}" placeholder="${esc(ph)}"
+        value="${esc(v.geheim ? "" : (v.waarde||""))}"></label>`;
+  }).join("") +
+  `<div style="margin-top:.5rem">
+     <button onclick="bewaarBron('${esc(naam)}')">Opslaan</button>
+     <span id="bs-${esc(naam)}" class="ok"></span>
+   </div>`;
+}
+
+async function bewaarBron(naam){
+  const b = _bronnen.find(x=>x.naam===naam);
+  const msg = document.getElementById("bs-"+naam);
+  const velden = {};
+  for(const v of b.velden){
+    const el = document.getElementById(`v-${naam}-${v.naam}`);
+    if(!el) continue;
+    // Een leeg geheim veld betekent "laat staan"; een leeg gewoon veld betekent "wis".
+    if(v.geheim && el.value === "") continue;
+    velden[v.naam] = el.value;
+  }
+  msg.textContent = "bezig…";
+  const r = await fetch(`/config/bronnen/${encodeURIComponent(naam)}`,
+    {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({velden})});
+  if(!r.ok){
+    const d = await r.json().catch(()=>({detail:"onbekende fout"}));
+    msg.textContent = "⚠ " + (d.detail || r.status);
+    return;
+  }
+  msg.textContent = "✓ opgeslagen";
+  await loadConfigView();
 }
 
 // ============ audit-detail ============
@@ -315,7 +395,7 @@ async function openAudit(){
   const a = d.audit;
   document.getElementById("wie").textContent = "";
   document.getElementById("audit-kop").textContent =
-    `${a.id} — ${a.normen.join(" + ")} · ${a.periode}`;
+    `${a.normen.map(normLabel).join(" + ")} · ${a.periode}`;
   document.getElementById("audit-warn").innerHTML = d.andere_actief
     ? `<div class="warn"><strong>Let op:</strong> ${esc(d.andere_actief.identiteit)} was hier recent
        actief (${esc(d.andere_actief.ts)}). De audit blijft bewerkbaar; bij gelijktijdige triage

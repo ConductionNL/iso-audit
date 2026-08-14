@@ -112,6 +112,20 @@ spec:
               value: /var/lib/iso-audit/audit.db
             - name: LOCAL_REPORT_DIR
               value: /var/lib/iso-audit/rapporten
+            # Optioneel: een beheerder kan de bron-catalogus (welke velden een auditor
+            # per bron invult) overrulen met een YAML. Niet gezet = de ingebouwde
+            # standaard, zodat het portaal uit de doos werkt.
+            # Genereren: ./scripts/genereer-bron-catalogus.sh
+            - name: ISO_AUDIT_BRON_CATALOGUS
+              value: /var/lib/iso-audit/bronnen.yaml
+            # Waar de browser heen gaat ná het wissen van de proxy-sessie, zodat
+            # uitloggen ook echt uitloggen is en een volgende login niet stil
+            # doorloopt op de bestaande Keycloak-sessie. `client_id` is verplicht:
+            # zonder dat negeert Keycloak de post_logout_redirect_uri.
+            # Per omgeving instelbaar — een andere partij heeft een andere provider.
+            - name: ISO_AUDIT_LOGOUT_URL
+              value: >-
+                https://iam.commonground.nu/realms/commonground/protocol/openid-connect/logout?client_id=iso-audit-portal&post_logout_redirect_uri=https%3A%2F%2Fiso.commonground.nu%2F
             # Google Workspace via het org-service-account (change
             # gsuite-service-account-sources). Tot die change draait het portaal
             # zonder Drive/Planning-bron; de healthcheck meldt ze als

@@ -57,17 +57,21 @@
       plus de run-historie uit `runs.jsonl`
 - [x] 3.3 Configuratie als eigen scherm: per bron gekoppeld/niet uit
       `/config/health`, met wat ontbreekt erbij
-- [ ] 3.6 **Configuratie schrijfbaar maken** (herziening 2026-08-14; de eerdere
-      alleen-lezen-eis was fout onderbouwd — zie `design.md`). Auditor koppelt bronnen
-      en zet de scope in de UI; geen cluster of beheerder nodig, want het tool moet aan
-      derden te leveren zijn
-- [ ] 3.7 Configuratiewijzigingen append-only loggen met identiteit en tijdstip. Dat
+- [x] 3.6 **Configuratie schrijfbaar** (herziening 2026-08-14; de eerdere
+      alleen-lezen-eis was fout onderbouwd — zie `design.md`). Per bron een kaart met een
+      Configureer-knop en een formulier uit de catalogus. Velden worden in `os.environ`
+      gezet, zodat álle Source-adapters ongewijzigd blijven werken
+- [x] 3.10 Catalogus declaratief: `bron_catalogus.py` met een ingebouwde standaard, te
+      overrulen met YAML via `ISO_AUDIT_BRON_CATALOGUS`. Een beheerder genereert die met
+      `scripts/genereer-bron-catalogus.sh` bij initialisatie. Geen generatiestap nodig om
+      het portaal te laten werken — anders is het niet te leveren
+- [x] 3.7 Configuratiewijzigingen append-only loggen met identiteit en tijdstip. Dat
       registreren **is** de controle; niet proberen te voorkomen dat een auditor
       bronnen kiest
-- [ ] 3.8 Wijziging weigeren zolang er in die audit een run loopt — het deel van de
+- [x] 3.8 Wijziging weigeren zolang er in die audit een run loopt — het deel van de
       immutability-regel dat een correctheidsreden heeft (een Source leest zijn config
       bij start en daarna niet meer)
-- [ ] 3.9 Credentials schrijfbaar maar niet uitleesbaar: API geeft "ingesteld" /
+- [x] 3.9 Credentials schrijfbaar maar niet uitleesbaar: API geeft "ingesteld" /
       "niet ingesteld", nooit de waarde
 
 - [x] 3.4 Waarschuwing wanneer een andere identiteit recent actief was in deze audit

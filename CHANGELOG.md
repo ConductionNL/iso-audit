@@ -6,6 +6,52 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-14 — bronnen koppelen in de UI, uitlogknop, en normkeuze als enum
+
+**Bronnen koppelen kan nu in het portaal.** Per bron een kaart met een
+Configureer-knop en een formulier; geen cluster, geen Secret, geen beheerder. Dat is
+wat het tool leverbaar maakt aan derden.
+
+- `bron_catalogus.py` zegt *wat* een bron nodig heeft (label, hint, geheim of niet).
+  Ingebouwde standaard, te overrulen met YAML via `ISO_AUDIT_BRON_CATALOGUS`. Een
+  beheerder genereert die bij initialisatie met
+  `scripts/genereer-bron-catalogus.sh`; zonder dat bestand werkt het portaal ook —
+  een tool dat pas werkt na een generatiestap lever je niet uit.
+- `bron_config.py` bewaart de *waarden* en zet ze in `os.environ`. Daarmee blijven
+  álle Source-adapters ongewijzigd: geen adapter hoeft te weten dat er een portaal is.
+- Waarden uit het manifest of een Secret blijven vóórgaan op wat via de UI is
+  ingevuld — wat een beheerder expliciet zette, weegt zwaarder.
+- Geheime velden gaan er nooit uit: de API meldt `ingesteld`, niet de waarde. Het
+  bestand op de PVC staat op mode 0600.
+- Elke wijziging staat append-only met identiteit, tijdstip en veldnamen in
+  `bron_config_log.jsonl` — waarden nooit. Dat registreren *is* de controle.
+- Configureren tijdens een lopende run geeft 409: een Source leest zijn config bij
+  start, dus halverwege wisselen levert een run met twee scopes.
+
+**Dit is geen secret-manager**, en dat staat er ook zo bij. Waarden staan als JSON op
+de PVC naast de audit-trail. Zwakker dan een cluster-Secret; bewuste ruil, want
+configuratie die alleen via Secrets kan betekent dat elke partij een
+Kubernetes-beheerder nodig heeft om te beginnen.
+
+**Uitlogknop.** Er was geen manier om het portaal te verlaten behalve je browser
+sluiten. Nieuw `/me` geeft de identiteit en een optionele logout-URL; de nav toont
+"ingelogd als X" plus Uitloggen. Met `ISO_AUDIT_LOGOUT_URL` gezet hopt uitloggen door
+naar de identity-provider, zodat een volgende login niet stil doorloopt op een
+bestaande sessie. Niet gezet = alleen de proxy-sessie wissen, wat beter is dan een
+hardcoded URL die bij een andere partij naar de verkeerde plek wijst.
+
+**Normkeuze is een enum.** Was: vinkjes plus een alinea over id-formaat, periode-syntax
+en norm-YAML's. Nu: één select met "ISO 9001", "ISO 27001", "Beide", en de uitleg als
+tooltip. De auditor hoeft niets te weten van slugs, id-opbouw of YAML.
+
+**Twee eigen fouten onderweg.** `"/memo/preview".startswith("/me")` is waar, dus het
+toevoegen van `/me` aan de ongescopede-padenlijst brak vijf tests; die vergelijking gaat
+nu op segmentgrens. En de guard-test voor "geen config tijdens een run" slaagde eerst
+per ongeluk: de sim-run doet één tik per bevinding, dus met een lege werkset was hij
+direct klaar en werd de guard nooit geraakt.
+
+875 passed, ruff + `mypy --strict` clean. Versie naar `0.2.0a3`.
+
 ### Added — 2026-08-14 — CI faalt als de image-inhoud wijzigt zonder versiebump
 
 De bestaande check vergeleek alleen of `version` en `newTag` gelijk waren. Die vangt

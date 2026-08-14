@@ -239,3 +239,19 @@ def test_run_neemt_de_norm_uit_de_audit(tmp_path: Path) -> None:
     assert client.post(f"/audits/{aid}/run/start", json={"mode": "sim"}).status_code == 200
     (rec,) = client.get(f"/audits/{aid}/runs").json()
     assert rec["norm"] == "beide"
+
+
+def test_me_geeft_identiteit_en_logout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zonder /me heeft de UI geen "ingelogd als" en geen uitlogknop."""
+    monkeypatch.setenv("ISO_AUDIT_LOGOUT_URL", "https://iam.example/logout")
+    client, _ = _portaal(tmp_path)
+    d = client.get("/me").json()
+    assert d["identiteit"] == AUDITOR
+    assert d["logout_url"] == "https://iam.example/logout"
+
+
+def test_me_zonder_logout_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Niet gezet → null, en de UI wist dan alleen de proxy-sessie."""
+    monkeypatch.delenv("ISO_AUDIT_LOGOUT_URL", raising=False)
+    client, _ = _portaal(tmp_path)
+    assert client.get("/me").json()["logout_url"] is None

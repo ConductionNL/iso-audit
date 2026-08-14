@@ -27,7 +27,7 @@ EXAMPLES = Path("examples/auditmemo")
 NORMS = "examples/norms"
 AUDITOR = "auditor@conduction.nl"
 
-ONGESCOPED = ("/healthz", "/config", "/audits", "/openapi.json", "/docs")
+ONGESCOPED = ("/healthz", "/config", "/audits", "/me", "/openapi.json", "/docs")
 """Paden die niet onder een audit vallen; al het andere krijgt de audit-prefix.
 
 `"/"` staat hier **niet** in: elk pad begint ermee, dus `startswith` zou dan altijd
@@ -49,7 +49,10 @@ class PortaalClient:
         """Directory van deze audit, voor tests die de bestanden direct inspecteren."""
 
     def _pad(self, pad: str) -> str:
-        if pad == "/" or pad.startswith(ONGESCOPED):
+        # Op segmentgrens vergelijken, niet op tekstprefix: `"/memo/preview"` begint met
+        # `"/me"` en zou anders ongescopet blijven. Die fout kostte vijf tests.
+        basis = pad.split("?")[0]
+        if pad == "/" or any(basis == o or basis.startswith(o + "/") for o in ONGESCOPED):
             return pad
         return f"/audits/{self.audit_id}{pad}"
 
