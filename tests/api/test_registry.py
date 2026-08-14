@@ -34,19 +34,19 @@ def _kandidaat(**kw: object) -> dict[str, object]:
     [("9001", "2026-Q3", "9001-2026-Q3"), ("27001", "2026-h2", "27001-2026-H2")],
 )
 def test_audit_id(norm: str, periode: str, verwacht: str) -> None:
-    assert audit_id(norm, periode) == verwacht
+    assert audit_id([norm], periode) == verwacht
 
 
 @pytest.mark.parametrize("periode", ["najaar", "2026", "Q3", "2026-Q", "26-Q3"])
 def test_audit_id_weigert_onsorteerbare_periode(periode: str) -> None:
     """Vrije tekst maakt sorteren op periode onbetrouwbaar — dus hard weigeren."""
     with pytest.raises(RegistryError, match="periode"):
-        audit_id("9001", periode)
+        audit_id(["9001"], periode)
 
 
 def test_audit_id_weigert_lege_norm() -> None:
-    with pytest.raises(RegistryError, match="norm"):
-        audit_id("  ", "2026-Q3")
+    with pytest.raises(RegistryError, match=r"[Nn]orm"):
+        audit_id(["  "], "2026-Q3")
 
 
 # --- aanmaken -------------------------------------------------------------
@@ -54,11 +54,11 @@ def test_audit_id_weigert_lege_norm() -> None:
 
 def test_maak_audit_legt_aanmaker_vast(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    aid = r.maak(norm="9001", periode="2026-Q3", door="auditor@conduction.nl")
+    aid = r.maak(normen=["9001"], periode="2026-Q3", door="auditor@conduction.nl")
 
     manifest = json.loads((r.pad(aid) / "audit.json").read_text(encoding="utf-8"))
     assert manifest["aangemaakt_door"] == "auditor@conduction.nl"
-    assert manifest["norm"] == "9001"
+    assert manifest["normen"] == ["9001"]
     assert manifest["periode"] == "2026-Q3"
     # Lege maar geldige werkset, zodat AuditSession direct te openen is.
     assert json.loads((r.pad(aid) / "findings.json").read_text(encoding="utf-8")) == []
@@ -67,11 +67,11 @@ def test_maak_audit_legt_aanmaker_vast(tmp_path: Path) -> None:
 def test_dubbel_id_faalt_en_laat_bestaande_ongemoeid(tmp_path: Path) -> None:
     """Geen stil suffix: twee audits met dezelfde norm én periode is een vergissing."""
     r = AuditRegistry(tmp_path)
-    aid = r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl")
+    aid = r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl")
     (r.pad(aid) / "findings.json").write_text(json.dumps([_kandidaat()]), encoding="utf-8")
 
     with pytest.raises(RegistryError, match="bestaat al"):
-        r.maak(norm="9001", periode="2026-Q3", door="b@conduction.nl")
+        r.maak(normen=["9001"], periode="2026-Q3", door="b@conduction.nl")
 
     assert len(json.loads((r.pad(aid) / "findings.json").read_text(encoding="utf-8"))) == 1
     assert len(list(tmp_path.iterdir())) == 1
@@ -93,7 +93,7 @@ def test_pad_weigert_ontsnapping(tmp_path: Path, aid: str) -> None:
 
 def test_tweede_run_vult_aan_en_behoudt_triage(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    aid = r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl")
+    aid = r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl")
     d = r.pad(aid)
 
     runs_mod.voeg_toe(d, [_kandidaat(id="f1")])
@@ -114,7 +114,7 @@ def test_tweede_run_vult_aan_en_behoudt_triage(tmp_path: Path) -> None:
 
 def test_duplicaat_wordt_overgeslagen_en_geteld(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    d = r.pad(r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl"))
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
 
     runs_mod.voeg_toe(d, [_kandidaat(id="f1")])
     # Zelfde norm/clausule/bron/titel — alleen een ander id en andere beschrijving.
@@ -127,7 +127,7 @@ def test_duplicaat_wordt_overgeslagen_en_geteld(tmp_path: Path) -> None:
 
 def test_dedup_negeert_hoofdletters_en_dubbele_spaties(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    d = r.pad(r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl"))
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
     runs_mod.voeg_toe(d, [_kandidaat(title="Correctieve maatregelen")])
     _, overgeslagen = runs_mod.voeg_toe(d, [_kandidaat(title="  correctieve   MAATREGELEN ")])
     assert overgeslagen == 1
@@ -135,7 +135,7 @@ def test_dedup_negeert_hoofdletters_en_dubbele_spaties(tmp_path: Path) -> None:
 
 def test_dedup_is_reproduceerbaar(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    d = r.pad(r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl"))
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
     kandidaten = [_kandidaat(id="a"), _kandidaat(id="b", clause="9.2")]
     eerste = runs_mod.voeg_toe(d, kandidaten)
     tweede = runs_mod.voeg_toe(d, kandidaten)
@@ -148,7 +148,7 @@ def test_dedup_is_reproduceerbaar(tmp_path: Path) -> None:
 
 def test_run_record_is_append_only(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    d = r.pad(r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl"))
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
 
     runs_mod.registreer(d, door="a@conduction.nl", modus="sim", norm="9001", bronnen=["drive"])
     eerste = runs_mod.lijst(d)
@@ -165,7 +165,7 @@ def test_run_record_is_append_only(tmp_path: Path) -> None:
 def test_mislukte_run_blijft_zichtbaar(tmp_path: Path) -> None:
     """Een run die faalde op een ontbrekende credential is auditinformatie."""
     r = AuditRegistry(tmp_path)
-    d = r.pad(r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl"))
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
     runs_mod.registreer(
         d,
         door="a@conduction.nl",
@@ -181,7 +181,7 @@ def test_mislukte_run_blijft_zichtbaar(tmp_path: Path) -> None:
 
 def test_geraadpleegde_bronnen_over_runs_heen(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    d = r.pad(r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl"))
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
     runs_mod.registreer(d, door="a@c.nl", modus="sim", norm="9001", bronnen=["drive"])
     runs_mod.registreer(d, door="a@c.nl", modus="sim", norm="9001", bronnen=["jira", "drive"])
     assert runs_mod.geraadpleegde_bronnen(d) == ["drive", "jira"]
@@ -192,7 +192,7 @@ def test_geraadpleegde_bronnen_over_runs_heen(tmp_path: Path) -> None:
 
 def test_andere_actief_waarschuwt_maar_blokkeert_niet(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    aid = r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl")
+    aid = r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl")
 
     r.markeer_actief(aid, "a@conduction.nl")
     assert r.andere_actief(aid, "a@conduction.nl") is None, "eigen activiteit is geen waarschuwing"
@@ -204,7 +204,7 @@ def test_andere_actief_waarschuwt_maar_blokkeert_niet(tmp_path: Path) -> None:
 
 def test_oude_activiteit_waarschuwt_niet(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    aid = r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl")
+    aid = r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl")
     (r.pad(aid) / ".actief").write_text(
         json.dumps({"identiteit": "a@conduction.nl", "ts": "2020-01-01T00:00:00Z"}),
         encoding="utf-8",
@@ -218,7 +218,7 @@ def test_oude_activiteit_waarschuwt_niet(tmp_path: Path) -> None:
 def test_status_nieuw_zonder_run(tmp_path: Path) -> None:
     """Een aangemaakte audit zonder run is een geldige toestand en moet zichtbaar zijn."""
     r = AuditRegistry(tmp_path)
-    r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl")
+    r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl")
     (regel,) = ov.alles(r)
     assert regel.status == ov.STATUS_NIEUW
     assert regel.runs == 0
@@ -226,7 +226,7 @@ def test_status_nieuw_zonder_run(tmp_path: Path) -> None:
 
 def test_status_loopt_en_memo_klaar(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    aid = r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl")
+    aid = r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl")
     d = r.pad(aid)
     runs_mod.voeg_toe(d, [_kandidaat(id="f1")])
     runs_mod.registreer(d, door="a@c.nl", modus="sim", norm="9001", bronnen=["drive"])
@@ -241,7 +241,7 @@ def test_status_loopt_en_memo_klaar(tmp_path: Path) -> None:
 
 def test_overzicht_toont_laatste_actor_uit_de_trail(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    d = r.pad(r.maak(norm="9001", periode="2026-Q3", door="a@conduction.nl"))
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
     with (d / "triage_log.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps({"timestamp": "2026-08-01T10:00:00Z", "actor": "eerste@c.nl"}) + "\n")
         fh.write(json.dumps({"timestamp": "2026-08-02T11:00:00Z", "actor": "laatste@c.nl"}) + "\n")
@@ -253,19 +253,76 @@ def test_overzicht_toont_laatste_actor_uit_de_trail(tmp_path: Path) -> None:
 
 def test_overzicht_sorteert_nieuwste_periode_eerst(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
-    r.maak(norm="9001", periode="2026-Q1", door="a@c.nl")
-    r.maak(norm="9001", periode="2026-Q3", door="a@c.nl")
-    r.maak(norm="27001", periode="2026-Q2", door="a@c.nl")
+    r.maak(normen=["9001"], periode="2026-Q1", door="a@c.nl")
+    r.maak(normen=["9001"], periode="2026-Q3", door="a@c.nl")
+    r.maak(normen=["27001"], periode="2026-Q2", door="a@c.nl")
     assert [x.periode for x in ov.alles(r)] == ["2026-Q3", "2026-Q2", "2026-Q1"]
 
 
 def test_overzicht_negeert_losse_mappen(tmp_path: Path) -> None:
     """Een directory zonder manifest is geen audit — niet meetellen."""
     r = AuditRegistry(tmp_path)
-    r.maak(norm="9001", periode="2026-Q3", door="a@c.nl")
+    r.maak(normen=["9001"], periode="2026-Q3", door="a@c.nl")
     (tmp_path / "rommel").mkdir()
     assert len(ov.alles(r)) == 1
 
 
 def test_overzicht_op_lege_root(tmp_path: Path) -> None:
     assert ov.alles(AuditRegistry(tmp_path / "bestaat-niet")) == []
+
+
+# --- meerdere normen per audit -------------------------------------------
+
+
+def test_audit_over_beide_normen(tmp_path: Path) -> None:
+    """9001 én 27001 is één audit met één memo, geen twee administraties."""
+    r = AuditRegistry(tmp_path)
+    aid = r.maak(normen=["9001", "27001"], periode="2026-Q3", door="a@c.nl")
+    assert aid == "27001_9001-2026-Q3"
+
+    manifest = json.loads((r.pad(aid) / "audit.json").read_text(encoding="utf-8"))
+    assert manifest["normen"] == ["27001", "9001"]
+
+
+def test_norm_db_slug_wordt_korte_code() -> None:
+    """De UI mag norm-DB-slugs sturen; er is één vocabulaire."""
+    from iso_audit.api.registry import norm_code
+
+    assert norm_code("iso-9001-2015") == "9001"
+    assert norm_code("iso-27001-2022") == "27001"
+    assert norm_code("9001") == "9001"
+
+
+def test_slug_en_code_leveren_hetzelfde_id(tmp_path: Path) -> None:
+    r = AuditRegistry(tmp_path)
+    assert audit_id(["iso-9001-2015"], "2026-Q3") == audit_id(["9001"], "2026-Q3")
+    r.maak(normen=["iso-9001-2015"], periode="2026-Q3", door="a@c.nl")
+    with pytest.raises(RegistryError, match="bestaat al"):
+        r.maak(normen=["9001"], periode="2026-Q3", door="a@c.nl")
+
+
+def test_run_code_leidt_de_pipeline_parameter_af() -> None:
+    from iso_audit.api.registry import run_code
+
+    assert run_code(["9001"]) == "9001"
+    assert run_code(["27001"]) == "27001"
+    assert run_code(["9001", "27001"]) == "beide"
+    assert run_code(["iso-27001-2022", "iso-9001-2015"]) == "beide"
+
+
+def test_norm_die_de_pipeline_niet_kent_faalt_hard(tmp_path: Path) -> None:
+    """Kiesbaar in de norm-DB is niet hetzelfde als draaibaar.
+
+    De norm-keuze staat op vier plekken in de pipeline hardcoded. Een derde norm mag
+    dus niet stil de verkeerde run opleveren — hij faalt bij het aanmaken.
+    """
+    r = AuditRegistry(tmp_path)
+    with pytest.raises(RegistryError, match="nog niet draaien"):
+        r.maak(normen=["iso-14001-2015"], periode="2026-Q3", door="a@c.nl")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_lege_normlijst_faalt(tmp_path: Path) -> None:
+    r = AuditRegistry(tmp_path)
+    with pytest.raises(RegistryError, match="minstens één norm"):
+        r.maak(normen=[], periode="2026-Q3", door="a@c.nl")

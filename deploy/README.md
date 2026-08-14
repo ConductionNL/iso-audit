@@ -142,9 +142,15 @@ Keycloak-clientsecret dat al in het cluster staat blijft ongemoeid.
 
 Na inloggen: het landingsscherm is het **audit-overzicht**. Een nieuwe audit maak je
 daar aan met norm + periode (`9001` + `2026-Q3` → id `9001-2026-Q3`); de routes zijn
-sindsdien audit-gescoped (`/audits/{id}/…`). Configuratie is een eigen scherm en is
-**alleen-lezen**: een bron koppelen gaat via Secrets en manifest, omdat een bron zijn
-configuratie onveranderlijk houdt binnen een auditperiode.
+sindsdien audit-gescoped (`/audits/{id}/…`). Configuratie is een eigen scherm: het
+toont per bron of die gekoppeld is en wat er ontbreekt. Koppelen vanuit de UI is in
+aanbouw (taak 3.6-3.9); tot dan komen bron-credentials uit de Secrets in
+`secret.example.yaml`.
+
+Dat koppelen hóórt in de UI te kunnen: een auditor heeft geen boodschap aan een
+cluster, en het tool moet aan derden te leveren zijn. De controle is dat elke
+wijziging en elke geraadpleegde bron wordt vastgelegd — niet dat configureren moeilijk
+is.
 
 **`/healthz` is extern níet bereikbaar, en dat is opzet.** Er staat geen
 `skip_auth_routes` in `oauth2-proxy.cfg`, dus de proxy onderschept élk pad — ook

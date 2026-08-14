@@ -93,7 +93,7 @@ def regel(audit_dir: Path) -> AuditOverzicht:
 
     return AuditOverzicht(
         id=str(manifest.get("id", audit_dir.name)),
-        norm=str(manifest.get("norm", "")),
+        normen=[str(n) for n in manifest.get("normen", [])],
         periode=str(manifest.get("periode", "")),
         status=_status(aantal_runs, openstaand, memo_klaar),
         bevindingen=totaal,
@@ -119,4 +119,4 @@ def alles(registry: AuditRegistry) -> list[AuditOverzicht]:
         regel(d) for d in sorted(registry.root.iterdir()) if d.is_dir() and (d / MANIFEST).is_file()
     ]
     # Periode aflopend, dan norm — `2026-Q3` sorteert lexicografisch correct.
-    return sorted(regels, key=lambda r: (r.periode, r.norm), reverse=True)
+    return sorted(regels, key=lambda r: (r.periode, r.normen), reverse=True)

@@ -39,9 +39,15 @@ AUDITS_ROOT_ENV = "ISO_AUDIT_AUDITS_ROOT"
 
 
 class NieuweAudit(BaseModel):
-    """Een audit aanmaken: norm + periode, de rest is afgeleid."""
+    """Een audit aanmaken: één of meer normen + periode; de rest is afgeleid.
 
-    norm: str
+    Meerdere normen is een gewone audit, geen speciaal geval: 9001 én 27001 samen
+    levert één audit met één memo. De normen mogen norm-DB-slugs zijn
+    (`iso-9001-2015`) of korte codes (`9001`) — `registry.norm_code` maakt er één
+    vocabulaire van.
+    """
+
+    normen: list[str]
     periode: str
 
 
@@ -96,10 +102,16 @@ def create_app(
         """Maak een audit aan. Een auditorhandeling, geen beheeractie."""
         wie = identiteit_van(request)
         try:
-            aid = registry.maak(norm=nieuw.norm, periode=nieuw.periode, door=wie)
+            aid = registry.maak(normen=nieuw.normen, periode=nieuw.periode, door=wie)
         except RegistryError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        log_event("audit_aangemaakt", wie, audit=aid, norm=nieuw.norm, periode=nieuw.periode)
+        log_event(
+            "audit_aangemaakt",
+            wie,
+            audit=aid,
+            normen=",".join(nieuw.normen),
+            periode=nieuw.periode,
+        )
         return asdict(ov.regel(registry.pad(aid)))
 
     # --- audit-onafhankelijke configuratie ----------------------------------

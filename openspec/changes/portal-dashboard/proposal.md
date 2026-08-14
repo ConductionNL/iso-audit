@@ -21,8 +21,8 @@ portaal één sessie kent, is het een demonstratie en geen werktuig.
 **Capability-raking** (`docs/missie.md`): dit versterkt capability 3
 (*auditor-spiegel*). De trail is nu toewijsbaar aan een mens, maar niet aan een
 audit — je kunt niet terugkijken hoe een eerdere auditperiode tot zijn conclusies
-kwam. Capability 1 wordt geraakt en bewust beschermd: de scope van een audit staat
-vast zodra hij loopt (zie het besluit over configuratie hieronder).
+kwam. Capability 1 wordt geraakt: de bron-scope staat vast zodra een run loopt — een
+correctheidseis, geen wantrouwen jegens de auditor (zie `design.md`).
 
 ## What Changes
 
@@ -40,8 +40,11 @@ vast zodra hij loopt (zie het besluit over configuratie hieronder).
 - **Dashboard als landingsscherm** met één regel per audit: norm + periode +
   status, triage-voortgang en of de memo klaar is, welke bronnen zijn geraadpleegd,
   en wie er als laatste aan werkte en wanneer.
-- **Configuratie als eigen taak, alleen-lezen.** Per bron gekoppeld of niet, met
-  wat er ontbreekt. Wijzigen blijft via Secrets en manifest.
+- **Configuratie als eigen taak, door de auditor zelf te zetten.** Per bron gekoppeld
+  of niet, met wat er ontbreekt, en koppelen/scope instellen in de UI. Geen cluster,
+  geen beheerder — anders is het tool niet aan derden te leveren. De controle is
+  registratie: elke wijziging append-only met identiteit, en elk run-record vermeldt
+  de geraadpleegde bronnen.
 - **Toegang blijft zoals hij is:** iedereen die inlogt ziet alle audits. Het
   audit-log legt vast wie wat deed. Geen tweede rechtenmodel naast Keycloak.
 
@@ -52,7 +55,7 @@ vast zodra hij loopt (zie het besluit over configuratie hieronder).
 - `audit-registry` — audits en runs als eerste-klas, aanvullende runs met
   deterministische deduplicatie.
 - `portal-dashboard` — overzicht van audits met de vier kolommen.
-- `portal-config-view` — configuratie als losse, alleen-lezende taak.
+- `portal-config-view` — configuratie als losse taak die de auditor zelf zet.
 
 ### Modified Capabilities
 
@@ -83,8 +86,8 @@ API-herstructurering die daarvoor nodig is.
   vergrendeling en geen samenvoeging van gelijktijdige beslissingen.
 - **Per-audit autorisatie.** Zou een eigen rechtenmodel naast Keycloak betekenen.
   Kan later fijnmazig via de bestaande `groups`-scope.
-- **Scope bewerkbaar in de UI.** Zie het besluit in `design.md`: de bron-scope
-  blijft configuratie, niet iets wat een auditor tijdens een audit verzet.
+- **Credentials teruglezen.** Invoeren kan, uitlezen nooit: het scherm meldt
+  "ingesteld" of "niet ingesteld" en de API geeft de waarde niet terug.
 - **Een leesrol voor management.** Niet genoemd als dagelijks gebruik; toevoegen
   vraagt de autorisatielaag die hierboven buiten scope staat.
 - **Automatische migratie van de bestaande sessie-dir.** Data verplaatsen doet een

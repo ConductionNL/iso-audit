@@ -58,21 +58,72 @@ def _nu() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def audit_id(norm: str, periode: str) -> str:
-    """Bouw het audit-id uit norm en periode, bv. ``9001-2026-Q3``.
+_NORM_SLUG = re.compile(r"^iso-(\d+)-\d{4}$")
+"""Norm-DB-slug, bv. ``iso-9001-2015``. De norm-DB is de config: een YAML erbij zetten
+maakt die norm kiesbaar, zonder codewijziging."""
 
-    :raises RegistryError: bij een lege norm of een periode die niet als
-        ``YYYY-Qn``/``YYYY-Hn`` te sorteren is.
+PIPELINE_NORMEN = frozenset({"9001", "27001"})
+"""Normen die de pipeline daadwerkelijk kan draaien.
+
+Bewust een aparte, kleinere set dan wat de norm-DB kan bevatten. De norm-keuze staat op
+vier plekken in de pipeline hardcoded (`choices=["9001","27001","beide"]`); een derde
+norm toevoegen aan de norm-DB maakt hem hier dus kiesbaar maar nog niet draaibaar. In
+plaats van dat stil mis te laten gaan, faalt het aanmaken met een leesbare fout."""
+
+
+def norm_code(norm: str) -> str:
+    """Korte code voor een norm: ``iso-9001-2015`` → ``9001``; ``9001`` blijft ``9001``.
+
+    Eén regel voor beide vormen, zodat de UI een norm-DB-slug mag doorgeven en een
+    mens een korte code — en er niet twee vocabulaires naast elkaar ontstaan.
     """
     norm = norm.strip()
+    m = _NORM_SLUG.match(norm)
+    if m:
+        return m.group(1)
+    if norm.isdigit():
+        return norm
+    raise RegistryError(f"Onbekende norm: {norm!r}. Verwacht bv. 'iso-9001-2015' of '9001'.")
+
+
+def run_code(normen: list[str]) -> str:
+    """De norm-parameter waarmee de pipeline draait: ``9001``, ``27001`` of ``beide``.
+
+    :raises RegistryError: bij een norm die de pipeline niet kent — expliciet in plaats
+        van een run die stil de verkeerde norm gebruikt.
+    """
+    codes = sorted({norm_code(n) for n in normen})
+    onbekend = [c for c in codes if c not in PIPELINE_NORMEN]
+    if onbekend:
+        raise RegistryError(
+            f"De pipeline kan norm(en) {', '.join(onbekend)} nog niet draaien. "
+            f"Ondersteund: {', '.join(sorted(PIPELINE_NORMEN))}."
+        )
+    if not codes:
+        raise RegistryError("Kies minstens één norm.")
+    return "beide" if len(codes) > 1 else codes[0]
+
+
+def audit_id(normen: list[str], periode: str) -> str:
+    """Bouw het audit-id uit normen en periode, bv. ``9001-2026-Q3`` of
+    ``9001_27001-2026-Q3``.
+
+    Meerdere normen worden gesorteerd en met ``_`` verbonden — URL-veilig en zonder de
+    ``+``-verwarring (die in query-strings een spatie betekent). Het id wordt nooit
+    terug geparsed: het manifest houdt de normen expliciet.
+
+    :raises RegistryError: bij een lege of onbekende norm, of een periode die niet als
+        ``JJJJ-Qn``/``JJJJ-Hn`` te sorteren is.
+    """
     periode = periode.strip().upper()
-    if not norm or not norm.replace("-", "").isalnum():
-        raise RegistryError(f"Ongeldige norm: {norm!r}. Verwacht bv. '9001' of '27001'.")
+    if not normen:
+        raise RegistryError("Kies minstens één norm.")
+    codes = sorted({norm_code(n) for n in normen})
     if not _PERIODE.match(periode):
         raise RegistryError(
             f"Ongeldige periode: {periode!r}. Verwacht 'JJJJ-Qn' of 'JJJJ-Hn', bv. '2026-Q3'."
         )
-    return f"{norm}-{periode}"
+    return f"{'_'.join(codes)}-{periode}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +131,7 @@ class AuditOverzicht:
     """Eén regel op het dashboard. Alles hierin is afgeleid uit de bestanden."""
 
     id: str
-    norm: str
+    normen: list[str]
     periode: str
     status: str
     """``nieuw`` | ``loopt`` | ``memo-klaar`` — berekend, nooit opgeslagen."""
@@ -119,15 +170,21 @@ class AuditRegistry:
             raise RegistryError(f"Audit {aid!r} bestaat niet.")
         return self.pad(aid)
 
-    def maak(self, *, norm: str, periode: str, door: str) -> str:
+    def maak(self, *, normen: list[str], periode: str, door: str) -> str:
         """Maak een audit aan en retourneer het id.
 
+        ``normen`` mag meerdere normen bevatten — een audit over 9001 én 27001 is
+        gewoon één audit met één memo. De pipeline-parameter wordt afgeleid
+        (:func:`run_code`) en niet apart bewaard, zodat er geen tweede waarheid over
+        de scope ontstaat.
+
         Een bestaand id is een fout en geen aanleiding om er een suffix bij te
-        verzinnen: twee audits met dezelfde norm én periode is bijna altijd een
-        vergissing, en stil doorgaan maakt daar een blijvende dubbele administratie
-        van.
+        verzinnen: dezelfde normen én periode is bijna altijd een vergissing, en stil
+        doorgaan maakt daar een blijvende dubbele administratie van.
         """
-        aid = audit_id(norm, periode)
+        aid = audit_id(normen, periode)
+        codes = sorted({norm_code(n) for n in normen})
+        run_code(codes)  # faalt vóór het aanmaken als de pipeline dit niet kan draaien
         dir_ = self.pad(aid)
         if (dir_ / MANIFEST).is_file():
             raise RegistryError(
@@ -138,7 +195,7 @@ class AuditRegistry:
             json.dumps(
                 {
                     "id": aid,
-                    "norm": norm.strip(),
+                    "normen": codes,
                     "periode": periode.strip().upper(),
                     "aangemaakt": _nu(),
                     "aangemaakt_door": door,

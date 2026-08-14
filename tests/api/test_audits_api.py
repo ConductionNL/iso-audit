@@ -61,7 +61,7 @@ def _vul(registry: AuditRegistry, aid: str, findings: list[dict[str, object]]) -
 def test_audit_aanmaken_is_een_auditorhandeling(tmp_path: Path) -> None:
     """Geen beheeractie: norm + periode volstaat, en de audit bestaat direct."""
     client, _ = _portaal(tmp_path)
-    r = client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
+    r = client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
     assert r.status_code == 201
     assert r.json()["id"] == "9001-2026-Q3"
     assert r.json()["status"] == ov.STATUS_NIEUW
@@ -72,15 +72,15 @@ def test_audit_aanmaken_is_een_auditorhandeling(tmp_path: Path) -> None:
 
 def test_ongeldige_periode_geeft_400(tmp_path: Path) -> None:
     client, _ = _portaal(tmp_path)
-    r = client.post("/audits", json={"norm": "9001", "periode": "najaar"})
+    r = client.post("/audits", json={"normen": ["9001"], "periode": "najaar"})
     assert r.status_code == 400
     assert "periode" in r.json()["detail"]
 
 
 def test_dubbele_audit_geeft_400(tmp_path: Path) -> None:
     client, _ = _portaal(tmp_path)
-    client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
-    r = client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
+    r = client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
     assert r.status_code == 400
     assert "bestaat al" in r.json()["detail"]
 
@@ -88,7 +88,7 @@ def test_dubbele_audit_geeft_400(tmp_path: Path) -> None:
 def test_lege_audit_staat_in_het_overzicht(tmp_path: Path) -> None:
     """Een audit zonder run is een geldige toestand en moet zichtbaar zijn."""
     client, _ = _portaal(tmp_path)
-    client.post("/audits", json={"norm": "27001", "periode": "2026-H2"})
+    client.post("/audits", json={"normen": ["27001"], "periode": "2026-H2"})
     (regel,) = client.get("/audits").json()
     assert regel["status"] == ov.STATUS_NIEUW
     assert regel["runs"] == 0
@@ -100,8 +100,8 @@ def test_lege_audit_staat_in_het_overzicht(tmp_path: Path) -> None:
 def test_beslissing_landt_in_de_genoemde_audit(tmp_path: Path) -> None:
     """De belangrijkste test van deze change: geen kruisbesmetting."""
     client, registry = _portaal(tmp_path)
-    client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
-    client.post("/audits", json={"norm": "27001", "periode": "2026-Q3"})
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
+    client.post("/audits", json={"normen": ["27001"], "periode": "2026-Q3"})
     a, b = "9001-2026-Q3", "27001-2026-Q3"
     _vul(registry, a, _FINDINGS)
     _vul(registry, b, _FINDINGS)
@@ -135,7 +135,7 @@ def test_padontsnapping_wordt_geweigerd(tmp_path: Path) -> None:
 
 def test_run_wordt_geregistreerd_met_identiteit(tmp_path: Path) -> None:
     client, registry = _portaal(tmp_path)
-    client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
     aid = "9001-2026-Q3"
     _vul(registry, aid, _FINDINGS)
 
@@ -152,7 +152,7 @@ def test_run_wordt_geregistreerd_met_identiteit(tmp_path: Path) -> None:
 
 def test_bronnen_uit_runs_landen_in_het_overzicht(tmp_path: Path) -> None:
     client, registry = _portaal(tmp_path)
-    client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
     aid = "9001-2026-Q3"
     _vul(registry, aid, _FINDINGS)
     client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "sources": ["drive"]})
@@ -176,7 +176,7 @@ def test_healthz_en_config_zijn_niet_audit_gescoped(tmp_path: Path) -> None:
 
 def test_detail_meldt_andere_actieve_auditor(tmp_path: Path) -> None:
     client, registry = _portaal(tmp_path)
-    client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
     aid = "9001-2026-Q3"
     _vul(registry, aid, _FINDINGS)
     registry.markeer_actief(aid, "iemand.anders@conduction.nl")
@@ -195,7 +195,7 @@ def test_tweede_run_via_de_route_behoudt_triage(tmp_path: Path) -> None:
     moduleniveau en niet in de praktijk. Deze test loopt door de échte route.
     """
     client, registry = _portaal(tmp_path)
-    client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
     aid = "9001-2026-Q3"
     d = _vul(registry, aid, _FINDINGS)
 
@@ -211,3 +211,31 @@ def test_tweede_run_via_de_route_behoudt_triage(tmp_path: Path) -> None:
     na = client.get(f"/audits/{aid}/findings").json()
     assert len(na) == 1
     assert na[0]["triage_status"] == "valide", "triage is weggegooid door de tweede run"
+
+
+def test_audit_over_beide_normen_via_de_api(tmp_path: Path) -> None:
+    client, _ = _portaal(tmp_path)
+    r = client.post("/audits", json={"normen": ["9001", "27001"], "periode": "2026-Q3"})
+    assert r.status_code == 201
+    assert r.json()["id"] == "27001_9001-2026-Q3"
+    assert r.json()["normen"] == ["27001", "9001"]
+
+
+def test_norm_buiten_de_pipeline_geeft_400(tmp_path: Path) -> None:
+    client, registry = _portaal(tmp_path)
+    r = client.post("/audits", json={"normen": ["iso-14001-2015"], "periode": "2026-Q3"})
+    assert r.status_code == 400
+    assert "nog niet draaien" in r.json()["detail"]
+    assert list(registry.root.iterdir()) == []
+
+
+def test_run_neemt_de_norm_uit_de_audit(tmp_path: Path) -> None:
+    """De run mag geen andere norm kunnen kiezen dan de audit — anders liegt de memo."""
+    client, registry = _portaal(tmp_path)
+    client.post("/audits", json={"normen": ["9001", "27001"], "periode": "2026-Q3"})
+    aid = "27001_9001-2026-Q3"
+    _vul(registry, aid, _FINDINGS)
+
+    assert client.post(f"/audits/{aid}/run/start", json={"mode": "sim"}).status_code == 200
+    (rec,) = client.get(f"/audits/{aid}/runs").json()
+    assert rec["norm"] == "beide"

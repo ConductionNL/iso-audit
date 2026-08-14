@@ -56,8 +56,20 @@
 - [x] 3.2 Audit-detail: de bestaande triage- en memo-flow, nu binnen één audit,
       plus de run-historie uit `runs.jsonl`
 - [x] 3.3 Configuratie als eigen scherm: per bron gekoppeld/niet uit
-      `/config/health`, met de ontbrekende env-var of Secret-key erbij.
-      **Alleen-lezen** — geen enkel endpoint dat bron-config of credentials schrijft
+      `/config/health`, met wat ontbreekt erbij
+- [ ] 3.6 **Configuratie schrijfbaar maken** (herziening 2026-08-14; de eerdere
+      alleen-lezen-eis was fout onderbouwd — zie `design.md`). Auditor koppelt bronnen
+      en zet de scope in de UI; geen cluster of beheerder nodig, want het tool moet aan
+      derden te leveren zijn
+- [ ] 3.7 Configuratiewijzigingen append-only loggen met identiteit en tijdstip. Dat
+      registreren **is** de controle; niet proberen te voorkomen dat een auditor
+      bronnen kiest
+- [ ] 3.8 Wijziging weigeren zolang er in die audit een run loopt — het deel van de
+      immutability-regel dat een correctheidsreden heeft (een Source leest zijn config
+      bij start en daarna niet meer)
+- [ ] 3.9 Credentials schrijfbaar maar niet uitleesbaar: API geeft "ingesteld" /
+      "niet ingesteld", nooit de waarde
+
 - [x] 3.4 Waarschuwing wanneer een andere identiteit recent actief was in deze audit
 - [x] 3.5 `ui.html` blijft één bestand zonder build-stap
 
@@ -73,7 +85,7 @@
 - [x] 4.3 `deployment.yaml`: de `--session`-arg vervalt; het portaal krijgt de
       audits-root. Versie + `newTag` gelijk bumpen (de image-check faalt anders)
 - [x] 4.4 `deploy/README.md` en `docs/` bijwerken: nieuwe routes, de migratiestap, en
-      dat configuratie alleen-lezen is en waarom
+      de stand van het configuratiescherm (koppelen vanuit de UI: taak 3.6-3.9)
 - [x] 4.5 `CHANGELOG.md`: breaking API-change expliciet benoemen
 
 ## 5. Buiten scope — niet stilzwijgend toevoegen

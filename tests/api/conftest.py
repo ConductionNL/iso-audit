@@ -77,7 +77,7 @@ def maak_portaal(
     """
     root = tmp_path / "audits"
     registry = AuditRegistry(root)
-    aid = registry.maak(norm=norm, periode=periode, door=AUDITOR)
+    aid = registry.maak(normen=[norm], periode=periode, door=AUDITOR)
     audit_dir = registry.pad(aid)
 
     if findings is not None:

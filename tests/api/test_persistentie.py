@@ -70,7 +70,7 @@ def _opzet(tmp_path: Path) -> tuple[Path, str]:
     """Maak een audits-root met één audit en de findings erin."""
     root = tmp_path / "audits"
     registry = AuditRegistry(root)
-    aid = registry.maak(norm="9001", periode="2026-Q3", door=_AUDITOR)
+    aid = registry.maak(normen=["9001"], periode="2026-Q3", door=_AUDITOR)
     d = registry.pad(aid)
     (d / "findings.json").write_text(json.dumps(_FINDINGS), encoding="utf-8")
     (d / "memo-input.yaml").write_text(

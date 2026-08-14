@@ -92,20 +92,40 @@ bij het starten van de app. Dat is de kern van de change; alles daarboven is sch
 buiten de eigen `ui.html` bestaat niet. Een compatibiliteitslaag onderhouden voor een
 consument die niet bestaat is verspilling.
 
-## Configuratie: tonen, niet zetten
+## Configuratie: de auditor zet het zelf
 
-Het configuratiescherm leest `/config/health` en zegt per bron: gekoppeld of niet, en
-zo niet, welke env-var of Secret-key ontbreekt. Wijzigen blijft via Secrets en manifest.
+Het configuratiescherm laat de auditor bronnen koppelen en de scope instellen. Geen
+cluster, geen manifest, geen beheerder.
 
-Dat is geen luiheid maar de missie: `sources/base.py` schrijft voor dat een Source
-zijn configuratie immutable houdt na `__init__`, als directe vertaling van
-capability 1 — *"toegang van tevoren ingericht en daarna onveranderlijk binnen een
-auditperiode"*. Een auditor die de Drive-map kan verzetten terwijl hij audit, kan
-zijn eigen bewijsbasis kiezen. Precies dat moet het tool onmogelijk maken.
+**Dit corrigeert een eerder besluit in deze change.** Ik had het scherm alleen-lezen
+gemaakt met als argument dat `sources/base.py` immutability eist en dat een auditor
+anders "zijn eigen bewijsbasis kiest". Twee fouten:
 
-De praktische pijn (een bron koppelen vraagt een beheerder) is echt, maar de
-oplossing daarvoor is een goede foutmelding en een duidelijk scherm — niet het
-weghalen van de garantie die het tool zijn waarde geeft.
+1. Die regel eist immutability **na `__init__`** — een object-lifecycle-invariant zodat
+   een Source niet halverwege een run van scope wisselt. Het is geen uitspraak over wie
+   mag configureren of waar de config vandaan komt. Ik heb een engineering-invariant
+   tot autorisatiebeleid gepromoveerd.
+2. De dreiging bestaat niet. Bewijs bestaat of het bestaat niet. Een auditor kiest
+   bronnen, die bronnen worden vastgelegd, en een ontbrekende bron valt een laag hoger
+   op: een interne auditor wordt door een externe gecontroleerd en die staat onder
+   toezicht.
+
+Bovendien maakte het het tool onleverbaar. Configuratie die alleen via cluster-Secrets
+kan, betekent dat elke derde partij een Kubernetes-beheerder nodig heeft om te
+beginnen.
+
+Wat er wél uit de immutability-regel volgt, en dat blijft staan: een
+configuratiewijziging wordt geweigerd zolang er in die audit een run loopt. Dat is een
+correctheidseis — een Source leest zijn config bij start en daarna niet meer, dus
+halverwege wisselen levert een run waarvan de helft een andere scope had.
+
+De controle is registratie, niet blokkade: elke configuratiewijziging append-only met
+identiteit en tijdstip, en elk run-record vermeldt de geraadpleegde bronnen. Dat
+laatste bestond al.
+
+Credentials mogen ingevoerd worden maar worden nooit teruggegeven — "ingesteld" of
+"niet ingesteld" volstaat. Invoeren moet kunnen, teruglezen hoeft nooit.
+
 
 ## Vastgelegde ontwerpbesluiten
 

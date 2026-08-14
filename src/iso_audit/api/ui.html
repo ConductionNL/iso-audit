@@ -87,10 +87,13 @@
 <section id="view-dashboard" hidden>
   <div class="step">
     <h2>Nieuwe audit</h2>
-    <p class="note">Norm + periode bepalen het id, bijvoorbeeld <code>9001-2026-Q3</code>.
-      Periode als <code>JJJJ-Qn</code> of <code>JJJJ-Hn</code>, zodat sorteren klopt.</p>
+    <p class="note">Normen + periode bepalen het id: <code>9001-2026-Q3</code>, of
+      <code>9001_27001-2026-Q3</code> als je beide toetst. Periode als
+      <code>JJJJ-Qn</code> of <code>JJJJ-Hn</code>, zodat sorteren klopt.
+      De normenlijst komt uit de norm-DB — een norm-YAML erbij zetten maakt hem hier
+      kiesbaar.</p>
     <div id="nieuw-audit">
-      <label>Norm<br><select id="na-norm"><option>9001</option><option>27001</option></select></label>
+      <div><span class="mini">Normen (één of meer)</span><br><span id="na-normen">laden…</span></div>
       <label>Periode<br><input id="na-periode" placeholder="2026-Q3" style="width:9rem"></label>
       <button onclick="maakAudit()">Aanmaken</button>
       <span id="na-msg" class="ok"></span>
@@ -102,14 +105,14 @@
   </div>
 </section>
 
-<!-- ============ configuratie (alleen-lezen) ============ -->
+<!-- ============ configuratie ============ -->
 <section id="view-config" hidden>
   <div class="step">
     <h2>Bronnen</h2>
-    <p class="note">Alleen-lezen. Een bron koppelen gaat via cluster-Secrets en het
-      deployment-manifest — niet hier. Reden: een bron houdt zijn configuratie
-      onveranderlijk binnen een auditperiode, anders kan een auditor zijn eigen
-      bewijsbasis kiezen.</p>
+    <p class="note">Per bron: gekoppeld of niet, en wat er ontbreekt. Koppelen vanuit
+      dit scherm is in aanbouw; tot dan komen bron-credentials uit de omgeving van de
+      deployment. Dat is een tijdelijke beperking, geen ontwerpkeuze — een auditor
+      hoort een bron zelf te kunnen koppelen.</p>
     <div id="config-wrap"><p class="note">laden…</p></div>
   </div>
 </section>
@@ -121,7 +124,7 @@
   <div id="audit-warn"></div>
 
   <div class="step">
-    <h2><span class="num">1</span>Run starten <span class="note">— kies normen + bronnen</span></h2>
+    <h2><span class="num">1</span>Run starten <span class="note">— kies de bronnen; de normen komen uit de audit</span></h2>
     <button onclick="loadConfig()">Laad opties</button>
     <div id="config-form" class="out" hidden></div>
     <div style="margin-top:.6rem">
@@ -221,7 +224,18 @@ async function route(){
 // ============ dashboard ============
 const STATUS_LABEL = {nieuw:"nieuw", loopt:"loopt", "memo-klaar":"memo klaar"};
 
+async function loadNormKeuze(){
+  const el = document.getElementById("na-normen");
+  if(el.dataset.loaded) return;
+  const o = await j("/config/options");
+  el.innerHTML = (o.norms||[]).map(n =>
+    `<label style="margin-right:.6rem"><input type="checkbox" class="na-norm" value="${esc(n)}"> ${esc(n)}</label>`
+  ).join("") || `<span class="mini">geen normen in de norm-DB</span>`;
+  el.dataset.loaded = "1";
+}
+
 async function loadDashboard(){
+  await loadNormKeuze();
   const audits = await j("/audits");
   const wrap = document.getElementById("dash-wrap");
   if(!audits.length){
@@ -238,7 +252,7 @@ async function loadDashboard(){
       : `<span class="mini">nog niemand</span>`;
     return `<tr>
       <td><a class="aid" href="#/audit/${encodeURIComponent(a.id)}">${esc(a.id)}</a><br>
-          <span class="mini">${esc(a.norm)} · ${esc(a.periode)}</span></td>
+          <span class="mini">${a.normen.map(esc).join(" + ")} · ${esc(a.periode)}</span></td>
       <td><span class="st st-${a.status}">${STATUS_LABEL[a.status]||a.status}</span><br>
           <span class="mini">${a.runs} run(s)</span></td>
       <td>${voortgang}<br>${memo}</td>
@@ -253,11 +267,12 @@ async function loadDashboard(){
 
 async function maakAudit(){
   const msg = document.getElementById("na-msg");
-  const norm = document.getElementById("na-norm").value;
+  const normen = [...document.querySelectorAll(".na-norm:checked")].map(e=>e.value);
   const periode = document.getElementById("na-periode").value.trim();
+  if(!normen.length){ msg.textContent = "⚠ kies minstens één norm"; return; }
   msg.textContent = "bezig…";
   const r = await fetch("/audits", {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({norm, periode})});
+    body: JSON.stringify({normen, periode})});
   if(!r.ok){
     const d = await r.json().catch(()=>({detail:"onbekende fout"}));
     msg.textContent = "⚠ " + (d.detail || r.status);
@@ -268,7 +283,7 @@ async function maakAudit(){
   location.hash = "#/audit/" + encodeURIComponent(a.id);
 }
 
-// ============ configuratie (alleen-lezen) ============
+// ============ configuratie ============
 async function loadConfigView(){
   const health = await j("/config/health");
   const rijen = Object.entries(health).map(([naam, h]) => `
@@ -283,7 +298,8 @@ async function loadConfigView(){
     `<table><thead><tr><th>Bron</th><th>Status</th><th>Wat ontbreekt / context</th></tr></thead>
      <tbody>${rijen}</tbody></table>
      <p class="note">Deze status komt uit dezelfde healthcheck die een run gebruikt —
-     er is geen tweede administratie die uit de pas kan lopen.</p>`;
+     er is geen tweede administratie die uit de pas kan lopen. Welke bronnen een run
+     heeft geraadpleegd staat per run vastgelegd in de run-historie.</p>`;
 }
 
 // ============ audit-detail ============
@@ -298,7 +314,8 @@ async function openAudit(){
   const d = await r.json();
   const a = d.audit;
   document.getElementById("wie").textContent = "";
-  document.getElementById("audit-kop").textContent = `${a.id} — ${a.norm} · ${a.periode}`;
+  document.getElementById("audit-kop").textContent =
+    `${a.id} — ${a.normen.join(" + ")} · ${a.periode}`;
   document.getElementById("audit-warn").innerHTML = d.andere_actief
     ? `<div class="warn"><strong>Let op:</strong> ${esc(d.andere_actief.identiteit)} was hier recent
        actief (${esc(d.andere_actief.ts)}). De audit blijft bewerkbaar; bij gelijktijdige triage
@@ -337,9 +354,7 @@ async function loadConfig(){
   const [o, health] = await Promise.all([j("/config/options"), j("/config/health")]);
   const el = document.getElementById("config-form"); el.hidden = false;
   el.innerHTML =
-    `<strong>Normen:</strong><br>` +
-    o.norms.map(n=>`<label><input type="checkbox" class="cfg-norm" value="${n}" checked> ${n}</label> `).join("") +
-    `<br><br><strong>Bronnen:</strong><br>` +
+    `<strong>Bronnen:</strong><br>` +
     o.sources.map(s=>{
       const h = health[s] || {};
       const off = !h.connected;
@@ -352,14 +367,9 @@ async function loadConfig(){
     `Greyed-out bronnen zijn niet gekoppeld — zie <a href="#/config">Configuratie</a>.</span>`;
 }
 function selectedConfig(){
-  return {
-    norms:[...document.querySelectorAll(".cfg-norm:checked")].map(e=>e.value),
-    sources:[...document.querySelectorAll(".cfg-src:checked")].map(e=>e.value)
-  };
-}
-function normCode(norms){
-  const a=norms.some(n=>n.includes("9001")), b=norms.some(n=>n.includes("27001"));
-  return (a&&b)?"beide":b?"27001":"9001";
+  // Normen staan hier niet meer bij: die horen bij de audit. Alleen de bron-scope is
+  // een keuze per run.
+  return { norms:[], sources:[...document.querySelectorAll(".cfg-src:checked")].map(e=>e.value) };
 }
 async function startRun(){
   const cfg = selectedConfig();
@@ -370,7 +380,8 @@ async function startRun(){
   const live = document.getElementById("live-mode").checked;
   const chapter = document.getElementById("chapter").value.trim() || null;
   const r = await fetch(A("/run/start"),{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({mode:live?"live":"sim",norm:normCode(cfg.norms),sources:cfg.sources,chapter})});
+    // Géén norm meesturen: die hoort bij de audit en komt uit het manifest.
+    body:JSON.stringify({mode:live?"live":"sim",sources:cfg.sources,chapter})});
   if(!r.ok){
     const d = await r.json().catch(()=>({detail:"onbekende fout"}));
     const prog=document.getElementById("run-progress"); prog.hidden=false;

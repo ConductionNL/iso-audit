@@ -7,6 +7,7 @@ de verkeerde audit vastlegt, en in een append-only trail is dat niet terug te dr
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException, Request
@@ -17,6 +18,7 @@ from iso_audit.api import runs as runs_mod
 from iso_audit.api.audit_log import log_event
 from iso_audit.api.auth_gate import identiteit_van
 from iso_audit.api.deps import Audits
+from iso_audit.api.registry import MANIFEST, RegistryError, run_code
 from iso_audit.api.session import SessionError
 
 
@@ -28,10 +30,14 @@ class RunConfig(BaseModel):
 
 
 class RunStartRequest(BaseModel):
-    """Run-start binnen deze audit: live pipeline of sim-timer, met scoping."""
+    """Run-start binnen deze audit: live pipeline of sim-timer, met scoping.
+
+    Géén `norm`-veld: de normen horen bij de audit en worden uit het manifest gelezen.
+    Een run die een andere norm kan kiezen dan de audit, is een run waarvan de scope
+    niet meer uit de audit volgt — en dan liegt de memo over wat er getoetst is.
+    """
 
     mode: str = "sim"
-    norm: str = "9001"
     sources: list[str] = []
     chapter: str | None = None
     top_n: int = 0
@@ -65,6 +71,14 @@ def maak_router(audits: Audits) -> APIRouter:
         r = req or RunStartRequest()
         wie = audits.muteert(audit_id, request)
 
+        # De norm komt uit de audit, niet uit het verzoek. Faalt hier als de audit een
+        # norm bevat die de pipeline nog niet kan draaien.
+        manifest = json.loads((audits.dir(audit_id) / MANIFEST).read_text(encoding="utf-8"))
+        try:
+            norm = run_code([str(n) for n in manifest.get("normen", [])])
+        except RegistryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
         # Kosten-attributie (sec-bevinding 6 van change iso-portal, besluit "loggen,
         # niet begrenzen"): de classifier houdt token-verbruik al bij, maar niet wie
         # de run startte. Zonder die koppeling is een kostenpiek niet adresseerbaar.
@@ -73,7 +87,7 @@ def maak_router(audits: Audits) -> APIRouter:
             wie,
             audit=audit_id,
             modus=r.mode,
-            norm=r.norm,
+            norm=norm,
             bronnen=",".join(r.sources),
             hoofdstuk=r.chapter or "",
         )
@@ -82,7 +96,7 @@ def maak_router(audits: Audits) -> APIRouter:
         try:
             resultaat = sessie.start_run(
                 mode=r.mode,
-                norm=r.norm,
+                norm=norm,
                 sources=r.sources,
                 chapter=r.chapter,
                 top_n=r.top_n,
@@ -95,7 +109,7 @@ def maak_router(audits: Audits) -> APIRouter:
                 dir_,
                 door=wie,
                 modus=r.mode,
-                norm=r.norm,
+                norm=norm,
                 bronnen=r.sources,
                 hoofdstuk=r.chapter,
                 fout=str(exc),
@@ -107,7 +121,7 @@ def maak_router(audits: Audits) -> APIRouter:
             dir_,
             door=wie,
             modus=r.mode,
-            norm=r.norm,
+            norm=norm,
             bronnen=r.sources,
             hoofdstuk=r.chapter,
             toegevoegd=toegevoegd,

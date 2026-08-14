@@ -6,6 +6,49 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-14 — audit over meerdere normen; normenlijst uit de norm-DB
+
+Twee correcties op mijn eigen ontwerp, beide op aanwijzing van de eigenaar.
+
+**Een audit omvat nu één of meer normen.** 9001 én 27001 samen is één audit met één
+memo, geen twee administraties. Het id wordt `9001-2026-Q3` of `27001_9001-2026-Q3`.
+De normenlijst in de UI komt uit de **norm-DB** in plaats van een hardcoded select: een
+norm-YAML erbij zetten maakt hem kiesbaar zonder codewijziging. Slugs
+(`iso-9001-2015`) en korte codes (`9001`) leiden naar hetzelfde id, zodat er één
+vocabulaire is.
+
+De run leidt zijn norm-parameter nu af uit het audit-manifest en het run-verzoek kan er
+geen meer meegeven. Een run die een andere norm kan kiezen dan de audit, levert een
+audit waarvan de scope niet uit de audit volgt — en dan vermeldt de memo iets anders dan
+er getoetst is.
+
+Kiesbaar is niet draaibaar: de norm-parameter staat op vier plekken in de pipeline
+hardcoded op `9001|27001|beide`. Een norm daarbuiten **faalt bij het aanmaken** met een
+leesbare fout, in plaats van stil een verkeerde run op te leveren. Die vier plekken
+generaliseren is een eigen change.
+
+**Het configuratiescherm wordt schrijfbaar, niet alleen-lezen.** Mijn eerdere eis was
+fout onderbouwd, op twee punten:
+
+- `sources/base.py` eist immutability **na `__init__`** — een object-lifecycle-invariant
+  zodat een Source niet halverwege een run van scope wisselt. Ik had daar een
+  autorisatiebeleid van gemaakt ("alleen via cluster-Secrets").
+- De dreiging bestond niet. Bewijs bestaat of het bestaat niet. Een auditor kiest
+  bronnen, die bronnen worden per run vastgelegd, en een ontbrekende bron valt een laag
+  hoger op: een interne auditor wordt door een externe gecontroleerd en die staat onder
+  toezicht.
+
+Bovendien maakte het het tool onleverbaar: configuratie die alleen via cluster-Secrets
+kan, betekent dat elke derde partij een Kubernetes-beheerder nodig heeft. Wat wél uit de
+immutability-regel volgt en blijft staan: een configuratiewijziging wordt geweigerd
+zolang er in die audit een run loopt. Credentials worden schrijfbaar maar nooit
+teruggegeven.
+
+De implementatie daarvan staat als taak 3.6-3.9; het scherm zegt nu eerlijk dat
+koppelen vanuit de UI in aanbouw is in plaats van dat het zo bedoeld zou zijn.
+
+851 passed, ruff + `mypy --strict` clean.
+
 ### Changed — 2026-08-14 — portaal is een dashboard met audits en runs (breaking API)
 
 Het portaal kende precies één auditsessie, meegegeven bij het starten. Daarmee kon je
