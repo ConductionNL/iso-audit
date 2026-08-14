@@ -43,3 +43,8 @@ output/
 *.crt
 *.p12
 *.pfx
+
+# Run-artefacten van externe agent-harnassen (habitat). Deze horen niet in de
+# historie van een repo die onder ISO 27001-scope valt: het zijn build-outputs,
+# geen bewijs. Zie CHANGELOG 2026-08-14.
+.habitat/

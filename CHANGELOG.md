@@ -6,6 +6,50 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Removed — 2026-08-14 — habitat-artefacten uit de repo
+
+Commit `cd0cc4f` (13 juli 2026, "seed apply-docs-contract change + habitat role
+files") bracht ongevraagd een externe agent-harnas binnen. Verwijderd:
+
+- `.claude/agents/{builder,reviewer,security}.md` — drie rol-agents die niet in
+  `CLAUDE.md` gedocumenteerd stonden en wier rolverdeling botst met de
+  OpenSpec-workflow die deze repo wél beschrijft.
+- `.mcp.json` — haalde een MCP-server via `uvx --from
+  git+https://github.com/MWest2020/handbook`. Dat is code uitvoeren uit een
+  **persoonlijke** repo in een org-repo: precies de persoonsgebonden afhankelijkheid
+  die dit project aan het opheffen is.
+- `.habitat/` (`audit.jsonl`, run-output, HTML-rapport) — getrackte build-artefacten
+  van een externe tool in een repo onder ISO 27001-scope. Nu in `.gitignore`.
+
+De historie blijft: `cd0cc4f` is niet herschreven. De bestanden verdwijnen met een
+normale commit, want de historie is auditbewijs.
+
+`CLAUDE.md` heeft een regel onder "Wat NIET hier hoort" gekregen, zodat een volgende
+seed niet stil opnieuw landt.
+
+### Changed — 2026-08-14 — `apply-docs-contract` gearchiveerd
+
+Deze change was géén artefact: de docs-herindeling naar het handbook-contract
+(`docs/{how-to,reference,explanation}` met front matter, stubs op de oude paden) is
+echt uitgevoerd en staat op `main`. Alleen de PR-stap stond nog open. Gearchiveerd als
+`2026-08-14-apply-docs-contract`.
+
+Wat de migratie destijds liet liggen en nu is opgelost: **de verwijzers**. `CLAUDE.md`
+wees twee keer naar `docs/missie.md`, sinds juli een deprecated stub — de
+instructie-ingang van de repo stuurde lezers dus naar een doorverwijspagina. En
+`README.md` + `ARCHITECTURE.md` linkten naar `docs/sources/`, `docs/sinks/` en
+`docs/notifiers/`, drie mappen die **niet meer bestaan**: dode links, geen stubs.
+
+Bijgewerkt: `CLAUDE.md`, `README.md`, `ARCHITECTURE.md`, `ONBOARDING.md`, `MEMORY.md`,
+`.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/feature.md`. `CHANGELOG.md`
+en de openspec-archieven zijn bewust *niet* aangepast — dat zijn verslagen van wat toen
+waar was.
+
+Nog open uit de proposal, als besluit voor Mark: de repo is publiek maar een deel van
+de pagina's is Nederlands.
+
+875 passed, 1 skipped; ruff clean.
+
 ### Added — 2026-08-14 — bronnen koppelen in de UI, uitlogknop, en normkeuze als enum
 
 **Bronnen koppelen kan nu in het portaal.** Per bron een kaart met een

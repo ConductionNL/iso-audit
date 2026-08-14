@@ -7,7 +7,7 @@
 
 Lees ook, in deze volgorde:
 
-1. [`docs/missie.md`](docs/missie.md) — *waarom* dit tool bestaat (drie capabilities).
+1. [`docs/explanation/missie.md`](docs/explanation/missie.md) — *waarom* dit tool bestaat (drie capabilities).
 2. [`ARCHITECTURE.md`](ARCHITECTURE.md) — protocol-lagen, registries, pipeline-flow.
 3. [`CLAUDE.md`](CLAUDE.md) — werkafspraken (boring & auditable, OpenSpec, geen `pip`).
 
@@ -20,7 +20,7 @@ Een **pluggable ISO 9001 + 27001 audit-pipeline**. Het leest bronnen
 een LLM, en produceert auditrapporten.
 
 Belangrijk mentaal model: **dit is auditor-*ondersteuning*, geen pure
-automation.** De drie capabilities uit `docs/missie.md` zijn onafhankelijke
+automation.** De drie capabilities uit `docs/explanation/missie.md` zijn onafhankelijke
 bronnen, patroondetectie, en de *auditor-spiegel*. Die laatste betekent dat
 een mens op vaste punten het oordeel houdt — de pipeline rapporteert nooit
 blind een non-conformiteit waar alleen "niet gedocumenteerd" geldt
@@ -78,7 +78,7 @@ De drie lagen volgen alle drie **hetzelfde registry-patroon** — zie
 | `src/iso_audit/miro/` | Miro-ingest — **READ-only** (write-flow verwijderd, zie CLAUDE.md) |
 | `src/iso_audit/store.py` | SQLite-laag: `verbinding()`, `initialiseer()`, `upsert_*` |
 | `src/iso_audit/interview.py` | Interactieve auditor-interview (§7) |
-| `src/iso_audit/memo/` | `iso-audit memo` + `profile` — management-auditmemo (HTML+PDF) uit findings; profielen + user-pointed norm-DB. Zie `docs/memo-architecture.md` |
+| `src/iso_audit/memo/` | `iso-audit memo` + `profile` — management-auditmemo (HTML+PDF) uit findings; profielen + user-pointed norm-DB. Zie `docs/explanation/memo-architecture.md` |
 | `openspec/` | Specs + changes; werkwijze in CLAUDE.md |
 
 ## 5. Veelgebruikte commando's

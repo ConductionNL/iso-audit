@@ -60,7 +60,7 @@ Twee design-disciplines:
    (`DriveSource` + `DriveSink`).
 2. **Immutable runtime-configuratie.** Source wordt geconfigureerd uit
    env-vars/config bij pipeline-start en daarna niet meer. Zie
-   [`docs/missie.md`](docs/missie.md) capability 1 voor de motivatie.
+   [`docs/explanation/missie.md`](docs/explanation/missie.md) capability 1 voor de motivatie.
 
 Adapters registreren via `@iso_audit.sources.register` op class-level. De
 registry werpt `ValueError` bij dubbele namen — dat is een
@@ -127,7 +127,7 @@ met zeven beslispunten:
 | `send_report` | hoog | direct verzenden via Sink | sign-off vereist via Notifier |
 | `delete_data` | hoog | nooit autonoom | mens-bevestigd via Notifier |
 
-Volledige uitwerking per beslispunt: zie [`docs/modes.md`](docs/modes.md).
+Volledige uitwerking per beslispunt: zie [`docs/reference/modes.md`](docs/reference/modes.md).
 
 ## Gegevensopslag
 
@@ -196,10 +196,9 @@ unit-files zijn auditable.
 
 ## Verder lezen
 
-- **[`docs/missie.md`](docs/missie.md)** — waarom dit tool bestaat en
-  welke design-criteria daaruit voortkomen.
+- **[`docs/explanation/missie.md`](docs/explanation/missie.md)** — waarom dit tool
+  bestaat en welke design-criteria daaruit voortkomen.
 - **[`MEMORY.md`](MEMORY.md)** — handoff-snapshot: huidige milestone-
   status, resterend werk, blocked items.
-- **[`docs/sources/`](docs/sources/)**, **[`docs/notifiers/`](docs/notifiers/)**,
-  **[`docs/sinks/`](docs/sinks/)**, **[`docs/modes.md`](docs/modes.md)** —
-  per-laag uitwerking en setup-instructies.
+- **[`docs/reference/`](docs/reference/)** — per-laag uitwerking en setup-instructies:
+  `source-*.md` per bron, `notifier-*.md` per kanaal, `sinks.md`, `modes.md`.

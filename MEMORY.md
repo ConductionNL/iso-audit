@@ -26,8 +26,8 @@
 Branch `refactor/miro-write-trim` → `refactor/iso-audit-milestone-b`,
 gemerged 2026-05-21. Verwijdert `iso_audit.miro.{board_setup,interview}` +
 tests; behoudt `client` + `ingest` (READ-pijp). Write-pad vervangen door
-Miro-AI prompts in `docs/miro-auditor-bord-prompt.md` en
-`docs/miro-interview-prompt.md`.
+Miro-AI prompts in `docs/how-to/miro-auditor-bord-prompt.md` en
+`docs/how-to/miro-interview-prompt.md`.
 
 OpenSpec: `openspec/changes/archive/miro-write-trim/` (proposal + design +
 tasks + spec-delta).
@@ -131,4 +131,4 @@ Update dit document bij elke substantiële sessie:
   daarna komt.
 
 Voor langetermijn-context (architectuur, missie, design-discipline):
-zie `CLAUDE.md`, `docs/missie.md`, `ARCHITECTURE.md`.
+zie `CLAUDE.md`, `docs/explanation/missie.md`, `ARCHITECTURE.md`.

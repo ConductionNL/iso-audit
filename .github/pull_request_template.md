@@ -4,7 +4,7 @@
 
 ## Waarom
 
-<!-- Motivatie. Verwijs naar issue, change-proposal of capability uit docs/missie.md. -->
+<!-- Motivatie. Verwijs naar issue, change-proposal of capability uit docs/explanation/missie.md. -->
 
 Closes #
 
@@ -28,7 +28,7 @@ Closes #
 
 ## Missie-impact
 
-<!-- Versterkt deze PR een van de drie capabilities uit docs/missie.md? Of is
+<!-- Versterkt deze PR een van de drie capabilities uit docs/explanation/missie.md? Of is
      het pure operatie? Beide zijn legitiem; missie-impact noteren maakt het
      spoor over tijd zichtbaar. -->
 

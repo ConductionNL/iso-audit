@@ -10,7 +10,7 @@ labels: ["enhancement"]
 
 ## Waarom — koppel terug aan missie
 
-<!-- iso-audit dient drie capabilities (zie docs/missie.md):
+<!-- iso-audit dient drie capabilities (zie docs/explanation/missie.md):
      1. onafhankelijke bronnen
      2. patroondetectie en herhalingsdetectie
      3. auditor-spiegel

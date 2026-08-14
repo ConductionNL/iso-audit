@@ -12,6 +12,13 @@
 - [x] 2.4 `.mcp.json` in de root plaatsen (template uit de seed; placeholder `TODO-change-3` laten staan).
 - [x] 3.1 Zelfcheck tegen het contract: alleen toegestane submappen dragen
       markdown, elke pagina heeft front matter, één taal (English).
-- [ ] 4.1 PR openen met titel `docs: apply handbook docs contract`; body vinkt
+- [x] 4.1 PR openen met titel `docs: apply handbook docs contract`; body vinkt
       per contractpunt af wat is toegepast + vermeldt de punten die de
       proposal als "PR-body" markeert. STOP daarna: Mark merget.
+      → Afgerond: de docs-herindeling staat op `main` (`docs/{how-to,reference,
+      explanation}` met front matter, stubs op de oude paden). Gearchiveerd op
+      2026-08-14 bij de habitat-sanering. De `.mcp.json` uit taak 2.4 is daarbij
+      verwijderd: die haalde een MCP-server via `uvx --from git+…` uit een
+      persoonlijke repo, en dat hoort niet in een org-repo. De taalkwestie uit
+      de proposal (deels Nederlandse pagina's in een publieke repo) staat nog
+      open en is een besluit voor Mark.

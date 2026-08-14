@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "handbook": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["--from", "git+https://github.com/MWest2020/handbook", "handbook-mcp"]
-    }
-  }
-}

@@ -31,19 +31,19 @@ sources/  →  pipeline  →  modes  →  notifiers (integer)
 ```
 
 Volledig plaatje in **[`ARCHITECTURE.md`](ARCHITECTURE.md)**. Het waarom
-in **[`docs/missie.md`](docs/missie.md)**. Sessie-status en volgende-
+in **[`docs/explanation/missie.md`](docs/explanation/missie.md)**. Sessie-status en volgende-
 stap in **[`MEMORY.md`](MEMORY.md)**.
 
 ## Documentatie
 
 - **[`ONBOARDING.md`](ONBOARDING.md)** — van nul naar productief; waar staat wat, hoe voeg je een adapter toe
-- **[`docs/missie.md`](docs/missie.md)** — drie capabilities en het rolconflict-frame
+- **[`docs/explanation/missie.md`](docs/explanation/missie.md)** — drie capabilities en het rolconflict-frame
 - **[`ARCHITECTURE.md`](ARCHITECTURE.md)** — protocol-lagen, registries, pipeline-flow
-- **[`docs/sources/`](docs/sources/)** — per bron-adapter (drive, planning, jira, mcp, rest)
-- **[`docs/sinks/`](docs/sinks/)** — schrijf-adapters
-- **[`docs/notifiers/`](docs/notifiers/)** — handoff-kanalen (slack, email, teams, mattermost)
-- **[`docs/modes.md`](docs/modes.md)** — autonoom vs integer en de zeven beslispunten
-- **[`docs/memo-architecture.md`](docs/memo-architecture.md)** — auditmemo-feature + uitbreidings-hooks
+- **[`docs/reference/`](docs/reference/)** — `source-*.md` per bron-adapter (drive,
+  planning, jira, mcp, rest), `sinks.md` voor schrijf-adapters, `notifier-*.md` per
+  handoff-kanaal (slack, email, teams, mattermost)
+- **[`docs/reference/modes.md`](docs/reference/modes.md)** — autonoom vs integer en de zeven beslispunten
+- **[`docs/explanation/memo-architecture.md`](docs/explanation/memo-architecture.md)** — auditmemo-feature + uitbreidings-hooks
 
 ## Management-auditmemo
 

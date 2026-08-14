@@ -6,7 +6,7 @@ Pluggable ISO 9001 + 27001 audit-pipeline. Verhuisd uit `Ops_to_Biz/audit/`
 in mei 2026 met als doel: bron-pluggability vóór Jira-ingest, modes-
 architectuur vóór de eerste integer-run, eigen audit-trail-context.
 
-**Lees [`docs/missie.md`](docs/missie.md) eerst.** Het tool dient drie
+**Lees [`docs/explanation/missie.md`](docs/explanation/missie.md) eerst.** Het tool dient drie
 capabilities (onafhankelijke bronnen, patroondetectie, auditor-spiegel) en
 heeft daardoor andere design-criteria dan een typische pipeline-tool. Elke
 substantiële change moet in zijn motivatie aangeven welke capability erdoor
@@ -84,10 +84,18 @@ uv run pre-commit run --all-files                # alles bij elkaar
 - **Miro write-flow.** Per change `miro-write-trim` (mei 2026) zijn
   `board_setup` en `interview` verwijderd; Miro is binnen iso-audit
   **READ-only**. Boards opzetten doet de auditor via Miro-AI — zie
-  `docs/miro-auditor-bord-prompt.md` en `docs/miro-interview-prompt.md`.
+  `docs/how-to/miro-auditor-bord-prompt.md` en
+  `docs/how-to/miro-interview-prompt.md`.
 - **Klant-data, echte audit-output.** `examples/` bevat alleen
   geanonimiseerde fixtures. Echte audit-rapporten en `.db`-bestanden zijn
   via `.gitignore` uitgesloten.
+- **Externe agent-harnassen.** Geen `.claude/agents/`, geen `.mcp.json`, geen
+  `.habitat/`. In juli 2026 seedde een habitat-run ongevraagd drie rol-agents
+  plus een `.mcp.json` die via `uvx --from git+…` een MCP-server uit een
+  persoonlijke repo haalde — in een org-repo is dat een supply-chain-
+  afhankelijkheid aan één persoon. Opgeruimd 2026-08-14. De werkwijze hier is
+  de OpenSpec-workflow hierboven; die veranderen is een change met een
+  motivatie, geen seed.
 
 ## Memory en gedeelde Claude-context
 
@@ -95,7 +103,7 @@ Deze repo erft de globale Claude-instructies (boring & auditable, geen
 push zonder confirmatie, etc.) van `~/.claude/CLAUDE.md`. Project-
 specifieke memory komt onder `~/.claude/projects/<repo-pad>/memory/`.
 
-Bij twijfel over een wijziging: lees [`docs/missie.md`](docs/missie.md)
+Bij twijfel over een wijziging: lees [`docs/explanation/missie.md`](docs/explanation/missie.md)
 en stel jezelf de vraag of de wijziging een van de drie capabilities
 versterkt of erodeert. Operationele verbeteringen zijn legitiem maar
 altijd lager prio dan missie-versterkende werk.
