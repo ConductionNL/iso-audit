@@ -31,8 +31,10 @@
 
 - [x] 4.1 GWS-impersonate-veld (optioneel) en `with_subject` in `auth.py`
 - [x] 4.2 Jira-label naar service-account; env-naam ongewijzigd
-- [ ] 4.3 `config/verbinding.py`: read-only test per integratie, genormaliseerde fout
-- [ ] 4.4 Test: een faalpad geeft geen ruwe leveranciersrespons terug
+- [x] 4.3 `config/verbinding.py`: normalisatie van leveranciersfouten + Anthropic-check.
+      GEEN parallelle healthcheck: `bron_health` blijft de enige bron van waarheid
+      voor koppelstatus — een tweede administratie zou uit de pas lopen
+- [x] 4.4 Test: een faalpad geeft geen ruwe leveranciersrespons terug
 
 ## 5. Documentatie
 

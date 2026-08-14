@@ -39,12 +39,15 @@ def _miro_health() -> dict[str, object]:
     import os
 
     if os.environ.get("MIRO_API_TOKEN"):
-        return {"connected": True, "status": "ok", "naam": "miro", "tenant": "MIRO_API_TOKEN"}
+        return {"connected": True, "status": "ok", "naam": "miro"}
+    # Auditor-taal, geen env-var-naam: het configuratiescherm is niet de plek waar
+    # iemand variabelenamen hoort te leren.
     return {
         "connected": False,
         "status": "fail",
         "naam": "miro",
-        "reden": "MIRO_API_TOKEN ontbreekt",
+        "soort": "auth",
+        "reden": "Er is nog geen API-token ingevuld.",
     }
 
 
@@ -65,7 +68,19 @@ def _check_source(naam: str) -> dict[str, object]:
         check = getattr(adapter, "probe", None) or adapter.healthcheck
         hc = check()
     except Exception as exc:
-        return {"connected": False, "status": "fail", "naam": naam, "reden": str(exc)[:200]}
+        # NIET str(exc) doorgeven: die tekst komt uit de client van de leverancier en kan
+        # een URL met credential of een tokenfragment bevatten. Tot 2026-08-14 landde dat
+        # rechtstreeks in de browser. De ruwe melding gaat nu naar het serverlog.
+        from iso_audit.config.verbinding import normaliseer
+
+        soort, tekst = normaliseer(exc, bron=naam)
+        return {
+            "connected": False,
+            "status": "fail",
+            "naam": naam,
+            "soort": soort,
+            "reden": tekst,
+        }
     return {"connected": hc.get("status") == "ok", **hc}
 
 

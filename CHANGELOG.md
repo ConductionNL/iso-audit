@@ -6,6 +6,34 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Security — 2026-08-14 — leveranciersfouten lekten naar de browser
+
+`api/session.py:_check_source` gaf `str(exc)[:200]` door aan het configuratiescherm. Die
+tekst komt uit de client van de leverancier en kan een URL met credential, een
+tokenfragment of een request-dump bevatten — en hij landde rechtstreeks in de browser
+(`ui.html`, de reden onder een niet-gekoppelde bron) en in alles wat de browser logt.
+
+Nieuw `config/verbinding.py` zet een exception om naar **één van vier soorten** (`auth`,
+`niet_gevonden`, `netwerk`, `onbekend`) met een vaste, leesbare tekst. De ruwe melding
+gaat naar het serverlog, waar hij voor diagnose thuishoort. Regressietest gooit een fout
+met een token erin en controleert dat noch het token, noch het hostname, noch de ruwe
+statuscode de client bereikt.
+
+Dit is **geen** tweede healthcheck: elke bron rapporteert zijn eigen status via
+`healthcheck()`/`probe()`, en `bron_health` blijft daarvoor de enige bron van waarheid —
+precies wat zijn eigen docstring al voorschreef. `verbinding.py` bevat alleen de
+vertaling van een fout, plus de Anthropic-check omdat die geen Source-adapter heeft.
+
+Meegenomen: de Miro-melding zei "MIRO_API_TOKEN ontbreekt". Een configuratiescherm is
+niet de plek waar iemand variabelenamen hoort te leren; nu "Er is nog geen API-token
+ingevuld."
+
+Toegevoegd: een "Opnieuw testen"-knop. Een token kan ongeldig worden zonder dat er iets
+wordt opgeslagen, en tot nu testte het scherm alleen bij het laden en na een wijziging.
+
+949 passed, 1 skipped; ruff + mypy --strict clean; bandit schoon op de CI-drempel.
+Versie `0.2.0a5`.
+
 ### Added — 2026-08-14 — Anthropic met abonnement of API-key, en optionele GWS-impersonation
 
 **Inloggen met een Claude-abonnement kan nu.** Eerder stond in dit project dat een
