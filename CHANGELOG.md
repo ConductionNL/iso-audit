@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-14 — `src/iso_audit/config/` stond niet in git
+
+CI viel om op `ModuleNotFoundError: No module named 'iso_audit.config'` terwijl de lokale
+suite groen was. Oorzaak: een **globale** gitignore-regel — een kale `config` in
+`~/.gitignore_global` — sluit elke map met die naam uit, ook een Python-package.
+`src/iso_audit/config/` en `tests/config/` zijn daardoor stil niet meegecommit: `git add -A`
+sloeg ze over en `git commit` slaagde zonder klacht.
+
+De lokale testsuite kon dit niet zien: die draait tegen de working tree, waar de bestanden
+wél staan. Pas een install uit een verse checkout viel om.
+
+Opgelost met expliciete negaties in `.gitignore`, bewust op `*.py` en niet op `**` — dat
+laatste overrulet de `__pycache__`-regel en trekt bytecode de commit in (eerst gebeurd,
+daarna teruggedraaid).
+
+**En als gate, niet als aantekening:** `tests/test_alles_getrackt.py` vergelijkt elke
+`.py` onder `src/` en `tests/` met `git ls-files` en faalt op wat git niet kent — met een
+verwijzing naar `git check-ignore -v` én naar de globale gitignore, want daar zat het.
+Een tweede test controleert dat de negaties geen bytecode meetrekken.
+
+**Wat dit nog blootlegde:** ruff respecteert `.gitignore`, dus de genegeerde map werd ook
+niet gelint. Zodra hij ontgrendeld was, kwamen er twee bevindingen boven die eerder
+onzichtbaar waren (`N818` op een exception-naam zonder `Error`-suffix, en een te lange
+regel). Beide gefixt; `SecretStoreOnbeschikbaar` heet nu `SecretStoreError`, conform
+`ConfigError` en `AuthError` elders. De eerdere "ruff clean"-meldingen van vandaag dekten
+dus minder bestanden dan ze suggereerden. Mypy en pytest keken wél mee — die respecteren
+`.gitignore` niet.
+
+974 passed, 1 skipped; ruff + mypy --strict clean; bandit 0 op medium+. Versie `0.2.0a8`.
+
 ### Added — 2026-08-14 — UI-configuratie in een Secret, met zo smal mogelijke rechten
 
 `config/secret_store.py` bewaart de UI-configuratie in het Secret

@@ -67,7 +67,7 @@ class BronConfig:
         if secret_store.beschikbaar():
             try:
                 return secret_store.lees()
-            except secret_store.SecretStoreOnbeschikbaar as exc:
+            except secret_store.SecretStoreError as exc:
                 # Terugvallen in plaats van breken: een auditor die zijn configuratie niet
                 # kan zien, kan hem ook niet repareren.
                 _log.warning('{"event": "secret_store_terugval", "reden": %r}', str(exc))
@@ -190,7 +190,7 @@ class BronConfig:
             try:
                 secret_store.schrijf(alle)
                 return
-            except secret_store.SecretStoreOnbeschikbaar as exc:
+            except secret_store.SecretStoreError as exc:
                 _log.warning('{"event": "secret_store_terugval_schrijven", "reden": %r}', str(exc))
 
         self.root.mkdir(parents=True, exist_ok=True)
