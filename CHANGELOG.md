@@ -6,6 +6,32 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-14 — Argo weigerde de hele sync op Role/RoleBinding
+
+Na de laatste push bleef het portaal op `0.2.0a3` staan. Argo stond `OutOfSync` maar
+meldde `health: Healthy` — een **stille stilstand**, geen zichtbare storing.
+
+Oorzaak: de AppProject `iso-platform` heeft een `namespaceResourceWhitelist`, en
+`rbac.authorization.k8s.io/Role` en `RoleBinding` stonden er niet in. Argo weigerde daarop
+de héle sync (`one or more synchronization tasks are not valid`), dus ook de Deployment.
+Geen cluster-rechtenprobleem: de argocd-controller *mag* Roles maken in die namespace —
+het was de projectpolicy.
+
+Beide kinds toegevoegd aan `argo/projects/iso-platform.yaml`, met de reden erbij.
+`clusterResourceWhitelist` blijft ongemoeid: geen ClusterRole.
+
+**Gelukkig gevolg:** omdat de sync faalde, is het image `0.2.0a7` nooit uitgerold. Dat
+image is kapot — nagemeten met `podman run`: `ModuleNotFoundError: No module named
+'iso_audit.config'`, want het is gebouwd uit de commit waarin die map niet in git zat.
+`0.2.0a8` is de eerste correcte.
+
+**Volgorde bij het herstellen:** eerst de commits naar origin (dan wijst het manifest naar
+`0.2.0a8`), daarna de AppProject toepassen. Andersom synct Argo `124590c` en rolt het
+kapotte `0.2.0a7` uit.
+
+Les: naar origin sturen is geen rollout. `scripts/rollout-portal.sh` wacht op de
+Argo-revisie en had dit gezien; die stap is overgeslagen.
+
 ### Fixed — 2026-08-14 — `src/iso_audit/config/` stond niet in git
 
 CI viel om op `ModuleNotFoundError: No module named 'iso_audit.config'` terwijl de lokale

@@ -45,6 +45,18 @@ spec:
       kind: Ingress
     - group: networking.k8s.io
       kind: NetworkPolicy
+    # Toegevoegd 2026-08-14 voor `deploy/rbac-config.yaml`: het portaal leest en patcht
+    # één Secret met UI-configuratie. Namespace-scoped Role en RoleBinding, geen
+    # ClusterRole — die staat hierboven bewust niet in clusterResourceWhitelist.
+    #
+    # Waarom dit nodig was: zonder deze twee regels weigerde Argo de HELE sync met
+    # "resource rbac.authorization.k8s.io:Role is not permitted in project iso-platform",
+    # dus ook de Deployment. De app bleef daardoor op een oude image staan terwijl de
+    # health "Healthy" bleef — een stille stilstand, geen zichtbare storing.
+    - group: rbac.authorization.k8s.io
+      kind: Role
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
 
   # Secret staat er bewust NIET bij: de credentials worden out-of-band aangemaakt
   # en Argo mag ze niet beheren of overschrijven. Zie deploy/secret.example.yaml.
