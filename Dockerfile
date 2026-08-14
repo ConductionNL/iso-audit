@@ -45,6 +45,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
+# Anthropic-CLI, alleen nodig voor de `sso`-auth-modus (inloggen met een
+# Claude-abonnement). De API-key-modus werkt zonder; ontbreekt de binary, dan meldt het
+# portaal dat en wijst het naar de API-key.
+#
+# Versie én checksum staan vast. Een `curl | tar` zonder verificatie is dezelfde
+# supply-chain-afhankelijkheid die we op 2026-08-14 uit deze repo hebben verwijderd
+# (een `.mcp.json` die code uit een persoonlijke repo haalde); dat mag hier niet
+# terugkomen. Bijwerken = versie én checksum samen bijwerken, uit
+# `ant_<versie>_checksums.txt` van de release.
+ARG ANT_VERSION=1.23.0
+ARG ANT_SHA256=ccedb855c18c3ddb2e3bb1c02b5bc0bb756115f7210bfccdbc1dcf8ec00e4fcb
+RUN set -eu; \
+    apt-get update && apt-get install -y --no-install-recommends curl ca-certificates; \
+    curl -fsSL -o /tmp/ant.tgz \
+      "https://github.com/anthropics/anthropic-cli/releases/download/v${ANT_VERSION}/ant_${ANT_VERSION}_linux_amd64.tar.gz"; \
+    echo "${ANT_SHA256}  /tmp/ant.tgz" | sha256sum -c -; \
+    tar -xzf /tmp/ant.tgz -C /usr/local/bin ant; \
+    rm -f /tmp/ant.tgz; \
+    apt-get purge -y curl && apt-get autoremove -y; \
+    rm -rf /var/lib/apt/lists/*; \
+    /usr/local/bin/ant --version
+
 # Vaste uid/gid; fsGroup 10001 in deployment.yaml sluit hierop aan zodat de
 # non-root app op de PVC mag schrijven.
 RUN groupadd --gid 10001 app && \
@@ -62,7 +84,12 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     # Fail closed is de default, ook als het manifest hem zou vergeten.
-    REQUIRE_AUTH=true
+    REQUIRE_AUTH=true \
+    # Waar de Anthropic-CLI zijn profiel bewaart. Het manifest wijst dit naar de PVC,
+    # zodat een `sso`-login een pod-restart overleeft. Deze default is een veilige
+    # bodem: een pad in de container, dus zonder manifest verdwijnt het profiel bij
+    # een restart in plaats van dat het ergens onverwacht blijft staan.
+    ANTHROPIC_CONFIG_DIR=/home/app/.config/anthropic
 
 # NUMERIEK, niet `USER app`. Met `runAsNonRoot: true` in de pod-securityContext
 # weigert de kubelet een container waarvan de user een naam is: hij kan dan niet

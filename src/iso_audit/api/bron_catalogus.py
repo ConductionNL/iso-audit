@@ -58,6 +58,10 @@ class BronDefinitie:
     uitleg: str = ""
     velden: list[Veld] = field(default_factory=list)
 
+    eigen_kaart: bool = False
+    """Heeft een eigen scherm in de UI en hoort niet in de generieke bronnenlijst.
+    Anders staat hetzelfde veld twee keer, met twee kanten die kunnen afwijken."""
+
 
 # Ingebouwde standaard. De env-var-namen komen uit de adapters zelf
 # (`sources/jira.py`, `miro/client.py`, `sources/drive.py`, `sources/planning.py`);
@@ -73,6 +77,15 @@ STANDAARD: list[BronDefinitie] = [
                 naam="AUDIT_SOURCE_FOLDER_ID",
                 label="Map-ID van de auditmap",
                 hint="Het laatste deel van de Drive-URL van de map.",
+            ),
+            Veld(
+                naam="GWS_IMPERSONATE_EMAIL",
+                label="Namens wie lezen (optioneel)",
+                verplicht=False,
+                hint=(
+                    "Leeg = alleen wat expliciet met het service-account gedeeld is. "
+                    "Gevuld vraagt eenmalige autorisatie door een Workspace-beheerder."
+                ),
             ),
         ],
     ),
@@ -98,8 +111,11 @@ STANDAARD: list[BronDefinitie] = [
             ),
             Veld(
                 naam="JIRA_USER_EMAIL",
-                label="Account",
-                hint="Bij voorkeur een functioneel account.",
+                label="Service-account e-mail",
+                hint=(
+                    "Bij voorkeur een functioneel account, geen persoon: dan blijft de "
+                    "koppeling werken als iemand de organisatie verlaat."
+                ),
             ),
             Veld(naam="JIRA_API_TOKEN", label="API-token", geheim=True),
             Veld(
@@ -115,6 +131,29 @@ STANDAARD: list[BronDefinitie] = [
         label="Miro",
         uitleg="Bevindingen van een auditbord, alleen lezen.",
         velden=[Veld(naam="MIRO_API_TOKEN", label="API-token", geheim=True)],
+    ),
+    # Geen bron maar wel configuratie, en het heeft een eigen kaart in de UI omdat de
+    # keuze tussen abonnement en API-key uitleg vraagt die niet in een tooltip past.
+    BronDefinitie(
+        naam="anthropic",
+        label="Claude (Anthropic)",
+        uitleg="Classificatie en memo-tekst.",
+        eigen_kaart=True,
+        velden=[
+            Veld(
+                naam="ANTHROPIC_AUTH_MODE",
+                label="Manier van inloggen",
+                verplicht=False,
+                hint="api_key werkt ook zonder browser; sso gebruikt een Claude-abonnement.",
+            ),
+            Veld(naam="ANTHROPIC_API_KEY", label="API-key", geheim=True, verplicht=False),
+            Veld(
+                naam="AUDIT_CLASSIFICATION_MODEL",
+                label="Model",
+                verplicht=False,
+                hint="Haiku is het snelst en goedkoopst; grotere modellen kosten meer per run.",
+            ),
+        ],
     ),
 ]
 
@@ -137,6 +176,7 @@ def _uit_yaml(data: Any) -> list[BronDefinitie]:
                 naam=str(item["naam"]),
                 label=str(item.get("label", item["naam"])),
                 uitleg=str(item.get("uitleg", "")),
+                eigen_kaart=bool(item.get("eigen_kaart", False)),
                 velden=velden,
             )
         )

@@ -33,6 +33,8 @@ from iso_audit.api.routes_audit import maak_router as router_audit
 from iso_audit.api.routes_memo import maak_router as router_memo
 from iso_audit.api.routes_triage import maak_router as router_triage
 from iso_audit.api.session import bron_health
+from iso_audit.classification.findings import KIESBARE_MODELLEN, PRIJZEN_PEILDATUM
+from iso_audit.config import anthropic_auth as aa
 from iso_audit.config import herkomst as hk
 from iso_audit.config.settings import Settings, load_config
 from iso_audit.memo.norm_lookup import laad_norm_db
@@ -48,6 +50,13 @@ andere partij heeft een andere identity-provider. Staat hij niet gezet, dan wist
 portaal alleen zijn eigen sessie — dan ben je uit het portaal maar niet uit de
 identity-provider, en dat is beter dan een hardcoded URL die bij iemand anders naar de
 verkeerde plek wijst."""
+
+
+class LoginCode(BaseModel):
+    """De code die de auditor uit de browser terugplakt."""
+
+    sessie: str
+    code: str
 
 
 class BronVelden(BaseModel):
@@ -224,6 +233,60 @@ def create_app(
         """
         huidig = _laad_settings()
         return {"config_version": huidig.config_version, "velden": hk.overzicht(huidig)}
+
+    @app.get("/config/anthropic")
+    def anthropic_status() -> dict[str, object]:
+        """Welke modus, welk model, en of er een actieve sessie is.
+
+        Bij `api_key` is de status een simpele "is de key ingesteld"; bij `sso` vragen we
+        de CLI. Dat verschil is expliciet, want een auditor moet weten waaróm het werkt.
+        """
+        huidig = _laad_settings()
+        modus = huidig.auth_mode
+        if modus == "sso":
+            sessie = aa.status()
+        else:
+            key = huidig["anthropic.api_key"]
+            sessie = {
+                "actief": key.ingesteld,
+                "reden": "" if key.ingesteld else "Er is geen API-key ingesteld.",
+            }
+        return {
+            "modus": modus,
+            "model": huidig["anthropic.model"].waarde,
+            "modellen": list(KIESBARE_MODELLEN),
+            "prijzen_peildatum": PRIJZEN_PEILDATUM,
+            **sessie,
+        }
+
+    @app.post("/config/anthropic/login")
+    def anthropic_login_start(request: Request) -> dict[str, str]:
+        """Start de browserstap. Het portaal heeft geen browser en hoort er geen te hebben."""
+        try:
+            sessie, url = aa.start_login()
+        except aa.AuthError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        log_event("anthropic_login_gestart", identiteit_van(request))
+        return {"sessie": sessie, "url": url}
+
+    @app.post("/config/anthropic/login/code")
+    def anthropic_login_code(body: LoginCode, request: Request) -> dict[str, object]:
+        """Lever de code aan. De code wordt niet gelogd en niet bewaard."""
+        try:
+            aa.voltooi_login(body.sessie, body.code)
+        except aa.AuthError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        log_event("anthropic_login_voltooid", identiteit_van(request))
+        return aa.status()
+
+    @app.post("/config/anthropic/logout")
+    def anthropic_logout(request: Request) -> dict[str, object]:
+        try:
+            aa.uitloggen()
+        except aa.AuthError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        log_event("anthropic_uitgelogd", identiteit_van(request))
+        return aa.status()
 
     @app.get("/config/wijzigingen")
     def config_wijzigingen() -> list[dict[str, object]]:

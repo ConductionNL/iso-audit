@@ -116,6 +116,7 @@
   <div class="step">
     <h2>Bronnen</h2>
     <p class="note">Kies een bron en vul in wat hij nodig heeft.</p>
+    <div id="anthropic-wrap"></div>
     <div id="config-wrap"><p class="note">laden…</p></div>
   </div>
 </section>
@@ -318,10 +319,103 @@ async function maakAudit(){
 // ============ configuratie ============
 let _bronnen = [];
 let _herkomst = {};
+let _loginSessie = null;
+
+// Wat kan met een abonnement en wat vraagt een key. Dit staat hier omdat een auditor
+// anders niet kan zien waarom een geplande run faalt terwijl handmatig werken wél lukt.
+function anthropicKaart(a){
+  const badge = a.actief
+    ? `<span class="badge-on">● actief</span>`
+    : `<span class="badge-off">⚠ ${esc(a.reden || "geen sessie")}</span>`;
+  const sso = a.modus === "sso";
+  const opties = (a.modellen||[]).map(m =>
+    `<option value="${esc(m)}"${m===a.model?" selected":""}>${esc(modelLabel(m))}</option>`).join("");
+  return `<div class="bronkaart">
+    <div class="bronkop"><strong>Claude (Anthropic)</strong> ${badge}</div>
+    <div class="mini">Classificatie en memo-tekst.</div>
+    <label class="veld">Manier van inloggen<br>
+      <select id="an-modus" onchange="zetAnthropicModus()">
+        <option value="api_key"${sso?"":" selected"}>API-key</option>
+        <option value="sso"${sso?" selected":""}>Log in met Claude (abonnement)</option>
+      </select></label>
+    ${sso ? `<div class="mini">Een abonnement werkt voor handmatig audits draaien. Voor
+      geplande runs is een API-key nodig: die hebben geen browser om mee in te loggen.</div>
+      <div style="margin-top:.5rem">
+        <button class="alt" onclick="anthropicLogin()">Log in met Claude</button>
+        <button class="alt" onclick="anthropicLogout()">Log uit</button>
+        <span id="an-msg" class="ok"></span>
+      </div>
+      <div id="an-login"></div>`
+      : `<label class="veld">API-key${a.actief?' <span class="ok">ingesteld</span>':""}<br>
+        <input id="an-key" type="password" style="width:100%"
+          placeholder="${a.actief?"laat leeg om te behouden":""}"></label>
+      <div><button onclick="bewaarAnthropicKey()">Opslaan</button>
+        <span id="an-msg" class="ok"></span></div>`}
+    <label class="veld">Model<br><select id="an-model" onchange="zetModel()">${opties}</select></label>
+    <div class="mini">Tarieven gecontroleerd op ${esc(a.prijzen_peildatum||"")}.</div>
+  </div>`;
+}
+function modelLabel(m){
+  const s = m.replace("claude-", "").replace(/-/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+async function loadAnthropic(){
+  document.getElementById("anthropic-wrap").innerHTML = anthropicKaart(await j("/config/anthropic"));
+}
+async function zetAnthropicModus(){
+  const modus = document.getElementById("an-modus").value;
+  await postBron("anthropic", {ANTHROPIC_AUTH_MODE: modus});
+  await loadAnthropic();
+}
+async function zetModel(){
+  await postBron("anthropic", {AUDIT_CLASSIFICATION_MODEL: document.getElementById("an-model").value});
+  msgAn("✓ model opgeslagen");
+}
+async function bewaarAnthropicKey(){
+  const el = document.getElementById("an-key");
+  if(!el.value){ msgAn("⚠ geen key ingevuld"); return; }
+  await postBron("anthropic", {ANTHROPIC_API_KEY: el.value});
+  el.value = ""; await loadAnthropic(); msgAn("✓ opgeslagen");
+}
+async function anthropicLogin(){
+  msgAn("bezig…");
+  const r = await fetch("/config/anthropic/login", {method:"POST"});
+  if(!r.ok){ msgAn("⚠ " + ((await r.json().catch(()=>({}))).detail || r.status)); return; }
+  const d = await r.json(); _loginSessie = d.sessie; msgAn("");
+  document.getElementById("an-login").innerHTML =
+    `<div class="mini">Open deze link, log in, en plak de code hieronder terug.</div>
+     <div style="margin:.3rem 0"><a href="${esc(d.url)}" target="_blank" rel="noopener">Inloggen bij Claude</a></div>
+     <label class="veld">Code<br><input id="an-code" style="width:100%"></label>
+     <button onclick="anthropicCode()">Code aanleveren</button>`;
+}
+async function anthropicCode(){
+  const code = document.getElementById("an-code").value;
+  const r = await fetch("/config/anthropic/login/code", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({sessie:_loginSessie, code})});
+  if(!r.ok){ msgAn("⚠ " + ((await r.json().catch(()=>({}))).detail || r.status)); return; }
+  document.getElementById("an-login").innerHTML = ""; await loadAnthropic(); msgAn("✓ ingelogd");
+}
+async function anthropicLogout(){
+  const r = await fetch("/config/anthropic/logout", {method:"POST"});
+  if(!r.ok){ msgAn("⚠ uitloggen mislukt"); return; }
+  await loadAnthropic(); msgAn("✓ uitgelogd");
+}
+function msgAn(tekst){
+  const el = document.getElementById("an-msg"); if(el) el.textContent = tekst;
+}
+async function postBron(naam, velden){
+  const r = await fetch(`/config/bronnen/${encodeURIComponent(naam)}`,
+    {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({velden})});
+  if(!r.ok) msgAn("⚠ " + ((await r.json().catch(()=>({}))).detail || r.status));
+  return r.ok;
+}
+
 async function loadConfigView(){
+  await loadAnthropic();
   const [health, bronnen, herk] = await Promise.all([
     j("/config/health"), j("/config/bronnen"), j("/config/herkomst")]);
-  _bronnen = bronnen;
+  _bronnen = bronnen.filter(b => !b.eigen_kaart);
   // Herkomst per env-naam, zodat elk invulveld kan tonen waar zijn waarde vandaan komt.
   _herkomst = Object.fromEntries((herk.velden||[]).map(v => [v.env, v]));
   const kaarten = bronnen.map(b => {

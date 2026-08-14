@@ -114,7 +114,13 @@ class BronConfig:
                     "waarde": "" if v.geheim else waarde,
                 }
             )
-        return {"naam": d.naam, "label": d.label, "uitleg": d.uitleg, "velden": velden}
+        return {
+            "naam": d.naam,
+            "label": d.label,
+            "uitleg": d.uitleg,
+            "eigen_kaart": d.eigen_kaart,
+            "velden": velden,
+        }
 
     def alles(self) -> list[dict[str, Any]]:
         return [self.status(b.naam) for b in cat.catalogus()]

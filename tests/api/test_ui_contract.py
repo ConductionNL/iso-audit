@@ -22,6 +22,7 @@ ONGESCOPED = {
     "/config/bronnen",
     "/config/wijzigingen",
     "/config/herkomst",
+    "/config/anthropic",
     "/me",
 }
 

@@ -61,6 +61,11 @@ spec:
             - |
               set -eu
               mkdir -p /var/lib/iso-audit/audits
+              # Profielmap voor de Anthropic-CLI. De app draait non-root; die map hier
+              # aanmaken is betrouwbaarder dan hopen dat fsGroup het toelaat op de
+              # volume-root. 700 omdat er een credential in komt te staan.
+              mkdir -p /var/lib/iso-audit/anthropic
+              chmod 700 /var/lib/iso-audit/anthropic
               [ -f /var/lib/iso-audit/conduction.profile.yaml ] || \
                 cp /app/examples/auditmemo/conduction.profile.yaml /var/lib/iso-audit/
               echo "audits-root gereed:"
@@ -118,6 +123,15 @@ spec:
             # Genereren: ./scripts/genereer-bron-catalogus.sh
             - name: ISO_AUDIT_BRON_CATALOGUS
               value: /var/lib/iso-audit/bronnen.yaml
+            # Profiel van de Anthropic-CLI op de PVC, zodat een `sso`-login een
+            # pod-restart overleeft. Zonder dit staat het profiel in de container en is
+            # de auditor na elke herstart weer uitgelogd.
+            - name: ANTHROPIC_CONFIG_DIR
+              value: /var/lib/iso-audit/anthropic
+            # Optioneel pad naar een config.yaml met niet-geheime defaults. Precedence:
+            # omgeving > config.yaml > UI. Niet gezet = alleen omgeving en UI.
+            - name: ISO_AUDIT_CONFIG
+              value: /var/lib/iso-audit/config.yaml
             # Waar de browser heen gaat ná het wissen van de proxy-sessie, zodat
             # uitloggen ook echt uitloggen is en een volgende login niet stil
             # doorloopt op de bestaande Keycloak-sessie. `client_id` is verplicht:

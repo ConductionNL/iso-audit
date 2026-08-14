@@ -6,6 +6,51 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-14 — Anthropic met abonnement of API-key, en optionele GWS-impersonation
+
+**Inloggen met een Claude-abonnement kan nu.** Eerder stond in dit project dat een
+abonnement niet bruikbaar was voor de classifier en dat SSO een tweede aanroeppad zou
+vragen. Dat was fout: de SDK lost credentials op in de volgorde API-key → auth-token →
+CLI-profiel → workload identity → default-profiel, dus een kale `anthropic.Anthropic()`
+— precies wat `findings.py`, `llm.py` en `thema.py` al gebruiken — pikt een CLI-profiel
+automatisch op. Er is dus **niets** aan de classifier gewijzigd.
+
+- `config/anthropic_auth.py` drijft `ant auth login --no-browser`: het portaal geeft de
+  authorize-URL aan de auditor, die logt in zijn eigen browser in en plakt de code terug.
+  Het portaal heeft geen browser en hoort er ook geen te hebben.
+- Halve logins staan in het geheugen met een harde vervaltijd van 10 minuten en worden
+  opgeruimd; een sessie-id is eenmalig. De code en de profielinhoud worden niet gelogd en
+  niet teruggegeven.
+- Foutmeldingen zijn genormaliseerd — ruwe CLI-output kan een URL met credential bevatten.
+- Het configscherm heeft een eigen Claude-kaart met de modus-keuze, de login/uitlog-actie,
+  het model en de peildatum van de tarieven. Daar staat ook waaróm een abonnement niet
+  overal werkt: geplande runs hebben geen browser om mee in te loggen.
+
+**Getest tegen een stub-CLI, niet tegen een echt account.** Een testsuite die een
+OAuth-flow tegen iemands profiel start en dat overschrijft is onacceptabel; de stub
+imiteert het contract (URL op stdout, code op stdin).
+
+**GWS-impersonation** is toegevoegd als optioneel veld (`GWS_IMPERSONATE_EMAIL`). Leeg =
+map-sharing precies zoals het was. Gevuld = `with_subject`, en dat vraagt eenmalige
+autorisatie van domain-wide delegation door een Workspace-super-admin; zonder die stap
+faalt elke call met `unauthorized_client`. In de code staat expliciet dat impersonation de
+map-sharing omzeilt die anders de auditscope begrenst — laat het leeg tenzij een bron
+onbereikbaar is.
+
+**`ant` in het image, met vastgepinde versie én checksum** (1.23.0 +
+sha256). Een `curl | tar` zonder verificatie is dezelfde supply-chain-afhankelijkheid die
+we vandaag uit deze repo verwijderden; die mag niet via de Dockerfile terugkomen.
+Ontbreekt de binary, dan meldt het portaal dat en wijst het naar de API-key-modus.
+
+`ANTHROPIC_CONFIG_DIR` staat op de PVC, zodat een login een pod-restart overleeft; de
+initContainer maakt die map met mode 700 aan.
+
+Jira's account-veld heet in de UI nu "Service-account e-mail" met de reden erbij. De
+env-naam blijft `JIRA_USER_EMAIL` — hernoemen zou een werkende, uitgerolde bron breken
+voor een cosmetische winst.
+
+932 passed, 1 skipped; ruff + mypy --strict clean. Versie `0.2.0a4`.
+
 ### Fixed — 2026-08-14 — prijzentabel stond fout, kostenregels vielen te laag uit
 
 `PRIJZEN` in `classification/findings.py` had Haiku 4.5 op $0.80/$4.00 per miljoen

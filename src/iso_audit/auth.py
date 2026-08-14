@@ -43,22 +43,46 @@ _WRITE_SCOPES: list[str] = [
 
 CREDS_ENV_VAR = "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"
 
+IMPERSONATE_ENV_VAR = "GWS_IMPERSONATE_EMAIL"
+"""Optioneel. Leeg = het service-account leest alleen wat expliciet met hem gedeeld is.
+
+Gevuld = domain-wide delegation: het service-account handelt namens deze gebruiker en ziet
+dus alles wat die gebruiker ziet. Dat vraagt een **eenmalige autorisatie door een
+Workspace-super-admin** voor de client-ID van het service-account én precies de scopes
+hieronder. Is die autorisatie er niet, dan faalt elke call met `unauthorized_client` — de
+configuratie ziet dan compleet uit terwijl er niets werkt, en daarom meldt de
+verbindingstest dit verschil expliciet.
+
+De ruimere blik is ook een risico: impersonation omzeilt de map-sharing die anders de
+scope van de audit begrenst. Laat dit veld leeg tenzij een bron zonder impersonation
+onbereikbaar is.
+"""
+
 
 def _get_credentials(scopes: list[str]) -> Any:
     """Laad de service-account-credentials voor de gevraagde scopes.
 
     Pad van het JSON-keyfile komt uit env-var `GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE`.
+    Staat `GWS_IMPERSONATE_EMAIL` gevuld, dan handelt het service-account namens die
+    gebruiker (domain-wide delegation); zie `IMPERSONATE_ENV_VAR`.
+
     Returntype is `Any` omdat `google.oauth2.service_account` geen
     runtime-stubs heeft die mypy --strict tevreden stellen.
     """
     creds_file = os.environ.get(CREDS_ENV_VAR)
     if not creds_file:
-        raise OSError(f"{CREDS_ENV_VAR} niet ingesteld in .env")
+        raise OSError(f"{CREDS_ENV_VAR} niet ingesteld")
     # google-auth ships zonder volledige type-stubs voor service_account;
     # de call is wel runtime-typed, maar mypy --strict ziet hem als untyped.
-    return service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
+    creds = service_account.Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
         creds_file, scopes=scopes
     )
+
+    namens = (os.environ.get(IMPERSONATE_ENV_VAR) or "").strip()
+    if namens:
+        # with_subject geeft een nieuw credentials-object; het origineel blijft ongemoeid.
+        creds = creds.with_subject(namens)
+    return creds
 
 
 def drive_read_service() -> Any:

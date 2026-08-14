@@ -15,11 +15,11 @@
 
 ## 2. Anthropic-auth
 
-- [ ] 2.1 `config/anthropic_auth.py`: login starten, code aanleveren, status, uitloggen
-- [ ] 2.2 Bij modus `sso` de API-key-variabele uit de omgeving verwijderen — ook leeg
-- [ ] 2.3 Endpoints voor login/logout/status; UI-toggle tussen de twee modi
-- [ ] 2.4 CLI in het image en profielmap op de persistente volume
-- [ ] 2.5 Test: lege API-key naast `sso` is na laden verdwenen
+- [x] 2.1 `config/anthropic_auth.py`: login starten, code aanleveren, status, uitloggen
+- [x] 2.2 Bij modus `sso` de API-key-variabele uit de omgeving verwijderen — ook leeg
+- [x] 2.3 Endpoints voor login/logout/status; UI-toggle tussen de twee modi
+- [x] 2.4 CLI in het image en profielmap op de persistente volume
+- [x] 2.5 Test: lege API-key naast `sso` is na laden verdwenen
 
 ## 3. Modelkeuze en prijzen
 
@@ -29,8 +29,8 @@
 
 ## 4. Bronvelden en verbindingstest
 
-- [ ] 4.1 GWS-impersonate-veld (optioneel) en `with_subject` in `auth.py`
-- [ ] 4.2 Jira-label naar service-account; env-naam ongewijzigd
+- [x] 4.1 GWS-impersonate-veld (optioneel) en `with_subject` in `auth.py`
+- [x] 4.2 Jira-label naar service-account; env-naam ongewijzigd
 - [ ] 4.3 `config/verbinding.py`: read-only test per integratie, genormaliseerde fout
 - [ ] 4.4 Test: een faalpad geeft geen ruwe leveranciersrespons terug
 
