@@ -184,3 +184,30 @@ def test_detail_meldt_andere_actieve_auditor(tmp_path: Path) -> None:
     detail = client.get(f"/audits/{aid}").json()
     assert detail["andere_actief"]["identiteit"] == "iemand.anders@conduction.nl"
     assert detail["audit"]["id"] == aid
+
+
+def test_tweede_run_via_de_route_behoudt_triage(tmp_path: Path) -> None:
+    """Regressie-vangnet voor het gat dat de containertest blootlegde.
+
+    `_run_live_worker` deed `self._save(drafted)` en overschreef daarmee de hele
+    werkset. De dedup-module bestond en was getest, maar niets riep hem aan vanuit de
+    run — dus de spec-eis "een volgende run gooit geen triage weg" hield op
+    moduleniveau en niet in de praktijk. Deze test loopt door de échte route.
+    """
+    client, registry = _portaal(tmp_path)
+    client.post("/audits", json={"norm": "9001", "periode": "2026-Q3"})
+    aid = "9001-2026-Q3"
+    d = _vul(registry, aid, _FINDINGS)
+
+    r = client.post(f"/audits/{aid}/findings/f1", json={"triage_status": "valide", "reason": "ok"})
+    assert r.status_code == 200
+
+    # Een run met dezelfde kandidaat erin mag hem niet opnieuw introduceren.
+    from iso_audit.api import runs as runs_mod
+
+    toegevoegd, overgeslagen = runs_mod.voeg_toe(d, _FINDINGS)
+    assert (toegevoegd, overgeslagen) == (0, 1)
+
+    na = client.get(f"/audits/{aid}/findings").json()
+    assert len(na) == 1
+    assert na[0]["triage_status"] == "valide", "triage is weggegooid door de tweede run"

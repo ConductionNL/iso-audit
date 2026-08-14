@@ -396,12 +396,20 @@ def test_live_run_worker_draft_en_status(tmp_path: Path, monkeypatch) -> None:  
     s._run_live_worker("27001", ["drive"], "8", 3)  # synchroon (geen thread)
 
     assert s._run.status == "done"
-    assert [f.id for f in s.findings()] == ["nc-8.15"]
+    # AANVULLEND, niet vervangend (change portal-dashboard): de nieuwe kandidaat komt
+    # erbij en de bestaande bevindingen blijven staan. Eerder overschreef de live
+    # worker findings.json wholesale en gooide daarmee alle triage van een eerdere
+    # run weg — precies wat de spec `audit-registry` verbiedt.
+    ids = [f.id for f in s.findings()]
+    assert "nc-8.15" in ids
+    assert {"f1", "f2"} <= set(ids), "bestaande bevindingen zijn overschreven"
+    assert s.laatste_merge == (1, 0)
     assert any("Stap 7/7" in m for m in s._run.log)
 
 
 def test_index_serveert_ui(tmp_path: Path) -> None:
     r = _client(tmp_path).get("/")
     assert r.status_code == 200
-    assert "auditor-flow" in r.text
+    assert "auditorportaal" in r.text
+    assert 'id="view-dashboard"' in r.text
     assert "Triage" in r.text

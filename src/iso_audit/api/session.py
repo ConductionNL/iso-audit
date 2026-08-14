@@ -120,6 +120,10 @@ class AuditSession:
         self._norms_dir = norms_dir
         self._memo_input_path = Path(memo_input_path)
         self._run = _RunState()
+        self.laatste_merge: tuple[int, int] = (0, 0)
+        """``(toegevoegd, overgeslagen)`` van de laatste run — de route registreert
+        dit bij het run-record, zodat een run die dertig kandidaten opleverde waarvan
+        achttien al bekend waren niet lijkt alsof hij niets deed."""
 
     # --- findings + triage ---------------------------------------------------
 
@@ -274,7 +278,13 @@ class AuditSession:
             drafted = draft_from_db(
                 norm=norm, norms_dir=str(self._norms_dir), language="nl", top_n=top_n
             )
-            self._save(drafted)
+            # AANVULLEN, niet overschrijven. Eerder deed dit `self._save(drafted)` en
+            # daarmee gooide een tweede run alle triage van de eerste weg — precies
+            # wat de spec `audit-registry` verbiedt. De dedup zit in `api.runs`;
+            # overgeslagen duplicaten worden door de route bij het run-record geteld.
+            from iso_audit.api.runs import voeg_toe
+
+            self.laatste_merge = voeg_toe(self.dir, [f.model_dump() for f in drafted])
             self._update_memo_context(norm, sources, chapter)
             self._run.done = self._run.total
             self._run.status = "done"

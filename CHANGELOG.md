@@ -6,6 +6,59 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-14 — portaal is een dashboard met audits en runs (breaking API)
+
+Het portaal kende precies één auditsessie, meegegeven bij het starten. Daarmee kon je
+een audit doen maar geen auditpraktijk draaien: een nieuwe audit vroeg een
+beheeractie, en eerdere audits waren onvindbaar zodra de sessie-dir hergebruikt was.
+Change `portal-dashboard`.
+
+**BREAKING op de API.** Alle auditdata-routes noemen nu hun audit:
+`/audits/{id}/findings` in plaats van `/findings`. `create_app` neemt een
+`AuditRegistry`, en `iso-audit ui` heeft `--audits` in plaats van `--session`;
+`--memo-input` is vervallen omdat memo-input bij één audit hoort. Bewust breaking: één
+deployment, versie `0.x`, geen consument buiten de eigen `ui.html`.
+
+Manifest en image moeten samen omhoog: het oude image kent `--audits` niet en het
+nieuwe kent `--session` niet. Beide zitten daarom in dezelfde commit, met versie én
+`newTag` op `0.2.0a0`.
+
+- **Audits zijn eerste-klas.** Directory met `audit.json`; id uit norm + periode
+  (`9001-2026-Q3`). Periode gevalideerd op `JJJJ-Qn`/`JJJJ-Hn` zodat sorteren klopt.
+  Een dubbel id is een fout, geen stil suffix.
+- **Runs append-only geregistreerd** in `runs.jsonl` met identiteit, modus, bronnen en
+  aantallen — inclusief mislukte runs met hun fout.
+- **Een volgende run vult aan.** Dedup deterministisch op norm + clausule + bron +
+  genormaliseerde titel; overgeslagen duplicaten worden geteld, niet stil weggelaten.
+- **Dashboard als landingsscherm** met norm+periode, status, triage-voortgang en
+  memo-status, bronnen, en wie er als laatste aan werkte. Status is **afgeleid** uit de
+  bestanden (`nieuw`/`loopt`/`memo-klaar`), nooit opgeslagen.
+- **Configuratie is een eigen, alleen-lezend scherm.** Wijzigen blijft via Secrets en
+  manifest: `sources/base.py` eist dat een bron zijn configuratie onveranderlijk houdt
+  binnen een auditperiode, en een auditor die zijn Drive-map kan verzetten kan zijn
+  eigen bewijsbasis kiezen.
+- **Gelijktijdig werk wordt gemeld, niet geblokkeerd** (`.actief`). Bewust geen slot:
+  een blijven-hangen slot maakt een audit onbruikbaar. Restrisico staat in de spec.
+- **Portaal start op een lege audits-root.** InitContainer heet nu `seed-audits` en
+  maakt alleen de root plus het profiel.
+
+**Gat dat de containertest blootlegde:** `_run_live_worker` deed `self._save(drafted)`
+en overschreef de hele werkset. De dedup-module bestond en was getest, maar niets riep
+hem aan vanuit de run — dus de eis "een volgende run gooit geen triage weg" hield op
+moduleniveau en niet in de praktijk. Nu gewired, met een regressietest via de échte
+route.
+
+Ook: sessies worden per audit-id gecachet (`api/deps.py`). Geen optimalisatie — de
+voortgang van een lopende run leeft in het sessie-object, en een verse sessie per
+request liet `/run/progress` altijd `idle` zeggen. Bij opschalen naar meerdere replicas
+moet run-status naar schijf.
+
+**Migratie: niets te doen.** Gemeten op de PVC 2026-08-14: `sessie/findings.json` is
+`[]` en er is geen `triage_log.jsonl`, dus er is nooit een beslissing vastgelegd. De
+oude `sessie/`-map wordt genegeerd en kan later weg.
+
+Versie naar `0.2.0a0`.
+
 ### Fixed — 2026-08-12 — login-500 opgelost in Git in plaats van in de Keycloak-UI
 
 De 500 na een geslaagde login kwam doordat Keycloak deze client niet als `aud` in

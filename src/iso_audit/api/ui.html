@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>iso-audit — auditor</title>
+<title>iso-audit — auditorportaal</title>
 <style>
   :root { --blue:#4376fc; --muted:#6a6a6a; --border:#e0e4ec; --soft:#f4f7ff; }
   * { box-sizing:border-box; }
   body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
          color:#1a1a1a; max-width:1000px; margin:0 auto; padding:1.5rem; line-height:1.5; }
-  h1 { color:var(--blue); }
+  h1 { color:var(--blue); margin:0 0 .2rem; font-size:1.5rem; }
   .step { border:1px solid var(--border); border-radius:8px; padding:1rem 1.2rem; margin:1rem 0; }
   .step h2 { color:var(--blue); margin:0 0 .3rem; font-size:1.1rem; }
   .step .num { background:var(--blue); color:#fff; border-radius:50%; padding:.1rem .55rem; margin-right:.4rem; }
@@ -29,7 +29,6 @@
   iframe { width:100%; height:520px; border:1px solid var(--border); border-radius:6px; margin-top:.5rem; }
   .ok { color:#1a7d46; font-size:.8rem; }
   .src-off { opacity:.5; }
-  /* Severity-kleuren: NC=rood, OFI=amber, POSITIVE=groen */
   .sev-NC[aria-pressed="true"] { background:#c0392b; color:#fff; border-color:#c0392b; }
   .sev-OFI[aria-pressed="true"] { background:#b8860b; color:#fff; border-color:#b8860b; }
   .sev-POSITIVE[aria-pressed="true"] { background:#1a7d46; color:#fff; border-color:#1a7d46; }
@@ -54,73 +53,285 @@
   #tip { position:fixed; display:none; max-width:480px; background:#1a1a1a; color:#fff;
          padding:.5rem .7rem; border-radius:6px; font-size:.8rem; white-space:pre-wrap;
          z-index:999; box-shadow:0 2px 10px rgba(0,0,0,.35); pointer-events:none; }
+  /* --- portaal-navigatie en dashboard --- */
+  nav { display:flex; gap:.6rem; align-items:center; margin:.6rem 0 1rem; padding-bottom:.6rem;
+        border-bottom:1px solid var(--border); }
+  nav a { color:var(--blue); text-decoration:none; font-size:.9rem; }
+  nav a[aria-current="page"] { font-weight:700; text-decoration:underline; }
+  nav .spacer { flex:1; }
+  #wie { color:var(--muted); font-size:.8rem; }
+  .st { border-radius:10px; padding:.05rem .5rem; font-size:.75rem; font-weight:600; }
+  .st-nieuw { background:#eef2ff; color:#3949ab; }
+  .st-loopt { background:#fff5e0; color:#8a5a00; }
+  .st-memo-klaar { background:#e6f6ec; color:#1a7d46; }
+  .aid { font-weight:600; color:var(--blue); text-decoration:none; }
+  .warn { background:#fff5e0; border-left:3px solid #b8860b; padding:.5rem .8rem; margin:.5rem 0;
+          font-size:.85rem; }
+  .mini { font-size:.78rem; color:var(--muted); }
+  #nieuw-audit { display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap; }
+  #nieuw-audit input, #nieuw-audit select { border:1px solid var(--border); border-radius:4px; padding:.3rem; }
 </style>
 </head>
-<body onload="refreshGate()">
+<body onload="boot()">
 <div id="tip"></div>
-<h1>iso-audit — auditor-flow</h1>
-<p class="note">Lokale tool. Vier stappen: landscape → run → triage → management-memo.</p>
 
-<div class="step">
-  <h2><span class="num">1</span>Configuratie <span class="note">— kies normen + bronnen voor de run</span></h2>
-  <button onclick="loadConfig()">Laad opties</button>
-  <div id="config-form" class="out" hidden></div>
-</div>
+<h1>iso-audit — auditorportaal</h1>
+<nav>
+  <a href="#/" id="nav-dash">Audits</a>
+  <a href="#/config" id="nav-config">Configuratie</a>
+  <span class="spacer"></span>
+  <span id="wie"></span>
+</nav>
 
-<div class="step">
-  <h2><span class="num">2</span>Run <span class="note">— live pipeline of indexatie-timer</span></h2>
-  <label>Chapter-filter: <input id="chapter" placeholder="bv. 8 · leeg = alles" style="width:140px"></label>
-  &nbsp; <label><input type="checkbox" id="live-mode"> Live run (echte pipeline + LLM)</label>
-  <br><br><button onclick="startRun()">Start run</button>
-  <div id="bar-wrap" hidden><div id="bar"></div></div>
-  <div id="run-progress" class="note" hidden></div>
-  <div id="run-log" class="out" hidden style="max-height:200px;overflow:auto;font-size:.8rem"></div>
-  <div id="run-out" class="out" hidden></div>
-</div>
-
-<div class="step">
-  <h2><span class="num">3</span>Triage + bewerken <span class="note">— valide / niet-valide / follow-up; append-only</span></h2>
-  <div id="triage-filter">
-    <span class="note">Filter:</span>
-    <button class="flt" data-sev="" onclick="loadFindings('')">Alle</button>
-    <button class="flt sev-NC" data-sev="NC" onclick="loadFindings('NC')">NC</button>
-    <button class="flt sev-OFI" data-sev="OFI" onclick="loadFindings('OFI')">OFI</button>
-    <button class="flt sev-POSITIVE" data-sev="POSITIVE" onclick="loadFindings('POSITIVE')">POSITIVE</button>
+<!-- ============ dashboard ============ -->
+<section id="view-dashboard" hidden>
+  <div class="step">
+    <h2>Nieuwe audit</h2>
+    <p class="note">Norm + periode bepalen het id, bijvoorbeeld <code>9001-2026-Q3</code>.
+      Periode als <code>JJJJ-Qn</code> of <code>JJJJ-Hn</code>, zodat sorteren klopt.</p>
+    <div id="nieuw-audit">
+      <label>Norm<br><select id="na-norm"><option>9001</option><option>27001</option></select></label>
+      <label>Periode<br><input id="na-periode" placeholder="2026-Q3" style="width:9rem"></label>
+      <button onclick="maakAudit()">Aanmaken</button>
+      <span id="na-msg" class="ok"></span>
+    </div>
   </div>
-  <div id="bulk-bar">
-    <span class="note">Bulk op selectie — triage</span>
-    <select id="bulk-triage"><option value="">—</option>
-      <option>open</option><option>valide</option><option>niet_valide</option><option>follow_up</option></select>
-    <input id="bulk-reason" class="reason" style="width:14rem" placeholder="reden (auditsessie)">
-    <button onclick="bulkApply()">Toepassen op selectie</button>
-    <span id="bulk-msg" class="ok"></span>
+  <div class="step">
+    <h2>Audits</h2>
+    <div id="dash-wrap"><p class="note">laden…</p></div>
   </div>
-  <div id="triage-wrap"></div>
-  <button id="btn-edit" class="alt" onclick="loadEditor()">Bewerk kop-NC's</button>
-  <div id="editor"></div>
-</div>
+</section>
 
-<div class="step">
-  <h2><span class="num">4</span>Conclusie <span class="note">— saturatie: genoeg of meer audits nodig</span></h2>
-  <button onclick="loadConclusion()">Toon conclusie</button>
-  <div id="conclusion-out" class="out" hidden></div>
-</div>
+<!-- ============ configuratie (alleen-lezen) ============ -->
+<section id="view-config" hidden>
+  <div class="step">
+    <h2>Bronnen</h2>
+    <p class="note">Alleen-lezen. Een bron koppelen gaat via cluster-Secrets en het
+      deployment-manifest — niet hier. Reden: een bron houdt zijn configuratie
+      onveranderlijk binnen een auditperiode, anders kan een auditor zijn eigen
+      bewijsbasis kiezen.</p>
+    <div id="config-wrap"><p class="note">laden…</p></div>
+  </div>
+</section>
 
-<div class="step" id="memo-step">
-  <h2><span class="num">5</span>Management-memo</h2>
-  <p id="gate-msg" class="note"></p>
-  <button id="btn-memo-edit" class="alt" onclick="loadMemoEditor()">Memo aanpassen vóór generatie</button>
-  <div id="memo-editor"></div>
-  <button id="btn-preview" onclick="preview()">Genereer preview</button>
-  <button id="btn-export" class="alt" onclick="exportPdf()">Exporteer PDF</button>
-  <span id="memo-msg" class="ok"></span>
-  <div id="memo-frame"></div>
-</div>
+<!-- ============ audit-detail ============ -->
+<section id="view-audit" hidden>
+  <p><a href="#/" class="mini">← alle audits</a></p>
+  <h2 id="audit-kop" style="color:var(--blue);margin:.2rem 0"></h2>
+  <div id="audit-warn"></div>
+
+  <div class="step">
+    <h2><span class="num">1</span>Run starten <span class="note">— kies normen + bronnen</span></h2>
+    <button onclick="loadConfig()">Laad opties</button>
+    <div id="config-form" class="out" hidden></div>
+    <div style="margin-top:.6rem">
+      <label>Chapter-filter: <input id="chapter" placeholder="bv. 8 · leeg = alles" style="width:140px"></label>
+      &nbsp; <label><input type="checkbox" id="live-mode"> Live run (echte pipeline + LLM)</label>
+      <br><br><button onclick="startRun()">Start run</button>
+    </div>
+    <div id="bar-wrap" hidden><div id="bar"></div></div>
+    <div id="run-progress" class="note" hidden></div>
+    <div id="run-log" class="out" hidden style="max-height:200px;overflow:auto;font-size:.8rem"></div>
+    <div id="run-out" class="out" hidden></div>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">2</span>Run-historie <span class="note">— append-only, ook mislukte runs</span></h2>
+    <div id="runs-wrap"><p class="note">laden…</p></div>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">3</span>Triage + bewerken <span class="note">— valide / niet-valide / follow-up; append-only</span></h2>
+    <div id="triage-filter">
+      <span class="note">Filter:</span>
+      <button class="flt" data-sev="" onclick="loadFindings('')">Alle</button>
+      <button class="flt sev-NC" data-sev="NC" onclick="loadFindings('NC')">NC</button>
+      <button class="flt sev-OFI" data-sev="OFI" onclick="loadFindings('OFI')">OFI</button>
+      <button class="flt sev-POSITIVE" data-sev="POSITIVE" onclick="loadFindings('POSITIVE')">POSITIVE</button>
+    </div>
+    <div id="bulk-bar">
+      <span class="note">Bulk op selectie — triage</span>
+      <select id="bulk-triage"><option value="">—</option>
+        <option>open</option><option>valide</option><option>niet_valide</option><option>follow_up</option></select>
+      <input id="bulk-reason" class="reason" style="width:14rem" placeholder="reden (auditsessie)">
+      <button onclick="bulkApply()">Toepassen op selectie</button>
+      <span id="bulk-msg" class="ok"></span>
+    </div>
+    <div id="triage-wrap"></div>
+    <button id="btn-edit" class="alt" onclick="loadEditor()">Bewerk kop-NC's</button>
+    <div id="editor"></div>
+  </div>
+
+  <div class="step">
+    <h2><span class="num">4</span>Conclusie <span class="note">— saturatie: genoeg of meer audits nodig</span></h2>
+    <button onclick="loadConclusion()">Toon conclusie</button>
+    <div id="conclusion-out" class="out" hidden></div>
+  </div>
+
+  <div class="step" id="memo-step">
+    <h2><span class="num">5</span>Management-memo</h2>
+    <p id="gate-msg" class="note"></p>
+    <button id="btn-memo-edit" class="alt" onclick="loadMemoEditor()">Memo aanpassen vóór generatie</button>
+    <div id="memo-editor"></div>
+    <button id="btn-preview" onclick="preview()">Genereer preview</button>
+    <button id="btn-export" class="alt" onclick="exportPdf()">Exporteer PDF</button>
+    <span id="memo-msg" class="ok"></span>
+    <div id="memo-frame"></div>
+  </div>
+</section>
 
 <script>
 const SEV = ["NC","OFI","POSITIVE"];
 const TRIAGE = ["open","valide","niet_valide","follow_up"];
 const j = async (url,opts) => (await fetch(url,opts)).json();
+const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const escapeHtml = esc;
+
+// Huidige audit. Komt uit de URL-hash, niet uit servergeheugen: de server kent geen
+// "huidige audit" — elk verzoek noemt de zijne. Zo kun je ook een audit-URL delen.
+let AUDIT = null;
+// Elk audit-gescoped pad loopt hierlangs. Vergeet je dat, dan krijg je een 404 en
+// niet stilzwijgend de verkeerde audit.
+const A = p => `/audits/${encodeURIComponent(AUDIT)}${p}`;
+
+// ============ routing ============
+function boot(){ window.addEventListener("hashchange", route); route(); }
+
+function toon(id){
+  for(const v of ["view-dashboard","view-audit","view-config"]){
+    document.getElementById(v).hidden = (v !== id);
+  }
+}
+async function route(){
+  const h = location.hash || "#/";
+  document.getElementById("nav-dash").setAttribute("aria-current", h === "#/" ? "page" : "false");
+  document.getElementById("nav-config").setAttribute("aria-current", h === "#/config" ? "page" : "false");
+  if(h.startsWith("#/audit/")){
+    AUDIT = decodeURIComponent(h.slice("#/audit/".length));
+    toon("view-audit");
+    await openAudit();
+    return;
+  }
+  AUDIT = null;
+  if(h === "#/config"){ toon("view-config"); await loadConfigView(); return; }
+  toon("view-dashboard");
+  await loadDashboard();
+}
+
+// ============ dashboard ============
+const STATUS_LABEL = {nieuw:"nieuw", loopt:"loopt", "memo-klaar":"memo klaar"};
+
+async function loadDashboard(){
+  const audits = await j("/audits");
+  const wrap = document.getElementById("dash-wrap");
+  if(!audits.length){
+    wrap.innerHTML = `<p class="note">Nog geen audits. Maak er hierboven een aan.</p>`;
+    return;
+  }
+  const rijen = audits.map(a => {
+    const voortgang = a.bevindingen
+      ? `${a.bevindingen - a.triage_open}/${a.bevindingen} getrieerd`
+      : "geen bevindingen";
+    const memo = a.memo_klaar ? `<span class="ok">✓ memo</span>` : `<span class="mini">geen memo</span>`;
+    const wie = a.laatste_actor
+      ? `${esc(a.laatste_actor)}<br><span class="mini">${esc(a.laatste_wijziging||"")}</span>`
+      : `<span class="mini">nog niemand</span>`;
+    return `<tr>
+      <td><a class="aid" href="#/audit/${encodeURIComponent(a.id)}">${esc(a.id)}</a><br>
+          <span class="mini">${esc(a.norm)} · ${esc(a.periode)}</span></td>
+      <td><span class="st st-${a.status}">${STATUS_LABEL[a.status]||a.status}</span><br>
+          <span class="mini">${a.runs} run(s)</span></td>
+      <td>${voortgang}<br>${memo}</td>
+      <td>${a.bronnen.length ? a.bronnen.map(esc).join(", ") : `<span class="mini">—</span>`}</td>
+      <td>${wie}</td>
+    </tr>`;
+  }).join("");
+  wrap.innerHTML = `<table><thead><tr>
+      <th>Audit</th><th>Status</th><th>Triage</th><th>Bronnen</th><th>Laatst bewerkt</th>
+    </tr></thead><tbody>${rijen}</tbody></table>`;
+}
+
+async function maakAudit(){
+  const msg = document.getElementById("na-msg");
+  const norm = document.getElementById("na-norm").value;
+  const periode = document.getElementById("na-periode").value.trim();
+  msg.textContent = "bezig…";
+  const r = await fetch("/audits", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({norm, periode})});
+  if(!r.ok){
+    const d = await r.json().catch(()=>({detail:"onbekende fout"}));
+    msg.textContent = "⚠ " + (d.detail || r.status);
+    return;
+  }
+  const a = await r.json();
+  msg.textContent = "✓ aangemaakt";
+  location.hash = "#/audit/" + encodeURIComponent(a.id);
+}
+
+// ============ configuratie (alleen-lezen) ============
+async function loadConfigView(){
+  const health = await j("/config/health");
+  const rijen = Object.entries(health).map(([naam, h]) => `
+    <tr>
+      <td><strong>${esc(naam)}</strong></td>
+      <td>${h.connected ? `<span class="badge-on">● gekoppeld</span>`
+                        : `<span class="badge-off">⚠ niet gekoppeld</span>`}</td>
+      <td>${h.connected ? `<span class="mini">${esc(h.tenant||"")}</span>`
+                        : esc(h.reden||"geen reden gemeld")}</td>
+    </tr>`).join("");
+  document.getElementById("config-wrap").innerHTML =
+    `<table><thead><tr><th>Bron</th><th>Status</th><th>Wat ontbreekt / context</th></tr></thead>
+     <tbody>${rijen}</tbody></table>
+     <p class="note">Deze status komt uit dezelfde healthcheck die een run gebruikt —
+     er is geen tweede administratie die uit de pas kan lopen.</p>`;
+}
+
+// ============ audit-detail ============
+async function openAudit(){
+  const r = await fetch(A(""));
+  if(!r.ok){
+    document.getElementById("audit-kop").textContent = `Audit "${AUDIT}" bestaat niet`;
+    document.getElementById("audit-warn").innerHTML =
+      `<p class="note">Terug naar <a href="#/">alle audits</a>.</p>`;
+    return;
+  }
+  const d = await r.json();
+  const a = d.audit;
+  document.getElementById("wie").textContent = "";
+  document.getElementById("audit-kop").textContent = `${a.id} — ${a.norm} · ${a.periode}`;
+  document.getElementById("audit-warn").innerHTML = d.andere_actief
+    ? `<div class="warn"><strong>Let op:</strong> ${esc(d.andere_actief.identiteit)} was hier recent
+       actief (${esc(d.andere_actief.ts)}). De audit blijft bewerkbaar; bij gelijktijdige triage
+       wint de laatste schrijver in de werkset. Beide beslissingen blijven in de trail staan.</div>`
+    : "";
+  // Reset van de vorige audit, zodat er nooit data van audit A in audit B te zien is.
+  for(const id of ["triage-wrap","editor","memo-frame","memo-editor"]){
+    document.getElementById(id).innerHTML = "";
+  }
+  document.getElementById("run-out").hidden = true;
+  await Promise.all([loadRuns(), loadFindings(""), refreshGate()]);
+}
+
+async function loadRuns(){
+  const runs = await j(A("/runs"));
+  const wrap = document.getElementById("runs-wrap");
+  if(!runs.length){ wrap.innerHTML = `<p class="note">Nog geen runs in deze audit.</p>`; return; }
+  const rijen = runs.slice().reverse().map(r => `
+    <tr>
+      <td>${esc(r.run_id)}<br><span class="mini">${esc(r.gestart)}</span></td>
+      <td>${esc(r.door)}</td>
+      <td>${esc(r.modus)} · ${esc(r.norm)}${r.hoofdstuk ? " · §"+esc(r.hoofdstuk) : ""}</td>
+      <td>${(r.bronnen||[]).map(esc).join(", ") || "—"}</td>
+      <td>${r.status === "fout"
+            ? `<span class="badge-off">⚠ fout</span><br><span class="mini">${esc(r.fout||"")}</span>`
+            : `+${r.toegevoegd} nieuw${r.overgeslagen ? `, ${r.overgeslagen} al bekend` : ""}`}</td>
+    </tr>`).join("");
+  wrap.innerHTML = `<table><thead><tr>
+      <th>Run</th><th>Door</th><th>Modus</th><th>Bronnen</th><th>Resultaat</th>
+    </tr></thead><tbody>${rijen}</tbody></table>
+    <p class="note">Nieuwste bovenaan. Een volgende run vult aan: bestaande triage blijft staan
+    en al bekende kandidaten worden geteld, niet stil weggelaten.</p>`;
+}
 
 async function loadConfig(){
   const [o, health] = await Promise.all([j("/config/options"), j("/config/health")]);
@@ -131,7 +342,6 @@ async function loadConfig(){
     `<br><br><strong>Bronnen:</strong><br>` +
     o.sources.map(s=>{
       const h = health[s] || {};
-      // Niet-gekoppeld = greyed out (disabled + uitgevinkt), met reden in de tooltip.
       const off = !h.connected;
       const badge = off ? `<span class="badge-off" data-tip="${(h.reden||'niet gekoppeld')}">⚠ niet gekoppeld</span>`
                         : `<span class="badge-on">● gekoppeld</span>`;
@@ -139,7 +349,7 @@ async function loadConfig(){
              `${off?'disabled':'checked'}> ${s} ${badge}</label> `;
     }).join("") +
     `<br><span class="note">Niet-aangevinkte bronnen vallen buiten de run-scope. `+
-    `Greyed-out bronnen zijn niet gekoppeld (healthcheck faalt) — koppel ze via hun env-vars.</span>`;
+    `Greyed-out bronnen zijn niet gekoppeld — zie <a href="#/config">Configuratie</a>.</span>`;
 }
 function selectedConfig(){
   return {
@@ -153,20 +363,26 @@ function normCode(norms){
 }
 async function startRun(){
   const cfg = selectedConfig();
-  // Vorige ronde wissen — voorkomt dat stale triage/memo blijft staan (bv. als de run faalt).
   document.getElementById("triage-wrap").innerHTML = "";
   document.getElementById("editor").innerHTML = "";
   document.getElementById("memo-frame").innerHTML = "";
   document.getElementById("run-out").hidden = true;
   const live = document.getElementById("live-mode").checked;
   const chapter = document.getElementById("chapter").value.trim() || null;
-  await fetch("/run/start",{method:"POST",headers:{"Content-Type":"application/json"},
+  const r = await fetch(A("/run/start"),{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({mode:live?"live":"sim",norm:normCode(cfg.norms),sources:cfg.sources,chapter})});
+  if(!r.ok){
+    const d = await r.json().catch(()=>({detail:"onbekende fout"}));
+    const prog=document.getElementById("run-progress"); prog.hidden=false;
+    prog.textContent = "Run niet gestart: " + (d.detail||r.status);
+    await loadRuns();   // de mislukte run staat in de historie
+    return;
+  }
   const prog=document.getElementById("run-progress"); prog.hidden=false;
   const bar=document.getElementById("bar"); document.getElementById("bar-wrap").hidden=false;
   const logEl=document.getElementById("run-log");
   const poll=setInterval(async ()=>{
-    const p=await j("/run/progress");
+    const p=await j(A("/run/progress"));
     const pct=p.total?Math.round(100*p.done/p.total):0;
     bar.style.width=pct+"%";
     const eenheid = p.mode==="live" ? `stap ${p.done}/${p.total}` : `${p.done}/${p.total} bestanden`;
@@ -174,21 +390,25 @@ async function startRun(){
     if(p.log && p.log.length){ logEl.hidden=false; logEl.textContent=p.log.join("\n"); logEl.scrollTop=logEl.scrollHeight; }
     if(p.status==="done"||p.status==="error"){
       clearInterval(poll);
-      if(p.status==="error"){ prog.textContent="Run mislukt — zie log."; return; }
+      if(p.status==="error"){ prog.textContent="Run mislukt — zie log."; await loadRuns(); return; }
       prog.textContent=`Klaar in ${p.elapsed_s}s.`;
-      const d=await j("/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
+      const d=await j(A("/run"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(cfg)});
       const el=document.getElementById("run-out"); el.hidden=false;
       el.textContent=`Findings: ${d.findings}\nTellingen: ${JSON.stringify(d.counts)}`;
-      refreshGate();
+      await Promise.all([loadRuns(), loadFindings(_activeFilter), refreshGate()]);
     }
   }, live?700:400);
 }
 let _activeFilter = "";
-function escapeHtml(s){ return String(s||"").replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 async function loadFindings(severity){
   _activeFilter = severity || "";
   document.querySelectorAll("#triage-filter .flt").forEach(b=>b.setAttribute("aria-pressed", b.dataset.sev===_activeFilter));
-  const fs = await j("/findings" + (_activeFilter ? "?severity="+_activeFilter : ""));
+  const fs = await j(A("/findings") + (_activeFilter ? "?severity="+_activeFilter : ""));
+  if(!fs.length){
+    document.getElementById("triage-wrap").innerHTML =
+      `<p class="note">Geen bevindingen${_activeFilter?" met filter "+_activeFilter:""}. Start een run.</p>`;
+    return;
+  }
   let rows = fs.map(f => `
     <tr data-id="${f.id}" class="sevrow-${f.severity}">
       <td><input type="checkbox" class="sel" value="${f.id}"></td>
@@ -205,7 +425,6 @@ async function loadFindings(severity){
     <tr class="detail" id="det-${f.id}" hidden><td colspan="8"><em>laden…</em></td></tr>`).join("");
   document.getElementById("triage-wrap").innerHTML =
     `<table><thead><tr><th><input type="checkbox" onclick="toggleAll(this)" title="alles selecteren"></th><th>Bevinding</th><th>Clausule</th><th>Bron</th><th>Classificatie</th><th>Triage</th><th>Reden</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
-  // Detail (brondocumenten) lazy laden bij eerste uitklap — geen hover meer.
 }
 async function toggleDetail(id){
   const row = document.getElementById("det-"+id);
@@ -219,8 +438,7 @@ async function loadDetail(id){
   const det = document.getElementById("det-"+id);
   if(!det) return;
   try{
-    const c = await j("/findings/"+id+"/context");
-    // Eén lijst: per brondocument een link + de beschrijving (wat de tool aantrof).
+    const c = await j(A("/findings/"+id+"/context"));
     const bronnen = (c.bronnen||[]).map(b=>{
       const label = escapeHtml(b.doc_naam || b.doc_id || b.herkomst || "bron");
       const link = b.url ? `<a href="${b.url}" target="_blank" rel="noopener">${label}</a>` : label;
@@ -230,12 +448,10 @@ async function loadDetail(id){
     const bronBlok = bronnen
       ? `<strong>Bevinding berust op:</strong><ul class="det-bron-list">${bronnen}</ul>`
       : `<span class="note">Geen brondocumenten gekoppeld.</span>`;
-    // NC: hoe de tool het bewijs idealiter had gezien (helpt de triage).
     const vb = (c.examples||[]).map(x=>`<li>${escapeHtml(x)}</li>`).join("");
     const vbBlok = vb
       ? `<div class="det-ideal"><strong>Hoe de tool het had willen zien:</strong><ul class="det-bron-list">${vb}</ul></div>`
       : "";
-    // Redigeerbaar veld: NC → vereiste corrigerende maatregel; OFI → aanbeveling.
     let editBlok = "";
     if(c.severity === "NC"){
       editBlok = `<div class="det-ideal"><label class="note">Vereiste corrigerende maatregel</label>`
@@ -256,15 +472,15 @@ function reasonFor(id){
 }
 function flash(id){
   const tr = document.querySelector(`tr[data-id="${id}"]`);
-  tr.querySelector("td.ok").textContent = "✓ opgeslagen";
+  if(tr) tr.querySelector("td.ok").textContent = "✓ opgeslagen";
 }
 async function post(id,body){
-  await fetch(`/findings/${id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  await fetch(A(`/findings/${id}`),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   flash(id);
   refreshGate();
 }
 async function refreshGate(){
-  const s = await j("/triage/status");
+  const s = await j(A("/triage/status"));
   const step = document.getElementById("memo-step");
   document.getElementById("btn-preview").disabled = !s.complete;
   document.getElementById("btn-export").disabled = !s.complete;
@@ -291,22 +507,21 @@ async function bulkApply(){
   const body = {reason, triage_status: tri};
   msg.textContent = "bezig…";
   for(const id of ids){  // append-only: elke wijziging apart gelogd
-    await fetch(`/findings/${id}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    await fetch(A(`/findings/${id}`),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   }
   msg.textContent = `✓ ${ids.length} bijgewerkt`;
   await refreshGate();
-  await loadFindings(_activeFilter);  // herlaad: severity/triage-wijzigingen zichtbaar maken
+  await loadFindings(_activeFilter);
 }
-function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 let _editorIds = [];
 async function loadEditor(){
-  const fs = await j("/findings?severity=NC");  // alle kop-NC's bewerkbaar tijdens triage
+  const fs = await j(A("/findings?severity=NC"));
   _editorIds = fs.map(f=>f.id);
   let html = fs.length
     ? `<div style="margin:.4rem 0"><button onclick="saveAllEdits()">Alles opslaan (${fs.length})</button> <span id="es-all" class="ok"></span></div>`
     : "";
   for(const f of fs){
-    const d = await j("/findings/"+f.id);
+    const d = await j(A("/findings/"+f.id));
     html += `<div style="border:1px solid var(--border);border-radius:6px;padding:.6rem;margin:.5rem 0">
       <label class="note">Titel</label>
       <input id="t-${f.id}" style="width:100%;font-weight:600" value="${esc(d.title)}">
@@ -317,13 +532,13 @@ async function loadEditor(){
       <button onclick="saveEdit('${f.id}')">Opslaan</button> <span id="es-${f.id}" class="ok"></span>
     </div>`;
   }
-  document.getElementById("editor").innerHTML = html || "<p class='note'>Geen valide kop-NC's.</p>";
+  document.getElementById("editor").innerHTML = html || "<p class='note'>Geen kop-NC's om te bewerken.</p>";
 }
 async function saveEdit(id){
   const body = { title:document.getElementById("t-"+id).value,
     deviation:document.getElementById("dev-"+id).value,
     corrective_measure:document.getElementById("cm-"+id).value, reason:"redactie in UI" };
-  await fetch("/findings/"+id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  await fetch(A("/findings/"+id),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const s=document.getElementById("es-"+id); if(s) s.textContent="✓ opgeslagen";
 }
 async function saveAllEdits(){
@@ -333,14 +548,13 @@ async function saveAllEdits(){
 }
 async function saveField(id, field, elId){
   const body = {reason:"redactie in UI"}; body[field] = document.getElementById(elId).value;
-  await fetch("/findings/"+id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  await fetch(A("/findings/"+id),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   const s=document.getElementById("fs-"+id); if(s) s.textContent="✓ opgeslagen";
 }
 async function loadConclusion(){
-  const c = await j("/conclusion");
+  const c = await j(A("/conclusion"));
   const t = c.tally;
   const el = document.getElementById("conclusion-out"); el.hidden = false;
-  // OFI-thematisering: aan een thema met veel OFI's werken tilt de org breed op.
   const themes = (c.ofi_themes||[]).map(x=>
     `<li><strong>${escapeHtml(x.thema)}</strong> — ${x.count} OFI('s) <span class="note">(§${x.clauses.join(", §")})</span></li>`
   ).join("");
@@ -353,7 +567,7 @@ async function loadConclusion(){
 }
 function val(id){ const e=document.getElementById(id); return e ? e.value : ""; }
 async function loadMemoEditor(){
-  const m = await j("/memo/input");
+  const m = await j(A("/memo/input"));
   const ctx = m.context || {};
   const scopeLines = Object.entries(ctx.scope||{}).map(([k,v])=>`${k}: ${v}`).join("\n");
   document.getElementById("memo-editor").innerHTML = `
@@ -369,7 +583,7 @@ async function loadMemoEditor(){
     </div>`;
 }
 async function saveMemoInput(){
-  const m = await j("/memo/input");            // basis: behoudt date/version/detail_report_ref + dataset_counts
+  const m = await j(A("/memo/input"));
   const ctx = m.context || {};
   m.title = val("m-title"); m.lead_summary = val("m-lead");
   ctx.audit_cycle = val("m-cycle");
@@ -379,15 +593,16 @@ async function saveMemoInput(){
   ctx.scope_caveat = val("m-caveat");
   ctx.discussion = val("m-disc") || null;
   m.context = ctx;
-  const r = await fetch("/memo/input",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(m)});
+  const r = await fetch(A("/memo/input"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(m)});
   document.getElementById("m-msg").textContent = r.ok ? "✓ opgeslagen" : "⚠ fout (controleer velden)";
 }
 async function preview(){
-  document.getElementById("memo-frame").innerHTML = `<iframe src="/memo/preview"></iframe>`;
+  document.getElementById("memo-frame").innerHTML = `<iframe src="${A("/memo/preview")}"></iframe>`;
 }
 async function exportPdf(){
-  const d = await j("/memo/export",{method:"POST"});
+  const d = await j(A("/memo/export"),{method:"POST"});
   document.getElementById("memo-msg").textContent = "PDF: "+d.pdf;
+  await loadRuns();
 }
 // Eigen hover-tooltip (betrouwbaarder dan native title): toont data-tip bij hover.
 const _tip = document.getElementById("tip");

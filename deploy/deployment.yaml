@@ -12,10 +12,11 @@ metadata:
     app.kubernetes.io/name: iso-audit-portal
     app.kubernetes.io/part-of: iso-platform
 spec:
-  # Eén replica, en dat is geen tijdelijke keuze: de PVC is ReadWriteOnce en
-  # `create_app()` neemt één AuditSession. Meerdere replicas zouden dezelfde
-  # SQLite-DB en dezelfde append-only trail beschrijven. Opschalen vraagt eerst de
-  # sessie-selectie-change (zie proposal.md, Scope-grens).
+  # Eén replica, en dat is nog steeds geen tijdelijke keuze. Het portaal kent sinds
+  # change portal-dashboard wél meerdere audits, maar twee redenen blijven: de PVC is
+  # ReadWriteOnce, en de voortgang van een lopende run leeft in het geheugen van het
+  # proces (zie api/deps.py). Opschalen vraagt dus eerst run-status op schijf en een
+  # RWX-volume.
   replicas: 1
   strategy:
     # Recreate i.p.v. RollingUpdate: bij RWO kan de nieuwe pod het volume niet
@@ -43,35 +44,27 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       initContainers:
-        # Zet een LEGE maar geldige sessie op de PVC als die er nog niet is.
+        # Zet de audits-root en het profiel klaar als die er nog niet zijn.
         #
-        # `iso-audit ui` weigert te starten zonder findings.json — bewust, want een
-        # verzonnen lege sessie in een auditwerktuig is erger dan een harde fout
-        # (spec portal-deployment). Gevolg was wel dat het portaal niet online kón
-        # staan zonder dat er al een audit liep: de eerste rollout crashloopte op
-        # precies die fout met een verse PVC (2026-08-12).
+        # Sinds change portal-dashboard hoeft er GEEN lege sessie meer te staan: het
+        # portaal start op een lege audits-root en de auditor maakt zelf een audit
+        # aan. Daarmee is de spanning weg die de eerste rollout omduwde — de app
+        # weigerde te starten zonder findings.json, en die stond er niet.
         #
-        # Deze initContainer haalt die spanning eruit zonder de discipline op te
-        # geven: hij verzint geen bevindingen maar schrijft `[]` — leeg is leeg, en
-        # dat is een eerlijke startstand. Profiel en memo-input komen uit het image.
-        # Idempotent: bestaande bestanden worden nooit overschreven, dus een echte
-        # auditsessie op de PVC blijft ongemoeid.
-        - name: seed-sessie
+        # Idempotent: bestaande bestanden worden nooit overschreven, dus echte
+        # auditdata op de PVC blijft ongemoeid.
+        - name: seed-audits
           image: ghcr.io/conductionnl/iso-audit:latest  # override via kustomize images:
           command:
             - /bin/sh
             - -c
             - |
               set -eu
-              mkdir -p /var/lib/iso-audit/sessie
-              [ -f /var/lib/iso-audit/sessie/findings.json ] || \
-                printf '[]\n' > /var/lib/iso-audit/sessie/findings.json
-              [ -f /var/lib/iso-audit/sessie/memo-input.yaml ] || \
-                cp /app/examples/auditmemo/memo-input.yaml /var/lib/iso-audit/sessie/
+              mkdir -p /var/lib/iso-audit/audits
               [ -f /var/lib/iso-audit/conduction.profile.yaml ] || \
                 cp /app/examples/auditmemo/conduction.profile.yaml /var/lib/iso-audit/
-              echo "sessie-dir gereed:"
-              ls -la /var/lib/iso-audit /var/lib/iso-audit/sessie
+              echo "audits-root gereed:"
+              ls -la /var/lib/iso-audit /var/lib/iso-audit/audits
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -93,18 +86,20 @@ spec:
         # localhost-bind is wat X-Forwarded-Email betrouwbaar maakt.
         - name: app
           image: ghcr.io/conductionnl/iso-audit:latest  # override via kustomize images:
-          # `iso-audit ui` heeft geen env-fallbacks: --session/--profile/--norms/
-          # --memo-input zijn alle vier verplicht. Dat is de expliciete-config-
-          # discipline van de repo en die houden we hier vast: de paden staan hier,
-          # zichtbaar in het manifest, niet verstopt in een image-default.
+          # `iso-audit ui` heeft geen env-fallbacks: --audits, --profile en --norms
+          # zijn alle drie verplicht. Dat is de expliciete-config-discipline van de
+          # repo en die houden we hier vast: de paden staan zichtbaar in het manifest,
+          # niet verstopt in een image-default.
           # --host 127.0.0.1 is essentieel: de app mag niet op het pod-netwerk
           # luisteren, want dat is het trust-anker onder X-Forwarded-Email.
           args:
             - "ui"
-            - "--session=/var/lib/iso-audit/sessie"
+            # `--session` en `--memo-input` zijn vervallen (change portal-dashboard):
+            # het portaal kent nu meerdere audits, elk met eigen memo-input in hun
+            # directory. Eén globale sessie-vlag zou daar tegen werken.
+            - "--audits=/var/lib/iso-audit/audits"
             - "--profile=/var/lib/iso-audit/conduction.profile.yaml"
             - "--norms=/app/examples/norms"
-            - "--memo-input=/var/lib/iso-audit/sessie/memo-input.yaml"
             - "--host=127.0.0.1"
             - "--port=8081"
           env:

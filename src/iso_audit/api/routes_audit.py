@@ -102,6 +102,7 @@ def maak_router(audits: Audits) -> APIRouter:
             )
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        toegevoegd, overgeslagen = sessie.laatste_merge
         runs_mod.registreer(
             dir_,
             door=wie,
@@ -109,6 +110,8 @@ def maak_router(audits: Audits) -> APIRouter:
             norm=r.norm,
             bronnen=r.sources,
             hoofdstuk=r.chapter,
+            toegevoegd=toegevoegd,
+            overgeslagen=overgeslagen,
         )
         return resultaat
 

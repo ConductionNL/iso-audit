@@ -51,28 +51,30 @@
 
 ## 3. UI (capability: portal-dashboard, portal-config-view)
 
-- [ ] 3.1 Landingsscherm: audit-overzicht met de vier kolommen, inclusief lege
+- [x] 3.1 Landingsscherm: audit-overzicht met de vier kolommen, inclusief lege
       audits. Nieuwe audit aanmaken vanaf hier
-- [ ] 3.2 Audit-detail: de bestaande triage- en memo-flow, nu binnen één audit,
+- [x] 3.2 Audit-detail: de bestaande triage- en memo-flow, nu binnen één audit,
       plus de run-historie uit `runs.jsonl`
-- [ ] 3.3 Configuratie als eigen scherm: per bron gekoppeld/niet uit
+- [x] 3.3 Configuratie als eigen scherm: per bron gekoppeld/niet uit
       `/config/health`, met de ontbrekende env-var of Secret-key erbij.
       **Alleen-lezen** — geen enkel endpoint dat bron-config of credentials schrijft
-- [ ] 3.4 Waarschuwing wanneer een andere identiteit recent actief was in deze audit
-- [ ] 3.5 `ui.html` blijft één bestand zonder build-stap
+- [x] 3.4 Waarschuwing wanneer een andere identiteit recent actief was in deze audit
+- [x] 3.5 `ui.html` blijft één bestand zonder build-stap
 
 ## 4. Uitrollen en documentatie
 
-- [ ] 4.1 Eenmalige migratie van de bestaande `sessie/`-dir naar
-      `audits/<norm>-<periode>/` — **mens-actie**, gedocumenteerd, geen automatische
-      verplaatsing. Het portaal verzint niet welke audit dat was
-- [ ] 4.2 initContainer `seed-sessie` aanpassen: `audits/`-root aanmaken i.p.v. een
-      lege sessie. Idempotent blijven
-- [ ] 4.3 `deployment.yaml`: de `--session`-arg vervalt; het portaal krijgt de
+- [x] 4.1 Migratie: **niets te doen.** Gemeten op de PVC 2026-08-14:
+      `sessie/findings.json` is `[]` en er is geen `triage_log.jsonl`, dus er is nooit
+      een beslissing vastgelegd. De oude `sessie/`-map wordt genegeerd en kan later
+      weg — geen handmatige verhuizing nodig
+
+- [x] 4.2 initContainer omgedoopt naar `seed-audits` en maakt nu de `audits/`-root
+      aan i.p.v. een lege sessie — de oude naam loog na deze change. Idempotent
+- [x] 4.3 `deployment.yaml`: de `--session`-arg vervalt; het portaal krijgt de
       audits-root. Versie + `newTag` gelijk bumpen (de image-check faalt anders)
-- [ ] 4.4 `deploy/README.md` en `docs/` bijwerken: nieuwe routes, de migratiestap, en
+- [x] 4.4 `deploy/README.md` en `docs/` bijwerken: nieuwe routes, de migratiestap, en
       dat configuratie alleen-lezen is en waarom
-- [ ] 4.5 `CHANGELOG.md`: breaking API-change expliciet benoemen
+- [x] 4.5 `CHANGELOG.md`: breaking API-change expliciet benoemen
 
 ## 5. Buiten scope — niet stilzwijgend toevoegen
 

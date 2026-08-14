@@ -100,17 +100,14 @@ defect kopiëren).
    waardoor branch-bescherming een uitzondering voor de bot vroeg en een
    gecompromitteerde stap de gedeployde tag kon verleggen. De workflow heeft nu
    geen schrijfrechten op de repo.
-4. **Sessie-inhoud op de PVC — gaat automatisch.** Een initContainer
-   (`seed-sessie`) zet bij het starten een *lege maar geldige* sessie neer als die
-   er nog niet is: `findings.json` met `[]`, plus profiel en memo-input uit het
-   image. Idempotent — bestaande bestanden worden nooit overschreven, dus een echte
-   auditsessie blijft ongemoeid.
+4. **Geen sessie-inhoud nodig.** Sinds change `portal-dashboard` start het portaal op
+   een **lege** audits-root: een initContainer (`seed-audits`) maakt
+   `/var/lib/iso-audit/audits` aan en zet het profiel klaar, en de auditor maakt zelf
+   een audit aan in de UI. Idempotent — bestaande auditdata wordt nooit overschreven.
 
-   Dit was eerst handwerk, en dat brak de eerste rollout: `iso-audit ui` weigert te
-   starten zonder `findings.json` (bewust — zie de spec `portal-deployment`), dus met
-   een verse PVC crashloopte de app op precies die fout. De initContainer haalt die
-   spanning eruit zonder de discipline op te geven: hij verzint geen bevindingen,
-   `[]` is een eerlijke startstand.
+   Dit was eerder handwerk en dat brak de eerste rollout: `iso-audit ui` weigerde te
+   starten zonder `findings.json`, en die stond er niet. Die spanning is nu weg zonder
+   de discipline op te geven — een audit bestaat pas als iemand hem aanmaakt.
 
 **DNS vraagt geen stap.** external-dns kijkt cluster-breed naar Ingresses met
 domain-filter `commonground.nu` en maakt het record uit `ingress.yaml`.
@@ -141,7 +138,13 @@ Keycloak-clientsecret dat al in het cluster staat blijft ongemoeid.
 
     kubectl -n iso-platform rollout status deploy/iso-audit-portal
     curl -sS https://iso.commonground.nu/ping        # "OK" — van oauth2-proxy zelf
-    # / geeft 302 naar Keycloak: de auth-gate doet zijn werk
+    # / geeft de sign-in-pagina: de auth-gate doet zijn werk
+
+Na inloggen: het landingsscherm is het **audit-overzicht**. Een nieuwe audit maak je
+daar aan met norm + periode (`9001` + `2026-Q3` → id `9001-2026-Q3`); de routes zijn
+sindsdien audit-gescoped (`/audits/{id}/…`). Configuratie is een eigen scherm en is
+**alleen-lezen**: een bron koppelen gaat via Secrets en manifest, omdat een bron zijn
+configuratie onveranderlijk houdt binnen een auditperiode.
 
 **`/healthz` is extern níet bereikbaar, en dat is opzet.** Er staat geen
 `skip_auth_routes` in `oauth2-proxy.cfg`, dus de proxy onderschept élk pad — ook
