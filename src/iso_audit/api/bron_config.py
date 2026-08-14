@@ -9,12 +9,18 @@ De Source-adapters lezen hun configuratie uit env-vars bij `__init__`. Deze modu
 de opgeslagen waarden in `os.environ` — dan werken alle adapters ongewijzigd en blijft
 de Source-architectuur intact. Geen adapter hoeft te weten dat er een portaal bestaat.
 
-## Wat dit wel en niet is
+## Waar de waarden staan
 
-Dit is géén secret-manager. De waarden staan als JSON op de PVC, mode 0600, in dezelfde
-volume als de audit-trail. Zwakker dan een cluster-Secret, en dat is een bewuste ruil:
-configuratie die alleen via Secrets kan, maakt het tool onleverbaar aan derden — dan
-heeft elke partij een Kubernetes-beheerder nodig om te beginnen.
+Twee backends achter dezelfde interface:
+
+1. **Kubernetes-Secret** wanneer `ISO_AUDIT_CONFIG_SECRET` gezet is en er een
+   serviceaccount-token in de pod ligt. Dat is de plek waar een beheerder credentials
+   verwacht, met RBAC en kube-API-auditlogging eromheen.
+2. **JSON op de PVC** (mode 0600) als terugval — lokaal draaien, of levering aan een partij
+   zonder Kubernetes. Zonder die terugval is het tool niet meer buiten dit cluster te
+   draaien, en dat was juist de reden om configuratie uit het cluster te halen.
+
+Dit is in beide gevallen géén secret-manager met eigen sleutelbeheer.
 
 Wat er tegenover staat: geheime velden worden nooit teruggegeven via de API, en elke
 wijziging staat append-only met identiteit en tijdstip in `bron_config_log.jsonl`. Dat
@@ -24,12 +30,16 @@ registreren is de controle, niet het moeilijk maken van configureren.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from iso_audit.api import bron_catalogus as cat
+from iso_audit.config import secret_store
+
+_log = logging.getLogger("iso_audit.audit")
 
 WAARDEN = "bron_config.json"
 LOG = "bron_config_log.jsonl"
@@ -54,6 +64,16 @@ class BronConfig:
     # --- lezen ---------------------------------------------------------------
 
     def _laad(self) -> dict[str, dict[str, str]]:
+        if secret_store.beschikbaar():
+            try:
+                return secret_store.lees()
+            except secret_store.SecretStoreOnbeschikbaar as exc:
+                # Terugvallen in plaats van breken: een auditor die zijn configuratie niet
+                # kan zien, kan hem ook niet repareren.
+                _log.warning('{"event": "secret_store_terugval", "reden": %r}', str(exc))
+        return self._laad_pvc()
+
+    def _laad_pvc(self) -> dict[str, dict[str, str]]:
         if not self.pad.is_file():
             return {}
         try:
@@ -161,11 +181,22 @@ class BronConfig:
         if not gewijzigd:
             return
 
+        self._bewaar(alle)
+        self._log(bron, gewijzigd, toegestaan, door)
+
+    def _bewaar(self, alle: dict[str, dict[str, str]]) -> None:
+        """Schrijf naar het Secret als dat kan, anders naar de PVC."""
+        if secret_store.beschikbaar():
+            try:
+                secret_store.schrijf(alle)
+                return
+            except secret_store.SecretStoreOnbeschikbaar as exc:
+                _log.warning('{"event": "secret_store_terugval_schrijven", "reden": %r}', str(exc))
+
         self.root.mkdir(parents=True, exist_ok=True)
         self.pad.write_text(json.dumps(alle, ensure_ascii=False, indent=1), encoding="utf-8")
         # Alleen de eigenaar mag dit bestand lezen: er kunnen tokens in staan.
         self.pad.chmod(0o600)
-        self._log(bron, gewijzigd, toegestaan, door)
 
     def _log(
         self, bron: str, gewijzigd: list[str], toegestaan: dict[str, cat.Veld], door: str

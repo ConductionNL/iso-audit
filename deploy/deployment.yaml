@@ -132,6 +132,11 @@ spec:
             # omgeving > config.yaml > UI. Niet gezet = alleen omgeving en UI.
             - name: ISO_AUDIT_CONFIG
               value: /var/lib/iso-audit/config.yaml
+            # Zet de Secret-backend voor UI-configuratie aan. Niet gezet = alleen de
+            # JSON op de PVC. De rechten staan in rbac-config.yaml: get+patch op precies
+            # deze naam, geen list, geen ClusterRole.
+            - name: ISO_AUDIT_CONFIG_SECRET
+              value: iso-audit-portal-config
             # Waar de browser heen gaat ná het wissen van de proxy-sessie, zodat
             # uitloggen ook echt uitloggen is en een volgende login niet stil
             # doorloopt op de bestaande Keycloak-sessie. `client_id` is verplicht:
@@ -200,6 +205,13 @@ spec:
               mountPath: /tmp
             - name: google-creds
               mountPath: /etc/iso-audit/google
+              readOnly: true
+            # Serviceaccount-token, ALLEEN hier. De SA houdt
+            # automountServiceAccountToken: false, zodat de oauth2-proxy-sidecar geen
+            # token krijgt: die heeft er niets te zoeken bij de kube-API. Het pad is het
+            # standaardpad, zodat de kube-client hem zonder configuratie vindt.
+            - name: kube-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
               readOnly: true
         # De auth-voorkant: de ENIGE netwerk-listener. Valideert de auditor tegen
         # Keycloak (dat Google brokert) en stuurt de identiteit als
@@ -274,6 +286,23 @@ spec:
               mountPath: /etc/oauth2-proxy
               readOnly: true
       volumes:
+        # Kortlevend, per pod uitgegeven token met een expliciete audience. Een projected
+        # token verloopt en wordt geroteerd; het legacy Secret-token deed dat niet.
+        - name: kube-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+                  audience: https://kubernetes.default.svc
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - fieldRef:
+                  fieldPath: metadata.namespace
+                  path: namespace
         - name: data
           persistentVolumeClaim:
             claimName: iso-audit-portal-data

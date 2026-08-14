@@ -10,12 +10,14 @@ resources:
   - service.yaml
   - ingress.yaml
   - networkpolicy.yaml
+  - rbac-config.yaml
   # secret.example.yaml is een TEMPLATE — de echte Secrets out-of-band aanmaken.
   # Bewust NIET in resources: dan zou Argo placeholders over echte secrets heen
   # syncen.
   #
-  # Geen rbac-*.yaml: dit portaal heeft geen kube-API-toegang nodig (anders dan
-  # openwoo-provisioner, dat Argo-status pollt).
+  # rbac-config.yaml geeft get+patch op PRECIES ÉÉN Secret-naam (de UI-configuratie).
+  # Namespace-scoped Role, geen ClusterRole, geen `list` — zonder resourceNames zou de
+  # pod élk Secret in de namespace mogen lezen, inclusief de bron-credentials.
   #
   # Geen networkpolicy-egress: het openwoo-origineel staat sinds 2026-07-13
   # uitgeschakeld wegens DNS-breuk onder Gardener/Calico. Zie networkpolicy.yaml.
@@ -40,4 +42,4 @@ configMapGenerator:
 # tag bestaat vóór de merge en Argo vindt hem direct.
 images:
   - name: ghcr.io/conductionnl/iso-audit
-    newTag: "0.2.0a6"
+    newTag: "0.2.0a7"

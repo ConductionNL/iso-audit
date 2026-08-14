@@ -156,7 +156,7 @@ def test_geen_tool_raakt_de_trail_of_de_database() -> None:
 def test_geen_tool_opent_een_bestand_voor_schrijven() -> None:
     for tool in tools.ALLE_TOOLS:
         bron = inspect.getsource(_functie(tool))
-        for term in ('open(', "write_text", "mkdir", '"w"', "'w'"):
+        for term in ("open(", "write_text", "mkdir", '"w"', "'w'"):
             assert term not in bron, f"{tool} schrijft ({term})"
 
 

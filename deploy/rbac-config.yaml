@@ -1,0 +1,42 @@
+# Rechten om precies één Secret te lezen en bij te werken: het Secret waarin de
+# UI-configuratie van het portaal staat.
+#
+# Zo smal als het kan, en dat is bewust:
+#
+#   * Een **Role**, geen ClusterRole. De rechten gelden alleen in `iso-platform`.
+#   * `resourceNames` op één naam. Zonder die beperking mag de pod élk Secret in de
+#     namespace lezen — inclusief het oauth2-proxy-secret en de bron-credentials.
+#   * Geen `list` en geen `watch`. `list` zou alle Secrets in de namespace opsommen en
+#     daarmee `resourceNames` in de praktijk zinloos maken.
+#   * Geen `create` en geen `delete`. Het Secret wordt out-of-band aangemaakt door een
+#     beheerder; het portaal past alleen zijn eigen sleutel aan met een merge-patch.
+#
+# Te verifiëren met:
+#   kubectl auth can-i --as=system:serviceaccount:iso-platform:iso-audit-portal \
+#     get secret/iso-audit-portal-config -n iso-platform          # -> yes
+#   kubectl auth can-i --as=system:serviceaccount:iso-platform:iso-audit-portal \
+#     list secrets -n iso-platform                                # -> no
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: iso-audit-portal-config
+  namespace: iso-platform
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["iso-audit-portal-config"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: iso-audit-portal-config
+  namespace: iso-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: iso-audit-portal-config
+subjects:
+  - kind: ServiceAccount
+    name: iso-audit-portal
+    namespace: iso-platform

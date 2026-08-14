@@ -6,6 +6,45 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-14 — UI-configuratie in een Secret, met zo smal mogelijke rechten
+
+`config/secret_store.py` bewaart de UI-configuratie in het Secret
+`iso-audit-portal-config` wanneer `ISO_AUDIT_CONFIG_SECRET` gezet is. Achter dezelfde
+`BronConfig`-interface: geen publieke methode gewijzigd.
+
+**De PVC-terugval blijft.** Onbereikbare kube-API of geen Secret geconfigureerd = schrijven
+naar `bron_config.json` met een waarschuwing. Zonder terugval is het tool niet meer buiten
+dit cluster te draaien, en dat was juist de reden om configuratie uit het cluster te halen.
+
+**Twee dingen anders gedaan dan het plan zei.**
+
+Het plan zei `automountServiceAccountToken: true`. Dat zet de token in **élke** container
+van de pod, ook in de oauth2-proxy-sidecar, en die heeft bij de kube-API niets te zoeken.
+In plaats daarvan blijft de SA-default `false` en mount `deployment.yaml` een **projected**
+token alleen in de app-container: 1 uur geldig, automatisch geroteerd, expliciete audience.
+Daarmee wordt de hardening-keuze van vorige week niet teruggedraaid maar verfijnd.
+
+Bandit flagde `urllib.request.urlopen` (B310) omdat het niet kan bewijzen dat het schema
+https is. Dat is niet met een `# nosec` weggezet: de code gebruikt nu
+`http.client.HTTPSConnection`, die geen ander schema *kan* worden. Structureel in plaats van
+een controle die iemand kan vergeten — en de bandit-bevinding is weg in plaats van gesust.
+
+**Rechten, zo smal als het kan** (`deploy/rbac-config.yaml`): Role — geen ClusterRole —
+met `resourceNames: ["iso-audit-portal-config"]` en verbs `get`+`patch`. Geen `list` (dat
+zou alle Secrets opsommen en de naambeperking zinloos maken), geen `create`/`delete`. De
+drie `kubectl auth can-i`-regels om dit te verifiëren staan in `deploy/README.md`, samen
+met de reden waarom de app nu wél een token heeft — een reviewer die de oude regel kent
+moet die uitleg kunnen vinden.
+
+Een kube-API-fout geeft alleen de statuscode terug, nooit de responsbody: die kan het
+meegestuurde token echoën. Met test.
+
+972 passed, 1 skipped; ruff + mypy --strict clean; bandit 0 bevindingen op medium+.
+Versie `0.2.0a7`.
+
+**Nog te doen in het cluster:** het lege Secret aanmaken en de drie `can-i`-regels
+verifiëren. Tot dat moment draait het portaal op de PVC-terugval — dus zonder functieverlies.
+
 ### Added — 2026-08-14 — agentische laag: doorvragen, met afdwingbare grenzen
 
 `iso_audit.agent` voegt toe wat de vaste keten niet kan: **doorvragen**. `pipeline.py`

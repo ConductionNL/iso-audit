@@ -200,6 +200,8 @@ persoon. Dit is de tabel waar een ISO-audit om vraagt.
 | Google-service-account | Drive, Docs, Sheets | `iso-audit-portal-google` / `service-account.json` | Workspace-SA | `info@conduction.nl` | **12 maanden** — verloopt niet zelf, dus rotatie is een agenda-item |
 | Jira-token | Jira Cloud | `iso-audit-portal-sources` / `jira-api-token` | functioneel Atlassian-account | `info@conduction.nl` | 12 maanden |
 | Miro-token | Miro REST v2 | `iso-audit-portal-sources` / `miro-api-token` | org-owned token/app | `info@conduction.nl` | 12 maanden |
+| UI-configuratie | het portaal zelf | `iso-audit-portal-config` / `bron_config.json` | n.v.t. — door auditors gevuld | `info@conduction.nl` | volgt de credential erin |
+| kube-API-token | Kubernetes | n.v.t. — projected volume, geen Secret | SA `iso-audit-portal` | `info@conduction.nl` | 1 uur, automatisch geroteerd |
 | ghcr-push | GitHub Packages | n.v.t. — `GITHUB_TOKEN` in Actions | `ConductionNL/iso-audit` | `info@conduction.nl` | per run, kortlevend |
 | tag-bump-commit | GitHub contents | n.v.t. — `GITHUB_TOKEN` in Actions | `github-actions[bot]` | `info@conduction.nl` | per run, kortlevend |
 
@@ -210,6 +212,40 @@ migratie is pas af als het persoonlijke credential is *ingetrokken*, met een
 De 12-maandstermijn is een keuze, niet een technische grens: de meeste van deze
 credentials verlopen niet uit zichzelf. Zonder vastgelegd plafond is "rotatiemoment"
 een intentie zonder datum.
+
+## Kube-API-toegang: waarom de app een token heeft
+
+Tot 2026-08-14 had dit portaal **geen** kube-API-toegang, en dat stond zo in
+`serviceaccount.yaml`. Sinds de UI-configuratie in een Secret staat, heeft de app die
+toegang wél nodig. Een reviewer die de oude regel kent, moet kunnen vinden waarom hij is
+veranderd — daarom staat het hier en niet alleen in een commit-bericht.
+
+De toegang is zo smal mogelijk gemaakt:
+
+| Keuze | Waarom |
+|---|---|
+| `automountServiceAccountToken: false` blijft staan | Automount zet de token in **élke** container van de pod, ook in de oauth2-proxy-sidecar. Die heeft bij de kube-API niets te zoeken. |
+| Projected token, alleen in de `app`-container | Kortlevend (1 uur), automatisch geroteerd, met expliciete audience. Het legacy Secret-token verliep nooit. |
+| Role, geen ClusterRole | De rechten gelden alleen in `iso-platform`. |
+| `resourceNames: ["iso-audit-portal-config"]` | Zonder die beperking mag de pod élk Secret in de namespace lezen — inclusief het oauth2-secret en de bron-credentials. |
+| `get` + `patch`, geen `list` | `list` zou alle Secrets opsommen en `resourceNames` in de praktijk zinloos maken. Geen `create`/`delete`: het Secret komt van een beheerder. |
+
+Te verifiëren:
+
+```
+kubectl auth can-i --as=system:serviceaccount:iso-platform:iso-audit-portal \
+  get secret/iso-audit-portal-config -n iso-platform     # yes
+kubectl auth can-i --as=system:serviceaccount:iso-platform:iso-audit-portal \
+  get secret/iso-audit-portal-oauth -n iso-platform      # no
+kubectl auth can-i --as=system:serviceaccount:iso-platform:iso-audit-portal \
+  list secrets -n iso-platform                           # no
+```
+
+**De PVC-terugval blijft.** Is de kube-API onbereikbaar of is
+`ISO_AUDIT_CONFIG_SECRET` niet gezet, dan schrijft het portaal naar
+`bron_config.json` op de PVC met een waarschuwing in de log. Zonder die terugval is het
+tool niet meer buiten dit cluster te draaien — en dat was juist de reden om configuratie
+uit het cluster te halen.
 
 ## Bekende openstaande punten
 
