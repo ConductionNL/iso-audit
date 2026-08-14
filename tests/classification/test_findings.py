@@ -146,9 +146,19 @@ def test_kostenteller_voeg_toe_accumuleert() -> None:
 
 def test_kostenteller_kosten_haiku() -> None:
     teller = findings.Kostenteller(model="claude-haiku-4-5-20251001")
-    # 1M input tokens à $0.80 = $0.80
+    # 1M input tokens à $1.00 = $1.00. Was $0.80 tot 2026-08-14: de prijzentabel stond
+    # te laag, waardoor kostenregels in auditrapporten ~25% te laag uitvielen.
     teller.input_tokens = 1_000_000
-    assert teller.kosten_usd() == pytest.approx(0.80)
+    assert teller.kosten_usd() == pytest.approx(1.00)
+
+
+def test_kostenteller_alias_en_gedateerde_haiku_kosten_gelijk() -> None:
+    """Historische runs staan op de gedateerde ID; die mag niet anders uitpakken."""
+    alias = findings.Kostenteller(model="claude-haiku-4-5")
+    gedateerd = findings.Kostenteller(model="claude-haiku-4-5-20251001")
+    alias.input_tokens = 1_000_000
+    gedateerd.input_tokens = 1_000_000
+    assert alias.kosten_usd() == pytest.approx(gedateerd.kosten_usd())
 
 
 def test_kostenteller_kosten_onbekend_model() -> None:

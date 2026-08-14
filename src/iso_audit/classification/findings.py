@@ -50,28 +50,54 @@ MAX_TEKST = 2000
 MIRO_BATCH = 20
 CHARS_PER_TOKEN = 4  # ruwe schatting voor dry-run-cost
 
-# Prijzen USD per miljoen tokens. Bron: anthropic.com/pricing (geldig 2026).
+# Prijzen USD per miljoen tokens. Bron: anthropic.com/pricing.
 # Cache-write 5m = 1.25x input; cache-read = 0.1x input (standaard tariefstructuur).
+#
+# LET OP — op 2026-08-14 gecorrigeerd, niet alleen verversd. De oude tabel had Haiku
+# 4.5 op 0.80/4.00 (werkelijk 1.00/5.00), waardoor elke kostenregel in een
+# auditrapport ~25% te laag uitviel, en Opus op 15.00/75.00 (werkelijk 5.00/25.00).
+# Een te lage kostenpost is schadelijker dan geen kostenpost, omdat hij compleet lijkt.
+PRIJZEN_PEILDATUM = "2026-08-14"
+"""Datum waarop deze tarieven zijn gecontroleerd. Prijzen wijzigen buiten deze repo
+om; rapporteer deze datum mee bij elk kostenbedrag."""
+
 PRIJZEN: dict[str, dict[str, float]] = {
-    "claude-haiku-4-5-20251001": {
-        "input": 0.80,
-        "output": 4.00,
-        "cache_write_5m": 1.00,
-        "cache_read": 0.08,
+    # Alias én gedateerde ID: beide zijn geldige model-strings, en er staan
+    # historische runs in de DB op de gedateerde vorm.
+    "claude-haiku-4-5": {
+        "input": 1.00,
+        "output": 5.00,
+        "cache_write_5m": 1.25,
+        "cache_read": 0.10,
     },
-    "claude-sonnet-4-6-20250929": {
+    "claude-haiku-4-5-20251001": {
+        "input": 1.00,
+        "output": 5.00,
+        "cache_write_5m": 1.25,
+        "cache_read": 0.10,
+    },
+    "claude-sonnet-5": {
         "input": 3.00,
         "output": 15.00,
         "cache_write_5m": 3.75,
         "cache_read": 0.30,
     },
-    "claude-opus-4-7": {
-        "input": 15.00,
-        "output": 75.00,
-        "cache_write_5m": 18.75,
-        "cache_read": 1.50,
+    "claude-opus-5": {
+        "input": 5.00,
+        "output": 25.00,
+        "cache_write_5m": 6.25,
+        "cache_read": 0.50,
     },
 }
+
+KIESBARE_MODELLEN: tuple[str, ...] = (
+    "claude-haiku-4-5",
+    "claude-sonnet-5",
+    "claude-opus-5",
+)
+"""Wat een auditor in de UI kan kiezen, van goedkoop naar duur. Elk model hier MOET
+een prijsregel hebben — `tests/config/test_modelkeuze.py` faalt anders. Zonder die
+test kan een nieuw model stil zonder kostenrapportage gaan lopen."""
 
 
 # ---------------------------------------------------------------------------

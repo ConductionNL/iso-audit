@@ -62,6 +62,20 @@ class BronConfig:
             return {}
         return {str(k): {str(vk): str(vv) for vk, vv in v.items()} for k, v in data.items()}
 
+    def ui_waarden(self) -> dict[str, str]:
+        """Alle via de UI ingevulde waarden, gesleuteld op env-naam.
+
+        Dit is wat deze store bijdraagt aan de precedence-keten in
+        `config.settings.load_config` — de laagste van de drie bronnen. De store hoeft
+        daardoor niets te weten van puntpaden of van de andere bronnen.
+        """
+        plat: dict[str, str] = {}
+        for velden in self._laad().values():
+            for naam, waarde in velden.items():
+                if waarde:
+                    plat[naam] = waarde
+        return plat
+
     def naar_omgeving(self) -> None:
         """Zet alle opgeslagen waarden in ``os.environ``.
 

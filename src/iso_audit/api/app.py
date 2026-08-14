@@ -33,6 +33,8 @@ from iso_audit.api.routes_audit import maak_router as router_audit
 from iso_audit.api.routes_memo import maak_router as router_memo
 from iso_audit.api.routes_triage import maak_router as router_triage
 from iso_audit.api.session import bron_health
+from iso_audit.config import herkomst as hk
+from iso_audit.config.settings import Settings, load_config
 from iso_audit.memo.norm_lookup import laad_norm_db
 
 AUDITS_ROOT_ENV = "ISO_AUDIT_AUDITS_ROOT"
@@ -96,7 +98,17 @@ def create_app(
     # Bron-configuratie naast de audits op de PVC, en meteen in de omgeving zodat de
     # adapters hem zien. Waarden uit het manifest of een Secret blijven voorgaan.
     bronnen = BronConfig(registry.root.parent)
-    bronnen.naar_omgeving()
+
+    # Eén loader bepaalt welke waarde wint (env > config.yaml > UI) en levert per veld
+    # de herkomst mee. Alles wat configuratie nodig heeft, komt hierlangs — niet
+    # rechtstreeks bij os.environ, want dan is de herkomst weg.
+    def _laad_settings() -> Settings:
+        s = load_config(root=registry.root.parent, ui_waarden=bronnen.ui_waarden())
+        s.naar_omgeving()
+        return s
+
+    settings = _laad_settings()
+    hk.log_herkomst(settings)
     _audits = Audits(registry=registry, profile=profile, norms_dir=norms_dir)
 
     def _run_loopt() -> str | None:
@@ -197,7 +209,21 @@ def create_app(
         except ConfigError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         log_event("bron_geconfigureerd", wie, bron=bron, velden=",".join(sorted(body.velden)))
+        # De herkomst is nu veranderd: leg de nieuwe situatie vast, zodat de trail en
+        # /config/herkomst niet uiteenlopen met wat de adapters straks lezen.
+        hk.log_herkomst(_laad_settings())
         return bronnen.status(bron)
+
+    @app.get("/config/herkomst")
+    def config_herkomst() -> dict[str, object]:
+        """Per veld: welke bron won, en of het is ingesteld.
+
+        Dit is wat een auditor achteraf vraagt — liep die run op een cluster-Secret of
+        op iets dat iemand in de UI had ingetypt? Geheime waarden komen gemaskeerd
+        terug, nooit volledig.
+        """
+        huidig = _laad_settings()
+        return {"config_version": huidig.config_version, "velden": hk.overzicht(huidig)}
 
     @app.get("/config/wijzigingen")
     def config_wijzigingen() -> list[dict[str, object]]:

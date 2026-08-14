@@ -1,0 +1,52 @@
+# iso-audit — voorbeeldconfiguratie
+#
+# Kopieer naar `config.yaml` naast de audits-root, of wijs er expliciet naar met
+# ISO_AUDIT_CONFIG=/pad/naar/config.yaml
+#
+# WAAR HOORT WAT
+#
+#   omgeving      → geheimen en per-omgeving-waarden. Wint altijd.
+#   config.yaml   → niet-geheime defaults die je in een repo wil hebben. Dit bestand.
+#   UI            → wat een auditor zelf koppelt. Laagste prioriteit.
+#
+# Een geheim in dit bestand werkt wél, maar wordt gelogd als waarschuwing: een
+# repo-bestand is niet de plek voor een token. Gebruik daarvoor de omgeving of de UI.
+
+config_version: 1
+
+gws:
+  # Optioneel. Leeg = het service-account leest alleen wat expliciet met hem gedeeld is.
+  # Gevuld = impersonation, en dat vraagt dat een Workspace-super-admin domain-wide
+  # delegation heeft geautoriseerd voor de client-ID en de scopes. Zonder die
+  # autorisatie faalt elke call met `unauthorized_client`.
+  impersonate_email: ""
+
+jira:
+  base_url: "https://ORGANISATIE.atlassian.net"
+  # Bij voorkeur een functioneel account, geen persoon: dan blijft de koppeling werken
+  # als iemand de organisatie verlaat.
+  account_email: "iso-audit@ORGANISATIE.nl"
+  # api_token: hoort hier NIET. Zet hem in de omgeving of vul hem in de UI in.
+
+drive:
+  # Het laatste deel van de Drive-URL van de auditmap.
+  folder_id: ""
+
+planning:
+  # Het lange deel van de Sheets-URL van de auditplanning.
+  sheets_id: ""
+
+miro:
+  # api_token: hoort hier NIET — zie jira.api_token.
+
+anthropic:
+  # api_key  = werkt overal, ook headless (cron, CI, een runtime in het cluster).
+  # sso      = een Claude-abonnement via het CLI-profiel. Alleen interactief bruikbaar:
+  #            er is een browserstap nodig en het refresh-token verloopt hard.
+  auth_mode: "api_key"
+  # api_key: hoort hier NIET.
+  #
+  # Kiesbaar: claude-haiku-4-5 (default), claude-sonnet-5, claude-opus-5.
+  # Elk kiesbaar model heeft een prijsregel; zonder die regel zou een run een
+  # kostenpost van nul rapporteren en dat ziet compleet uit terwijl het dat niet is.
+  model: "claude-haiku-4-5"

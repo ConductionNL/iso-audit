@@ -21,6 +21,7 @@ ONGESCOPED = {
     "/config/options",
     "/config/bronnen",
     "/config/wijzigingen",
+    "/config/herkomst",
     "/me",
 }
 
@@ -130,3 +131,18 @@ def test_normlabel_verbergt_de_slug() -> None:
     bron = _bron()
     assert "function normLabel" in bron
     assert "ISO ${m[1]}" in bron
+
+
+def test_configscherm_toont_de_herkomst_per_veld() -> None:
+    """Zonder herkomst-badge typt een auditor iets in dat stil geen effect heeft."""
+    bron = _bron()
+    assert 'j("/config/herkomst")' in bron
+    assert "bronBadge" in bron
+    assert "BRON_LABEL" in bron
+
+
+def test_door_beheerder_gezette_velden_zijn_zichtbaar_vast() -> None:
+    """env en yaml kunnen in de UI niet overschreven worden; dat moet je kunnen zien."""
+    bron = _bron()
+    assert 'h.bron === "env" || h.bron === "yaml"' in bron
+    assert "bronbadge.vast" in bron

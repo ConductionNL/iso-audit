@@ -6,6 +6,67 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-14 — prijzentabel stond fout, kostenregels vielen te laag uit
+
+`PRIJZEN` in `classification/findings.py` had Haiku 4.5 op $0.80/$4.00 per miljoen
+tokens; werkelijk is dat **$1.00/$5.00**. Elke kostenregel in een auditrapport viel
+daardoor ongeveer een kwart te laag uit. Opus stond op $15.00/$75.00 waar $5.00/$25.00
+klopt — die kant op ook fout, alleen minder gevaarlijk.
+
+Een te lage kostenpost is schadelijker dan geen kostenpost, omdat hij compleet lijkt.
+
+Nu: `claude-haiku-4-5` (plus de gedateerde ID, identiek geprijsd — er staan historische
+runs op die vorm), `claude-sonnet-5`, `claude-opus-5`. Toegevoegd:
+`PRIJZEN_PEILDATUM = "2026-08-14"` en `KIESBARE_MODELLEN`, met tests die falen zodra een
+kiesbaar model geen prijsregel heeft, een tarief niet klopt met de standaard
+cache-structuur, of output goedkoper is dan input.
+
+**Nog open, gemeld niet gefixt:** `Kostenteller.kosten_usd()` geeft `0.0` voor een
+onbekend model. Dat is bestaand gedrag met een eigen test, en buiten de scope van deze
+change — maar het is dezelfde faalmodus: een run die stil geen kosten rapporteert. De
+nieuwe test dekt de keuzelijst, niet een handmatig meegegeven `--model`.
+
+### Added — 2026-08-14 — één configuratie-loader met herkomst
+
+Nieuw `src/iso_audit/config/`: `settings.py` en `herkomst.py`. Eén loader lost alle
+configuratie op in de volgorde **omgeving > `config.yaml` > UI > default**, en levert per
+veld mee **waar de waarde vandaan komt**. Voor een audit is dat het interessante deel:
+liep die run op een cluster-Secret of op iets dat iemand in de UI had ingetypt?
+
+- Herkomst is een eigenschap van de waarde (`Waarde(waarde, bron)`), niet een tweede
+  administratie die bij een transformatie kan wegvallen.
+- `Waarde.__repr__` toont een geheim **nooit** — je krijgt `<geheim>` plus de bron. Een
+  geheim kan daardoor niet via een f-string, een assert-melding of een stacktrace in een
+  logbestand belanden. Structurele grens, geen discipline; zelfde idee als
+  `api/audit_log.log_event`, die bewust alleen scalars aanneemt.
+- Eén maskeerfunctie voor de UI, met vaste bullet-lengte zodat de maskering niet verklapt
+  hoe lang een token is.
+- Bij het starten één audit-logregel per veld met de bron; nooit een waarde.
+  `GET /config/herkomst` geeft hetzelfde, zodat een auditor het zonder cluster kan zien.
+- Het configuratiescherm toont per invulveld een badge met de bron. Velden uit de
+  omgeving of `config.yaml` zijn gemarkeerd als vast — anders typt een auditor iets in dat
+  stil geen effect heeft.
+- Een geheim in `config.yaml` werkt maar waarschuwt. Weigeren zou een derde partij
+  blokkeren op een bestand dat hij zelf kan repareren.
+- Kapotte YAML en een nieuwere `config_version` blokkeren het portaal niet: configuratie
+  kunnen zien is de voorwaarde om hem te repareren.
+
+**De sso-val, met een eigen test.** Een gezette `ANTHROPIC_API_KEY` verslaat het
+CLI-profiel altijd — óók een lege string. Bij `auth_mode: sso` verwijdert de loader die
+variabele daarom actief uit de omgeving in plaats van hem over te slaan. Zonder dat faalt
+een run op een credential die de auditor niet gekozen heeft, en wijst de foutmelding naar
+Anthropic in plaats van naar de configuratie.
+
+Verder: `config.example.yaml`, `env.example` en `docs/reference/configuratie.md`. Het
+voorbeeldbestand heet bewust `env.example` en niet `.env.example`: de werkstation-policy
+verbiedt tooling het lezen en schrijven van `.env*`, en een naam die daar niet onder valt
+houdt agents en scripts weg bij echte secrets.
+
+Geen adapter en geen protocol gewijzigd — de loader vult `os.environ`, dus de
+Source-adapters blijven ongewijzigd werken.
+
+913 passed, 1 skipped; ruff + mypy --strict clean.
+
 ### Removed — 2026-08-14 — habitat-artefacten uit de repo
 
 Commit `cd0cc4f` (13 juli 2026, "seed apply-docs-contract change + habitat role

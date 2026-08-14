@@ -75,6 +75,9 @@
   .bronkop button { margin-left:auto; }
   .veld { display:block; margin:.4rem 0; font-size:.85rem; color:var(--muted); }
   .veld input { border:1px solid var(--border); border-radius:4px; padding:.3rem; color:#1a1a1a; }
+  .bronbadge { font-size:.7rem; padding:.05rem .35rem; border-radius:3px;
+               background:#eef1f5; color:#4a5568; }
+  .bronbadge.vast { background:#fdf3d8; color:#7a5b00; }
 </style>
 </head>
 <body onload="boot()">
@@ -314,9 +317,13 @@ async function maakAudit(){
 
 // ============ configuratie ============
 let _bronnen = [];
+let _herkomst = {};
 async function loadConfigView(){
-  const [health, bronnen] = await Promise.all([j("/config/health"), j("/config/bronnen")]);
+  const [health, bronnen, herk] = await Promise.all([
+    j("/config/health"), j("/config/bronnen"), j("/config/herkomst")]);
   _bronnen = bronnen;
+  // Herkomst per env-naam, zodat elk invulveld kan tonen waar zijn waarde vandaan komt.
+  _herkomst = Object.fromEntries((herk.velden||[]).map(v => [v.env, v]));
   const kaarten = bronnen.map(b => {
     const h = health[b.naam] || {};
     const badge = h.connected
@@ -338,6 +345,24 @@ async function loadConfigView(){
      Welke bronnen een run heeft geraadpleegd staat per run in de run-historie.</p>`;
 }
 
+// Waar komt deze waarde vandaan? Env en yaml zijn door een beheerder gezet en kunnen
+// hier niet overschreven worden — dat moet zichtbaar zijn, anders typt een auditor iets
+// in dat stil geen effect heeft.
+const BRON_LABEL = {
+  env: "uit de omgeving", yaml: "uit config.yaml", ui: "hier ingevuld",
+  default: "standaardwaarde", leeg: "",
+};
+function bronBadge(env){
+  const h = _herkomst[env];
+  if(!h || !h.bron || h.bron === "leeg") return "";
+  const vast = (h.bron === "env" || h.bron === "yaml");
+  const titel = vast
+    ? "Door een beheerder gezet; een waarde die je hier invult wordt niet gebruikt."
+    : "";
+  return ` <span class="bronbadge${vast ? " vast" : ""}"${titel ? ` title="${esc(titel)}"` : ""}>`
+    + `${esc(BRON_LABEL[h.bron] || h.bron)}</span>`;
+}
+
 function toonBronForm(naam){
   const doel = document.getElementById("bf-"+naam);
   const b = _bronnen.find(x=>x.naam===naam);
@@ -347,8 +372,9 @@ function toonBronForm(naam){
   doel.innerHTML = b.velden.map(v => {
     const tip = v.hint ? ` data-tip="${esc(v.hint)}"` : "";
     const status = v.geheim && v.ingesteld ? ` <span class="ok">ingesteld</span>` : "";
+    const bron = bronBadge(v.naam);
     const ph = v.geheim && v.ingesteld ? "laat leeg om te behouden" : (v.verplicht ? "" : "optioneel");
-    return `<label class="veld"${tip}>${esc(v.label)}${status}<br>
+    return `<label class="veld"${tip}>${esc(v.label)}${status}${bron}<br>
       <input id="v-${esc(naam)}-${esc(v.naam)}" style="width:100%"
         type="${v.geheim ? "password" : "text"}" placeholder="${esc(ph)}"
         value="${esc(v.geheim ? "" : (v.waarde||""))}"></label>`;
