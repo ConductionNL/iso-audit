@@ -6,6 +6,63 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-16 — een verlopen sessie liet het scherm eeuwig op "laden…" staan
+
+`j()` in `ui.html` deed `(await fetch(url)).json()` zonder naar de statuscode te kijken. Bij
+een 403 van de proxy — precies wat er gebeurt ná een cookie-rotatie, die alle sessies
+ongeldig maakt — klapte `.json()` om op de HTML-foutpagina, liep de fout weg uit een
+niet-afgevangen `route()`, en bleef het scherm hangen. Alweer een fout die zich voordoet als
+"er gebeurt niets", en dat is de vervelendste soort: je gaat het probleem elders zoeken.
+
+Nu: `j()` controleert de status, een `SessieVerlopen`-klasse voor 401/403, en een
+`veiligeRoute()` op `hashchange` die er de melding "Je sessie is verlopen — herlaad de
+pagina" van maakt. Vastgelegd in `tests/api/test_ui_contract.py`.
+
+### Fixed — 2026-08-16 — e2e-tests deden echte Drive-calls
+
+Twee testfouten in `tests/e2e/`: de fixtures ruimden de Google-variabelen niet op, waardoor de
+suite echte Drive-calls deed (traag en netwerkafhankelijk), en de wachtvoorwaarde accepteerde
+de tussenstand "bezig met testen…" als eindtoestand. Beide gerepareerd; de suite is twee keer
+achtereen groen en ging van 40 naar 24 seconden.
+
+### Fixed — 2026-08-16 — planning meldde zich groen op andermans spreadsheet
+
+`sources/planning.py` had `DEFAULT_PLANNING_SHEETS_ID` als terugval: het spreadsheet-ID van
+Conduction, ingebakken in de code. Gemeten in het cluster op 16 augustus stond noch
+`AUDIT_SOURCE_FOLDER_ID` noch `AUDIT_PLANNING_SHEETS_ID` gezet, en was het configuratie-Secret
+leeg. Drive meldde zich toen (terecht) als niet-gekoppeld — en planning **groen met 7 tabs**.
+
+Dat is precies de stille terugval die deze week overal is weggehaald, en hij stond live. Bij
+een derde partij wijst het portaal dan groen naar data van Conduction. Erger nog voor een
+audittool: je ziet groen en concludeert dat de koppeling werkt.
+
+Weg dus, zonder vervanging. Niet-geconfigureerd is nu een eigen toestand:
+`probe()`/`healthcheck()` melden `niet_geconfigureerd` met een leesbare reden — hetzelfde
+idioom als `sources/jira.py` al gebruikte — en wie er écht mee wil lézen krijgt een harde
+fout via `_vereis_id()`. Zichtbaar leeg in plaats van misleidend groen.
+
+### Fixed — 2026-08-16 — pipeline-fouten lekten leveranciersteksten naar de browser
+
+`session.py:_run_live_worker` ving élke pipeline-fout en zette `str(exc)` in twee dingen die
+de browser toont: de live-log (via `run_progress`) en het run-record in de audittrail. Die
+tekst komt uit de client van Google, Jira of Anthropic en kan een URL met credential of een
+tokenfragment bevatten — hetzelfde lekpad als de `reden` in `_check_source`, die op 14
+augustus al is dichtgezet. Nu via `normaliseer()`: de ruwe melding gaat naar het serverlog,
+de auditor ziet een vaste, leesbare tekst.
+
+`routes_audit.py` bleef ongemoeid: dat vangt alleen `SessionError`/`ValueError`/`OSError` uit
+onze eigen validatie, dus daar is geen leveranciersrespons in het spel.
+
+### Fixed — 2026-08-16 — de testsuite hing af van `GWS_IMPERSONATE_EMAIL` op de machine
+
+Staat die variabele gevuld — en op een werkstation dat het portaal lokaal draait staat hij
+dat — dan bouwt `auth.get_credentials()` gedelegeerde credentials en faalden 9 tests in
+`tests/test_auth.py`. Gemeten: 9 failed, 11 passed met de variabele gezet; groen zonder.
+
+Opgelost met één autouse-fixture in `tests/conftest.py`, repo-breed. Bewust niet per test:
+het raakt elke test die credentials bouwt, en een test die eraan moet dénken zichzelf te
+isoleren vergeet dat uiteindelijk.
+
 ### Added — 2026-08-16 — `rollout-portal.sh` doet de hele keten, met pre-flight
 
 Het script pushte, wachtte op de build en rolde uit — maar controleerde vooraf niets.

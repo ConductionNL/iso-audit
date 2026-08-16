@@ -407,10 +407,19 @@ class AuditSession:
                 toegevoegd, overgeslagen = self.laatste_merge
                 afsluiten(self.dir, run_id, toegevoegd=toegevoegd, overgeslagen=overgeslagen)
         except Exception as exc:  # surface elke pipeline-fout in de UI
-            self._run.log.append(f"FOUT: {exc}")
+            # NIET `str(exc)`: dit vangt élke pipeline-fout, dus ook die van Google, Jira
+            # en Anthropic. Zo'n tekst kan een URL met credential of een tokenfragment
+            # bevatten, en beide bestemmingen hieronder zijn zichtbaar in de browser — de
+            # live-log via `run_progress`, het run-record via de audittrail. Zelfde lekpad
+            # als de `reden` in `_check_source`, die op 2026-08-14 al is dichtgezet;
+            # `normaliseer` logt de ruwe melding naar het serverlog waar hij thuishoort.
+            from iso_audit.config.verbinding import normaliseer
+
+            _, tekst = normaliseer(exc, bron="pipeline")
+            self._run.log.append(f"FOUT: {tekst}")
             self._run.status = "error"
             if run_id:
-                afsluiten(self.dir, run_id, fout=str(exc))
+                afsluiten(self.dir, run_id, fout=tekst)
 
     def run_progress(self) -> dict[str, object]:
         """Voortgang van stap 2: done/total, verstreken tijd, ETA en (live) logregels."""

@@ -35,8 +35,14 @@ from iso_audit.sources.base import Document, Finding
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-DEFAULT_PLANNING_SHEETS_ID = "1BV2yajU7tQWU4dJPGc79V-mnH_-bQWCHKzhcU7XY37A"
 PLANNING_SHEETS_ID_ENV = "AUDIT_PLANNING_SHEETS_ID"
+
+# Bewust géén DEFAULT_PLANNING_SHEETS_ID. Tot 2026-08-16 stond hier het
+# spreadsheet-ID van Conduction als terugval. Gemeten in het cluster op die datum:
+# noch `AUDIT_SOURCE_FOLDER_ID` noch `AUDIT_PLANNING_SHEETS_ID` was gezet, waarop
+# Drive zich (terecht) als niet-gekoppeld meldde maar planning **groen** met 7 tabs —
+# op andermans spreadsheet. Bij een derde partij wijst het portaal dan groen naar
+# data van Conduction. Een lege configuratie hoort zichtbaar leeg te zijn.
 
 
 def _valideer_sheet_id(sid: str) -> str:
@@ -64,6 +70,30 @@ def _valideer_sheet_id(sid: str) -> str:
             "Controleer je .env.",
             PLANNING_SHEETS_ID_ENV,
             len(sid),
+        )
+    return sid
+
+
+def _resolve_spreadsheet_id(expliciet: str | None = None) -> str:
+    """Bepaal het planning-spreadsheet-ID; lege string als er niets geconfigureerd is.
+
+    Geen terugval op een ingebakken ID — zie de opmerking bovenaan. Niet-geconfigureerd
+    is een geldige toestand die `probe()`/`healthcheck()` als zodanig melden; wie er
+    écht mee wil lezen krijgt een harde fout via `_vereis_id`.
+    """
+    waarde = expliciet or os.environ.get(PLANNING_SHEETS_ID_ENV) or ""
+    return _valideer_sheet_id(waarde) if waarde else ""
+
+
+def _vereis_id(sid: str) -> str:
+    """Geef het ID terug, of raise als de planning niet gekoppeld is.
+
+    Lezen zonder configuratie hoort te falen, niet stilletjes iets anders te lezen.
+    """
+    if not sid:
+        raise OSError(
+            f"Geen planning-spreadsheet geconfigureerd. Stel {PLANNING_SHEETS_ID_ENV} in, "
+            "of vul het Spreadsheet-ID in bij Configuratie → Auditplanning."
         )
     return sid
 
@@ -213,9 +243,7 @@ class PlanningSource:
     naam = "planning"
 
     def __init__(self, spreadsheet_id: str | None = None) -> None:
-        self._spreadsheet_id = _valideer_sheet_id(
-            spreadsheet_id or os.environ.get(PLANNING_SHEETS_ID_ENV) or DEFAULT_PLANNING_SHEETS_ID
-        )
+        self._spreadsheet_id = _resolve_spreadsheet_id(spreadsheet_id)
 
     @property
     def spreadsheet_id(self) -> str:
@@ -223,7 +251,7 @@ class PlanningSource:
 
     def _fetch_alle(self) -> list[_PlanningRow]:
         """Lees alle tabs en parse elke tab tot planning-rows."""
-        tabs = sheets_lees_alle_tabs(self._spreadsheet_id)
+        tabs = sheets_lees_alle_tabs(_vereis_id(self._spreadsheet_id))
         alle: list[_PlanningRow] = []
         for tab_naam, rijen in tabs.items():
             alle.extend(_parse_tab(tab_naam, rijen))
@@ -269,6 +297,20 @@ class PlanningSource:
         del sessie_id
         return iter([])
 
+    def _niet_gekoppeld(self) -> dict[str, object]:
+        """Status voor "er is geen spreadsheet ingevuld" — geen leveranciersfout.
+
+        Eigen tekst, dus die mag letterlijk door (zie `config/verbinding.py`). In
+        auditor-taal: het configuratiescherm is niet de plek om env-var-namen te leren.
+        """
+        return {
+            "status": "fail",
+            "naam": self.naam,
+            "tenant": "",
+            "soort": "niet_geconfigureerd",
+            "reden": "Nog niet ingevuld: het spreadsheet-ID van de auditplanning.",
+        }
+
     def probe(self) -> dict[str, object]:
         """Lichte connectiviteits-probe: alleen de tabtitels opvragen.
 
@@ -276,6 +318,8 @@ class PlanningSource:
         configuratiescherm aangeroepen. Eén metadata-call bewijst hetzelfde: de credential
         werkt en de spreadsheet is bereikbaar.
         """
+        if not self._spreadsheet_id:
+            return self._niet_gekoppeld()
         try:
             namen = sheets_tabnamen(self._spreadsheet_id)
         except Exception as e:
@@ -296,6 +340,8 @@ class PlanningSource:
 
     def healthcheck(self) -> dict[str, object]:
         """Verifieer dat de planning-spreadsheet bereikbaar is (leest alle tabs)."""
+        if not self._spreadsheet_id:
+            return self._niet_gekoppeld()
         try:
             tabs = sheets_lees_alle_tabs(self._spreadsheet_id)
         except Exception as e:
@@ -332,7 +378,7 @@ def run(droog: bool = False, spreadsheet_id: str | None = None) -> None:
     initialiseer(conn)
     _initialiseer_planning_tabel(conn)
 
-    sid = spreadsheet_id or os.environ.get(PLANNING_SHEETS_ID_ENV, DEFAULT_PLANNING_SHEETS_ID)
+    sid = _vereis_id(_resolve_spreadsheet_id(spreadsheet_id))
     logger.info("Auditplanning inlezen uit Sheets: %s", sid)
     tabs = sheets_lees_alle_tabs(sid)
     if not tabs:

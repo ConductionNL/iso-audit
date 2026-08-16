@@ -16,6 +16,22 @@ from iso_audit.modes.base import Decision
 from iso_audit.sources.base import Document, Finding
 
 
+@pytest.fixture(autouse=True)
+def _geen_impersonation_uit_de_omgeving(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Maak de suite onafhankelijk van `GWS_IMPERSONATE_EMAIL` op de machine.
+
+    Staat die variabele gevuld — en op een werkstation dat het portaal lokaal draait staat
+    hij dat — dan bouwt `auth.get_credentials()` gedelegeerde credentials in plaats van
+    gewone, en falen 9 tests in `test_auth.py`. Gemeten op 2026-08-16: 9 failed, 11 passed
+    met de variabele gezet; groen zonder.
+
+    Autouse en repo-breed, niet per test: het raakt elke test die credentials bouwt, en een
+    test die eraan moet dénken zichzelf te isoleren vergeet het uiteindelijk. Zie de
+    testisolatie-regel in `~/.claude/CLAUDE.md`.
+    """
+    monkeypatch.delenv("GWS_IMPERSONATE_EMAIL", raising=False)
+
+
 @pytest.fixture
 def sample_document() -> Document:
     """Een geldig Document-instance voor adapter-conformance tests."""

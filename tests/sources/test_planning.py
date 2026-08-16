@@ -139,10 +139,39 @@ def test_parse_tab_skipt_ongeldige_clausule() -> None:
 # ---------- PlanningSource ----------
 
 
-def test_planningsource_default_id(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_planningsource_zonder_configuratie_is_leeg(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Geen terugval op een ingebakken spreadsheet-ID.
+
+    Tot 2026-08-16 stond het ID van Conduction hier als default. Gemeten in het cluster:
+    zonder configuratie meldde planning zich **groen met 7 tabs** op andermans sheet,
+    terwijl Drive zich terecht als niet-gekoppeld meldde. Bij een derde partij wijst het
+    portaal dan groen naar data van Conduction.
+    """
     monkeypatch.delenv(planning.PLANNING_SHEETS_ID_ENV, raising=False)
     src = planning.PlanningSource()
-    assert src.spreadsheet_id == planning.DEFAULT_PLANNING_SHEETS_ID
+    assert src.spreadsheet_id == ""
+
+
+def test_planningsource_zonder_configuratie_meldt_niet_gekoppeld(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Niet-gekoppeld is een eigen status, geen leveranciersfout en geen groen."""
+    monkeypatch.delenv(planning.PLANNING_SHEETS_ID_ENV, raising=False)
+    src = planning.PlanningSource()
+    for hc in (src.probe(), src.healthcheck()):
+        assert hc["status"] == "fail"
+        assert hc["soort"] == "niet_geconfigureerd"
+        assert "spreadsheet-ID" in str(hc["reden"])
+
+
+def test_planningsource_zonder_configuratie_weigert_te_lezen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Lezen zonder configuratie faalt zichtbaar in plaats van iets anders te lezen."""
+    monkeypatch.delenv(planning.PLANNING_SHEETS_ID_ENV, raising=False)
+    src = planning.PlanningSource()
+    with pytest.raises(OSError, match=planning.PLANNING_SHEETS_ID_ENV):
+        list(src.list_documents())
 
 
 def test_planningsource_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -334,13 +363,16 @@ def test_run_persisteert_planning(db_pad: str) -> None:
 
 # ---------- sheet-id validatie (config-grens) ----------
 
+# Vorm van een echt Sheets-ID (44 tekens uit [A-Za-z0-9_-]), maar van niemand.
+_SCHOON_SHEET_ID = "1AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVv"
+
 
 def test_valideer_sheet_id_clean_geen_warning(caplog: pytest.LogCaptureFixture) -> None:
     import logging
 
     with caplog.at_level(logging.WARNING):
-        out = planning._valideer_sheet_id(planning.DEFAULT_PLANNING_SHEETS_ID)
-    assert out == planning.DEFAULT_PLANNING_SHEETS_ID
+        out = planning._valideer_sheet_id(_SCHOON_SHEET_ID)
+    assert out == _SCHOON_SHEET_ID
     assert "misvormd" not in caplog.text
 
 
