@@ -218,7 +218,18 @@
 <script>
 const SEV = ["NC","OFI","POSITIVE"];
 const TRIAGE = ["open","valide","niet_valide","follow_up"];
-const j = async (url,opts) => (await fetch(url,opts)).json();
+// Elk GET-verzoek loopt hierlangs. De statuscontrole is niet cosmetisch: zonder die
+// controle klapt `.json()` om op een HTML-foutpagina van de proxy, loopt de fout weg uit
+// een niet-afgevangen `route()`, en blijft het scherm eeuwig op "laden…" staan zonder
+// uitleg. Dat gebeurde na een cookie-rotatie, die alle bestaande sessies ongeldig maakt.
+class SessieVerlopen extends Error {}
+
+const j = async (url,opts) => {
+  const r = await fetch(url,opts);
+  if(r.status === 401 || r.status === 403) throw new SessieVerlopen(String(r.status));
+  if(!r.ok) throw new Error(`${r.status} op ${url}`);
+  return r.json();
+};
 const esc = s => (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const escapeHtml = esc;
 
@@ -238,8 +249,25 @@ async function boot(){
     document.getElementById("wie").textContent = me.identiteit ? `ingelogd als ${me.identiteit}` : "";
     document.getElementById("uitloggen").hidden = false;
   }catch(e){ /* geen identiteit: de gate heeft het request al geweigerd */ }
-  window.addEventListener("hashchange", route);
-  route();
+  window.addEventListener("hashchange", veiligeRoute);
+  veiligeRoute();
+}
+
+// Een mislukte route liet het scherm op "laden…" staan, want de fout liep weg uit een
+// niet-afgevangen async-aanroep. Zeggen wát er mis is, is het minimum.
+async function veiligeRoute(){
+  try {
+    await route();
+  } catch(e) {
+    const wrap = document.querySelector("section:not([hidden]) .step") || document.body;
+    wrap.innerHTML = (e instanceof SessieVerlopen)
+      ? `<div class="warn"><strong>Je sessie is verlopen.</strong> Dat gebeurt onder meer
+         nadat het cookie-secret is geroteerd.
+         <a href="" onclick="location.reload();return false">Herlaad de pagina</a> om
+         opnieuw in te loggen.</div>`
+      : `<div class="warn"><strong>Laden mislukt.</strong> ${esc(String(e))}<br>
+         <a href="" onclick="location.reload();return false">Opnieuw proberen</a></div>`;
+  }
 }
 function uitloggen(){
   // Altijd de proxy-sessie wissen. Is er een logout-URL van de identity-provider

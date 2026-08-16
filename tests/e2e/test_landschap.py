@@ -80,7 +80,20 @@ def portaal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     monkeypatch.setenv("REQUIRE_AUTH", "false")
     db = tmp_path / "audit.db"
     monkeypatch.setenv("AUDIT_DB_PATH", str(db))
-    for naam in ("JIRA_BASE_URL", "JIRA_API_TOKEN", "MIRO_API_TOKEN", "AUDIT_SOURCE_FOLDER_ID"):
+    # Ook de Google-variabelen: anders doet `/config/health` een echte Drive-call met de
+    # credentials van de ontwikkelaar. Traag, netwerkafhankelijk, en het raakt
+    # productiedata — een testsuite hoort dat geen van drieën te doen.
+    for naam in (
+        "JIRA_BASE_URL",
+        "JIRA_API_TOKEN",
+        "JIRA_PROJECTS",
+        "MIRO_API_TOKEN",
+        "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE",
+        "GWS_IMPERSONATE_EMAIL",
+        "AUDIT_SOURCE_FOLDER_ID",
+        "AUDIT_DRIVE_FOLDER_ID",
+        "AUDIT_PLANNING_SHEETS_ID",
+    ):
         monkeypatch.delenv(naam, raising=False)
     _vul_db(db)
 

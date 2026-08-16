@@ -310,6 +310,13 @@ controleer_secrets() {
     if ! kubectl -n "$NS" get secret "$s" >/dev/null 2>&1; then
       echo "  LET OP: ${s} ontbreekt." >&2
       case "$s" in
+      iso-audit-portal-config)
+        echo "    Dit is geen credential maar de opslag waar het portaal zet wat een" >&2
+        echo "    auditor invult. ISO_AUDIT_CONFIG_SECRET staat wel in het manifest, dus" >&2
+        echo "    het portaal probeert dit Secret en valt terug op de PVC. Werkt, maar" >&2
+        echo "    de configuratie landt niet waar je hem verwacht." >&2
+        echo "    Leeg aanmaken: kubectl -n ${NS} create secret generic ${s}" >&2
+        ;;
       iso-audit-portal-google)
         echo "    Drive en de auditplanning werken dan niet; die credential is de" >&2
         echo "    enige die een auditor niet zelf in de UI kan zetten." >&2

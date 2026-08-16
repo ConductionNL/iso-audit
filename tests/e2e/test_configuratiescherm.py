@@ -57,7 +57,22 @@ def portaal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     """
     monkeypatch.setenv("REQUIRE_AUTH", "false")
     monkeypatch.setenv("JIRA_BASE_URL", "https://van-de-beheerder.invalid")
-    for naam in ("JIRA_USER_EMAIL", "JIRA_API_TOKEN", "MIRO_API_TOKEN"):
+    # Álle bronconfiguratie leeg, ook de Google-variabelen. Zonder die laatste doet het
+    # configuratiescherm bij elk herladen een echte Drive-call met de credentials van de
+    # ontwikkelaar: traag, afhankelijk van het netwerk, en het leest productiedata. Dat
+    # maakte deze test wisselvallig in de volledige suite — wat op een timeout leek maar
+    # een ontbrekende isolatie was.
+    for naam in (
+        "JIRA_USER_EMAIL",
+        "JIRA_API_TOKEN",
+        "JIRA_PROJECTS",
+        "MIRO_API_TOKEN",
+        "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE",
+        "GWS_IMPERSONATE_EMAIL",
+        "AUDIT_SOURCE_FOLDER_ID",
+        "AUDIT_DRIVE_FOLDER_ID",
+        "AUDIT_PLANNING_SHEETS_ID",
+    ):
         monkeypatch.delenv(naam, raising=False)
 
     registry = AuditRegistry(tmp_path / "audits")
@@ -138,10 +153,10 @@ def test_opslaan_geeft_zichtbare_terugkoppeling(pagina: Page) -> None:
     pagina.click("#bf-jira button:has-text('Opslaan en testen')")
 
     pagina.wait_for_selector("#bs-jira:has-text('opgeslagen')", timeout=30000)
-    # En de uitslag van de test verschijnt, in plaats van dat het scherm dichtklapt.
-    # Ruime marge: bij de volledige suite starten meerdere browsers tegelijk, en dan is
-    # 30s te krap gebleken — een flake, geen fout in de code.
-    pagina.wait_for_selector("#bt-jira:not(:empty)", timeout=60000)
+    # Wachten op de uitkomst, niet op "niet meer leeg": dat laatste is al waar zodra er
+    # "bezig met testen…" staat, en dan leest de test de tussenstand. Precies de fout die
+    # deze suite elders opspoort — een controle die op een tussentoestand afgaat.
+    pagina.wait_for_selector("#bt-jira:has-text('gekoppeld')", timeout=60000)
     uitslag = pagina.locator("#bt-jira").inner_text()
     assert "gekoppeld" in uitslag, f"geen leesbare testuitslag: {uitslag!r}"
 
@@ -149,7 +164,8 @@ def test_opslaan_geeft_zichtbare_terugkoppeling(pagina: Page) -> None:
 def test_de_testknop_werkt_los_van_opslaan(pagina: Page) -> None:
     _open_config(pagina, "miro")
     pagina.click("#bf-miro button:has-text('Testen')")
-    pagina.wait_for_selector("#bt-miro:not(:empty)", timeout=30000)
+    # Ook hier op de uitkomst wachten en niet op "niet meer leeg".
+    pagina.wait_for_selector("#bt-miro:has-text('niet gekoppeld')", timeout=30000)
     assert "niet gekoppeld" in pagina.locator("#bt-miro").inner_text()
 
 

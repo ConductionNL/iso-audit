@@ -12,7 +12,11 @@
 # draaien overschrijft in plaats van te falen).
 #
 # De waarden komen NOOIT als argument op de commandline (die staat in je
-# shell-history en in de procestabel) maar uit env-vars.
+# shell-history en in de procestabel) maar uit env-vars, of uit een env-bestand in de
+# repo-root. Dat bestand wordt geparsed en NIET ge-`source`d: een regel als
+# `X=$(...)` zou anders worden uitgevoerd, en zo'n bestand komt van buiten dit script.
+# Alleen de sleutels die hieronder in `lees_env_bestand` staan worden overgenomen; een
+# expliciet gezette omgevingsvariabele gaat altijd vóór.
 #
 # Writes: Secrets iso-audit-portal-{oauth,llm,sources,google} in iso-platform
 # Idempotent: ja — apply van een gegenereerd manifest
@@ -20,6 +24,13 @@
 # Style-afwijking: geen
 #
 # Usage:
+#   # eenvoudigst — waarden komen uit het env-bestand in de repo-root:
+#   ./scripts/create-portal-secrets.sh
+#
+#   # een ander bestand, of juist geen:
+#   ./scripts/create-portal-secrets.sh --env-file ~/geheim/portaal.env
+#   ./scripts/create-portal-secrets.sh --geen-env-file
+#
 #   # minimaal — alleen oauth2-proxy (verplicht om de pod te laten starten):
 #   KEYCLOAK_CLIENT_SECRET='...' ./scripts/create-portal-secrets.sh
 #
@@ -44,6 +55,28 @@ set -euo pipefail
 readonly NAMESPACE="iso-platform"
 
 SKIP_OAUTH=false
+ENV_FILE=".env"
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    --env-file)
+      ENV_FILE="${2:?--env-file vraagt een pad}"
+      shift
+      ;;
+    --geen-env-file) ENV_FILE="" ;;
+    -h | --help)
+      sed -n '/^# Usage:/,/^$/p' "$0" >&2
+      exit 0
+      ;;
+    *)
+      err "onbekend argument: $1"
+      exit 2
+      ;;
+    esac
+    shift
+  done
+}
 
 err() {
   echo "error: $*" >&2
@@ -57,6 +90,60 @@ apply_secret() {
     --namespace "$NAMESPACE" \
     "$@" \
     --dry-run=client -o yaml | kubectl apply -f -
+}
+
+# Vul ontbrekende waarden aan uit een .env-bestand.
+#
+# Bewust géén `source`: een .env met `$(...)` erin zou dan uitgevoerd worden, en zo'n
+# bestand komt van buiten dit script. Dit leest alleen regels van de vorm SLEUTEL=waarde
+# en pakt uitsluitend de sleutels die hieronder staan.
+#
+# Wat al in de omgeving staat wint: zo kun je één waarde overrulen zonder het bestand
+# aan te passen. Dezelfde volgorde als de app zelf aanhoudt.
+#
+# De app en dit script gebruiken niet overal dezelfde naam — de app leest
+# `ANTHROPIC_API_KEY` en `GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE`, dit script kent ze als
+# `ANTHROPIC_KEY` en `GOOGLE_SA_FILE`. Beide vormen worden herkend.
+lees_env_bestand() {
+  local pad="$1"
+  [[ -f "$pad" ]] || return 0
+  echo "  waarden aanvullen uit ${pad} (bestaande omgevingsvariabelen blijven voorgaan)"
+
+  local regel sleutel waarde doel
+  while IFS= read -r regel || [[ -n "$regel" ]]; do
+    regel="${regel%$'\r'}"
+    [[ "$regel" =~ ^[[:space:]]*(#|$) ]] && continue
+    [[ "$regel" == *=* ]] || continue
+
+    sleutel="${regel%%=*}"
+    waarde="${regel#*=}"
+    sleutel="${sleutel#export }"
+    # witruimte rond de sleutel weg
+    sleutel="${sleutel//[[:space:]]/}"
+    # omringende aanhalingstekens weg, indien aanwezig
+    if [[ "$waarde" == \"*\" || "$waarde" == \'*\' ]]; then
+      waarde="${waarde:1:${#waarde}-2}"
+    fi
+    [[ -n "$waarde" ]] || continue
+
+    case "$sleutel" in
+    KEYCLOAK_CLIENT_SECRET) doel="KEYCLOAK_CLIENT_SECRET" ;;
+    ANTHROPIC_KEY | ANTHROPIC_API_KEY) doel="ANTHROPIC_KEY" ;;
+    JIRA_BASE_URL) doel="JIRA_BASE_URL" ;;
+    JIRA_USER_EMAIL) doel="JIRA_USER_EMAIL" ;;
+    JIRA_API_TOKEN) doel="JIRA_API_TOKEN" ;;
+    MIRO_API_TOKEN) doel="MIRO_API_TOKEN" ;;
+    GOOGLE_SA_FILE | GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE) doel="GOOGLE_SA_FILE" ;;
+    *) continue ;;
+    esac
+
+    # Alleen invullen wat nog leeg is; `printf -v` en niet `eval`.
+    if [[ -z "${!doel:-}" ]]; then
+      printf -v "$doel" '%s' "$waarde"
+      export "${doel?}"
+      echo "    ${doel} ingelezen"
+    fi
+  done <"$pad"
 }
 
 controleer_vereisten() {
@@ -163,6 +250,9 @@ maak_google_secret() {
 }
 
 main() {
+  parse_args "$@"
+  echo "waarden verzamelen…"
+  lees_env_bestand "$ENV_FILE"
   controleer_vereisten
 
   echo "namespace ${NAMESPACE} controleren…"

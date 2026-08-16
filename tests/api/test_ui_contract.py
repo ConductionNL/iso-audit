@@ -122,6 +122,28 @@ def test_er_is_een_testknop_met_zichtbaar_resultaat() -> None:
     assert "testBron(naam)" in bewaar, "na opslaan meteen testen"
 
 
+def test_een_mislukt_verzoek_laat_het_scherm_niet_op_laden_staan() -> None:
+    """`j()` deed `(await fetch(url)).json()` zonder statuscontrole.
+
+    Bij een 403 van de proxy — bijvoorbeeld na een cookie-rotatie, die alle sessies
+    ongeldig maakt — klapt `.json()` om op de HTML-foutpagina, loopt de fout weg uit een
+    niet-afgevangen `route()`, en blijft het scherm eeuwig op "laden…" staan. Weer een
+    fout die zich voordoet als "er gebeurt niets".
+    """
+    bron = _bron()
+    helper = bron.split("const j = async")[1].split("const esc")[0]
+    assert "r.status === 401 || r.status === 403" in helper, "geen sessiecontrole"
+    assert "if(!r.ok)" in helper, "andere foutcodes worden niet opgemerkt"
+    assert "class SessieVerlopen" in bron
+
+    # En de route vangt hem af met een leesbare melding in plaats van stilte.
+    assert "async function veiligeRoute()" in bron
+    veilig = bron.split("async function veiligeRoute()")[1].split("\n}")[0]
+    assert "Je sessie is verlopen" in veilig
+    assert "Herlaad de pagina" in veilig
+    assert 'addEventListener("hashchange", veiligeRoute)' in bron
+
+
 def test_de_ui_wordt_niet_gecachet(tmp_path: Path) -> None:
     """Eén HTML-bestand zonder buildstap heeft geen versie in de URL. Zonder `no-store`
     zit een auditor na een uitrol op een oud scherm zonder het te merken — dat kostte hier
