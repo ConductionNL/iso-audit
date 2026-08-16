@@ -9,24 +9,9 @@ import pytest
 
 from iso_audit.sources.base import Document, Source
 
-
-@pytest.fixture(autouse=True)
-def _schone_jira_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Hermetisch: geen JIRA_*-env uit .env mag de tests beïnvloeden.
-
-    Met name JIRA_PROJECTS/JIRA_JQL zouden anders de geasserteerde JQL wijzigen
-    zodra ze in de gebruiker-.env staan.
-    """
-    for var in (
-        "JIRA_BASE_URL",
-        "JIRA_USER_EMAIL",
-        "JIRA_EMAIL",
-        "JIRA_API_TOKEN",
-        "JIRA_JQL",
-        "JIRA_FINDINGS_JQL",
-        "JIRA_PROJECTS",
-    ):
-        monkeypatch.delenv(var, raising=False)
+# De JIRA_*-env wordt repo-breed schoongemaakt door `_schone_omgeving` in
+# `tests/conftest.py`. Die fixture stond hier eerst lokaal; ze is verplaatst toen bleek dat
+# `test_pipeline_ingest.py` dezelfde bescherming nodig had en niet had.
 
 
 def _fake_response(ok: bool = True, status: int = 200, data: dict[str, Any] | None = None) -> Any:

@@ -53,15 +53,29 @@ de auditor ziet een vaste, leesbare tekst.
 `routes_audit.py` bleef ongemoeid: dat vangt alleen `SessionError`/`ValueError`/`OSError` uit
 onze eigen validatie, dus daar is geen leveranciersrespons in het spel.
 
-### Fixed — 2026-08-16 — de testsuite hing af van `GWS_IMPERSONATE_EMAIL` op de machine
+### Fixed — 2026-08-16 — de testsuite hing af van omgevingsvariabelen die tests niet zetten
 
-Staat die variabele gevuld — en op een werkstation dat het portaal lokaal draait staat hij
-dat — dan bouwt `auth.get_credentials()` gedelegeerde credentials en faalden 9 tests in
-`tests/test_auth.py`. Gemeten: 9 failed, 11 passed met de variabele gezet; groen zonder.
+Twee gevallen, allebei gemeten, allebei hetzelfde patroon: een test die groen is op jouw
+machine en rood ergens anders — of omgekeerd, wat erger is.
 
-Opgelost met één autouse-fixture in `tests/conftest.py`, repo-breed. Bewust niet per test:
-het raakt elke test die credentials bouwt, en een test die eraan moet dénken zichzelf te
-isoleren vergeet dat uiteindelijk.
+1. **`GWS_IMPERSONATE_EMAIL`.** Staat die gevuld — en op een werkstation dat het portaal
+   lokaal draait staat hij dat — dan bouwt `auth.get_credentials()` gedelegeerde
+   credentials en faalden 9 tests in `tests/test_auth.py`. Gemeten: 9 failed, 11 passed met
+   de variabele gezet; groen zonder.
+2. **`JIRA_PROJECTS`.** `tests/api/test_bron_config.py` post `JIRA_PROJECTS: "ISO"` naar de
+   config-API, waarna `BronConfig.naar_omgeving()` dat in `os.environ` van het testproces
+   zet — waar het blijft staan. Dat lekte naar
+   `test_jira_zonder_scope_stuurt_geen_lege_query`, die het onbegrensd-vangnet
+   (`updated >= -365d`) verwacht en `project in ("ISO")` kreeg. **Rood in CI sinds
+   `60312c5`, groen op een werkstation met een `.env`** — precies het verschil waardoor
+   niemand het opmerkte: de suite die je zelf draait zegt dat er niets aan de hand is.
+
+Beide opgelost met één autouse-fixture in `tests/conftest.py` die de betrokken variabelen
+vóór élke test wist. Repo-breed en niet per testfile: het raakt elke test die credentials
+bouwt of een JQL asserteert, en een test die eraan moet dénken zichzelf te isoleren vergeet
+dat uiteindelijk — wat hier ook precies gebeurd is. De gelijkwaardige lokale fixture in
+`tests/sources/test_jira.py` is daarmee vervallen; die stond er al, alleen niet waar het
+tweede geval hem nodig had.
 
 ### Added — 2026-08-16 — `rollout-portal.sh` doet de hele keten, met pre-flight
 

@@ -15,21 +15,50 @@ import pytest
 from iso_audit.modes.base import Decision
 from iso_audit.sources.base import Document, Finding
 
+# Variabelen die de uitkomst van een test veranderen zonder dat de test ze noemt. Twee
+# bronnen: de `.env` van de machine (via `load_dotenv()` bij import) en andere tests —
+# `BronConfig.naar_omgeving()` schrijft opgeslagen configuratie in `os.environ`, en die
+# blijft daarna staan voor de rest van de sessie.
+_OMGEVING_DIE_TESTS_BEINVLOEDT: tuple[str, ...] = (
+    # Gedelegeerde i.p.v. gewone credentials in `auth.get_credentials()`.
+    "GWS_IMPERSONATE_EMAIL",
+    # Veranderen de JQL die adapters opbouwen, en daarmee de assertions erop.
+    "JIRA_BASE_URL",
+    "JIRA_USER_EMAIL",
+    "JIRA_EMAIL",
+    "JIRA_API_TOKEN",
+    "JIRA_JQL",
+    "JIRA_FINDINGS_JQL",
+    "JIRA_PROJECTS",
+)
+
 
 @pytest.fixture(autouse=True)
-def _geen_impersonation_uit_de_omgeving(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Maak de suite onafhankelijk van `GWS_IMPERSONATE_EMAIL` op de machine.
+def _schone_omgeving(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Maak elke test onafhankelijk van omgevingsvariabelen die hij niet zelf zet.
 
-    Staat die variabele gevuld — en op een werkstation dat het portaal lokaal draait staat
-    hij dat — dan bouwt `auth.get_credentials()` gedelegeerde credentials in plaats van
-    gewone, en falen 9 tests in `test_auth.py`. Gemeten op 2026-08-16: 9 failed, 11 passed
-    met de variabele gezet; groen zonder.
+    Twee gemeten gevallen op 2026-08-16:
 
-    Autouse en repo-breed, niet per test: het raakt elke test die credentials bouwt, en een
-    test die eraan moet dénken zichzelf te isoleren vergeet het uiteindelijk. Zie de
-    testisolatie-regel in `~/.claude/CLAUDE.md`.
+    1. `GWS_IMPERSONATE_EMAIL` gevuld — en op een werkstation dat het portaal lokaal draait
+       staat hij dat — gaf 9 failures in `test_auth.py`; groen zonder.
+    2. `test_bron_config.py` post `JIRA_PROJECTS: "ISO"` naar de config-API, waarna
+       `naar_omgeving()` dat in `os.environ` zet. Dat lekte naar
+       `test_pipeline_ingest.py::test_jira_zonder_scope_stuurt_geen_lege_query`, die het
+       onbegrensd-vangnet (`updated >= -365d`) verwacht en `project in ("ISO")` kreeg. Rood
+       in CI, groen op een werkstation met een `.env` — het vervelendste soort verschil,
+       want de suite die je zelf draait zegt dan dat er niets aan de hand is.
+
+    Autouse en repo-breed, niet per testfile: dit raakt elke test die credentials bouwt of
+    een JQL asserteert, en een test die eraan moet dénken zichzelf te isoleren vergeet het
+    uiteindelijk. Zie de testisolatie-regel in `~/.claude/CLAUDE.md`.
+
+    De bescherming zit in het opschonen vóór élke test, niet in de teardown: `delenv` met
+    `raising=False` legt niets vast als de variabele afwezig was, en zet dan achteraf ook
+    niets terug. Een test die zélf in `os.environ` schrijft lekt dus nog steeds — alleen
+    bereikt die lek geen enkele volgende test meer.
     """
-    monkeypatch.delenv("GWS_IMPERSONATE_EMAIL", raising=False)
+    for var in _OMGEVING_DIE_TESTS_BEINVLOEDT:
+        monkeypatch.delenv(var, raising=False)
 
 
 @pytest.fixture
