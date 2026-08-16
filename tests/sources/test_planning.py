@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -172,7 +171,7 @@ def test_planningsource_list_documents() -> None:
         ]
     }
     src = planning.PlanningSource(spreadsheet_id="x")
-    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+    with patch.object(planning, "sheets_lees_alle_tabs", return_value=tabs):
         docs = list(src.list_documents())
     assert len(docs) == 1
     d = docs[0]
@@ -198,7 +197,7 @@ def test_planningsource_fetch_content() -> None:
         laatst_gewijzigd="",
         inhoud_uri="9001 2025",
     )
-    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+    with patch.object(planning, "sheets_lees_alle_tabs", return_value=tabs):
         content = src.fetch_content(doc)
     assert "Status: gepland" in content
     assert "januari" in content
@@ -240,18 +239,38 @@ def test_planningsource_list_findings_leeg() -> None:
 
 def test_planningsource_healthcheck_ok() -> None:
     src = planning.PlanningSource(spreadsheet_id="x")
-    with patch.object(planning, "gws_lees_alle_tabs", return_value={"t1": []}):
+    with patch.object(planning, "sheets_lees_alle_tabs", return_value={"t1": []}):
         h = src.healthcheck()
     assert h["status"] == "ok"
     assert h["aantal_tabs"] == 1
 
 
-def test_planningsource_healthcheck_fail() -> None:
+def test_planningsource_healthcheck_fail_lekt_de_ruwe_melding_niet() -> None:
+    """Zoals bij DriveSource: de leveranciersmelding hoort in het serverlog.
+
+    Deze test asserteerde eerder dat "auth fail" in `reden` stond. De echte melding hier
+    was een volledige subprocess-dump met de commandoregel erin.
+    """
     src = planning.PlanningSource(spreadsheet_id="x")
-    with patch.object(planning, "gws_lees_alle_tabs", side_effect=RuntimeError("auth fail")):
+    with patch.object(planning, "sheets_lees_alle_tabs", side_effect=RuntimeError("auth fail")):
         h = src.healthcheck()
     assert h["status"] == "fail"
-    assert "auth fail" in str(h["reden"])
+    assert h["soort"]
+    assert "auth fail" not in str(h["reden"])
+
+
+def test_planningsource_probe_leest_niet_alle_tabs() -> None:
+    """De probe vraagt alleen de tabtitels; `healthcheck()` leest de inhoud."""
+    src = planning.PlanningSource(spreadsheet_id="x")
+    with (
+        patch.object(planning, "sheets_tabnamen", return_value=["Tab1", "Tab2"]) as namen,
+        patch.object(planning, "sheets_lees_alle_tabs") as alles,
+    ):
+        h = src.probe()
+    assert h["status"] == "ok"
+    assert h["aantal_tabs"] == 2
+    assert namen.called
+    assert not alles.called
 
 
 # ---------- run (legacy CLI) ----------
@@ -271,7 +290,7 @@ def test_run_droog_doet_geen_db_mutatie(db_pad: str, capsys: pytest.CaptureFixtu
             ["", "4.1", "x", "", "Ctxt"],
         ]
     }
-    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+    with patch.object(planning, "sheets_lees_alle_tabs", return_value=tabs):
         planning.run(droog=True, spreadsheet_id="x")
     out = capsys.readouterr().out
     assert "4.1" in out
@@ -297,7 +316,7 @@ def test_run_persisteert_planning(db_pad: str) -> None:
             ["", "5.1", "", "x", "Leider"],
         ]
     }
-    with patch.object(planning, "gws_lees_alle_tabs", return_value=tabs):
+    with patch.object(planning, "sheets_lees_alle_tabs", return_value=tabs):
         planning.run(droog=False, spreadsheet_id="x")
 
     conn = store.verbinding(db_pad)
@@ -311,53 +330,6 @@ def test_run_persisteert_planning(db_pad: str) -> None:
     assert rows[0]["jaar"] == 2025
     assert rows[0]["kwartaal"] == "januari"
     assert rows[0]["status"] == "gepland"
-
-
-# ---------- gws_lees_alle_tabs/gws_lees_sheet (clients.gws extension) ----------
-
-
-def test_gws_lees_sheet_uses_default_range() -> None:
-    """`bereik=None` → default `A1:ZZ10000`."""
-    from iso_audit.clients import gws
-
-    with patch.object(gws, "_gws", return_value={"values": [["x"]]}) as mock:
-        out = gws.gws_lees_sheet("sid")
-    assert out == [["x"]]
-    params = mock.call_args.kwargs["params"]
-    assert params["range"] == "A1:ZZ10000"
-
-
-def test_gws_lees_alle_tabs_combineert_tabs() -> None:
-    from iso_audit.clients import gws
-
-    meta = {"sheets": [{"properties": {"title": "Tab1"}}, {"properties": {"title": "Tab2"}}]}
-    sheet_responses: list[Any] = [meta, {"values": [["a"]]}, {"values": [["b"]]}]
-    with patch.object(gws, "_gws", side_effect=sheet_responses):
-        out = gws.gws_lees_alle_tabs("sid")
-    assert set(out.keys()) == {"Tab1", "Tab2"}
-    assert out["Tab1"] == [["a"]]
-
-
-def test_gws_lees_alle_tabs_skipt_falende_tab() -> None:
-    """Een tab die error gooit wordt overgeslagen, niet propaged."""
-    from iso_audit.clients import gws
-
-    meta = {"sheets": [{"properties": {"title": "Tab1"}}, {"properties": {"title": "Tab2"}}]}
-
-    def fake_gws(*args: str, **kwargs: Any) -> dict[str, Any]:
-        # Eerste call = meta-fetch.
-        if "get" in args and "values" not in args:
-            return meta
-        # Tab2-fetch raised.
-        params = kwargs.get("params", {})
-        if "Tab2" in params.get("range", ""):
-            raise RuntimeError("Tab fout")
-        return {"values": [["a"]]}
-
-    with patch.object(gws, "_gws", side_effect=fake_gws):
-        out = gws.gws_lees_alle_tabs("sid")
-    assert "Tab1" in out
-    assert "Tab2" not in out
 
 
 # ---------- sheet-id validatie (config-grens) ----------

@@ -27,9 +27,13 @@ from typing import Literal
 
 _log = logging.getLogger("iso_audit.audit")
 
-Soort = Literal["auth", "niet_gevonden", "netwerk", "onbekend"]
+Soort = Literal["niet_geconfigureerd", "auth", "niet_gevonden", "netwerk", "onbekend"]
 
 TEKST: dict[Soort, str] = {
+    # Deze soort komt **nooit** uit `classificeer()`: hij hoort bij een fout die wij zelf
+    # vaststellen (een leeg verplicht veld), niet bij een respons van een leverancier. Er
+    # is dan ook niets te beschermen, dus adapters mogen hier hun eigen tekst meegeven.
+    "niet_geconfigureerd": "Deze bron is nog niet volledig ingevuld.",
     "auth": (
         "De credential is geweigerd. Controleer of hij nog geldig is en de juiste rechten heeft."
     ),

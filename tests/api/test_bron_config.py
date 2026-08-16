@@ -205,6 +205,141 @@ def test_api_koppelt_een_bron_zonder_cluster(
     assert "t0k3n" not in r.text
 
 
+def test_een_veld_uit_de_omgeving_is_gewoon_in_te_vullen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Zonder extra stap. Er heeft even een bevestigingsknop omheen gestaan; die loste een
+    probleem op dat toen al verholpen was (een save die slaagde en genegeerd werd) en
+    maakte configureren moeilijker. Registratie is de controle, niet het gedoe."""
+    monkeypatch.delenv("REQUIRE_AUTH", raising=False)
+    monkeypatch.setenv("JIRA_BASE_URL", "https://van-de-beheerder.atlassian.net")
+    client, _ = _portaal(tmp_path)
+
+    r = client.post(
+        "/config/bronnen/jira",
+        json={"velden": {"JIRA_BASE_URL": "https://door-de-auditor.example"}},
+    )
+    assert r.status_code == 200
+
+    rijen = {x["env"]: x for x in client.get("/config/herkomst").json()["velden"]}
+    assert rijen["JIRA_BASE_URL"]["bron"] == "ui-override"
+    assert os.environ["JIRA_BASE_URL"] == "https://door-de-auditor.example"
+
+
+def test_api_laat_een_vrij_veld_van_dezelfde_bron_wel_door(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """De blokkade is per veld, niet per bron — anders is een bron onbruikbaar zodra
+    de beheerder één veld heeft gezet."""
+    monkeypatch.delenv("REQUIRE_AUTH", raising=False)
+    monkeypatch.setenv("JIRA_BASE_URL", "https://van-de-beheerder.atlassian.net")
+    client, _ = _portaal(tmp_path)
+
+    r = client.post("/config/bronnen/jira", json={"velden": {"JIRA_PROJECTS": "ISO"}})
+    assert r.status_code == 200
+
+
+def test_ui_waarde_promoveert_niet_naar_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`naar_omgeving()` schrijft in `os.environ`; `_uit_env` leest daaruit.
+
+    Zonder een momentopname van de omgeving *vóór* de eerste `naar_omgeving()` leest een
+    tweede `load_config()` de UI-waarde terug als `bron="env"`. Dan meldt
+    `/config/herkomst` "door een beheerder gezet" over iets dat een auditor zelf intypte
+    — en zou de blokkade hierboven elk UI-veld na één save onbewerkbaar maken.
+    """
+    monkeypatch.delenv("REQUIRE_AUTH", raising=False)
+    monkeypatch.delenv("MIRO_API_TOKEN", raising=False)
+    client, _ = _portaal(tmp_path)
+
+    eerste = client.post("/config/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": "x"}})
+    assert eerste.status_code == 200
+
+    # Meermaals opvragen: elke aanroep doet een nieuwe load_config + naar_omgeving.
+    for _ in range(3):
+        rijen = {r["env"]: r for r in client.get("/config/herkomst").json()["velden"]}
+        assert rijen["MIRO_API_TOKEN"]["bron"] == "ui"
+
+    # En het veld blijft dus ook schrijfbaar.
+    opnieuw = client.post("/config/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": "y"}})
+    assert opnieuw.status_code == 200
+
+
+def test_een_ingevulde_waarde_vervangt_de_omgeving(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Het rotatiescenario: een key in een cluster-Secret verloopt en moet vervangen
+    kunnen worden zonder clusterbeheerder. Zonder die mogelijkheid hangt de
+    auditcapability weer aan één persoon."""
+    monkeypatch.delenv("REQUIRE_AUTH", raising=False)
+    monkeypatch.setenv("MIRO_API_TOKEN", "oude-key-uit-het-secret")
+    client, _ = _portaal(tmp_path)
+
+    met = client.post("/config/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": "nieuw"}})
+    assert met.status_code == 200
+
+    rijen = {r["env"]: r for r in client.get("/config/herkomst").json()["velden"]}
+    assert rijen["MIRO_API_TOKEN"]["bron"] == "ui-override", "de overschrijving moet winnen"
+    assert os.environ["MIRO_API_TOKEN"] == "nieuw", "de adapters moeten de nieuwe key zien"
+
+    # En het is zichtbaar dat het een overschrijving is, niet zomaar een invoer.
+    (miro,) = [b for b in client.get("/config/bronnen").json() if b["naam"] == "miro"]
+    (veld,) = miro["velden"]
+    assert veld["overschreven"] is True
+    assert veld["uit_omgeving"] is True
+
+
+def test_overschrijving_staat_als_zodanig_in_het_wijzigingsspoor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Overschrijven mag, maar niet stil: dat is de hele reden dat het toegestaan is."""
+    monkeypatch.delenv("REQUIRE_AUTH", raising=False)
+    monkeypatch.setenv("MIRO_API_TOKEN", "van-de-beheerder")
+    client, _ = _portaal(tmp_path)
+
+    client.post("/config/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": "x"}})
+
+    (regel,) = client.get("/config/wijzigingen").json()
+    assert regel["overschrijft_omgeving"] == ["MIRO_API_TOKEN"]
+    assert regel["velden"] == ["MIRO_API_TOKEN"]
+    assert "x" not in json.dumps(regel), "waarden horen niet in het spoor"
+
+
+def test_terug_naar_de_omgeving_herstelt_de_beheerderswaarde(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Een overschrijving moet terug te draaien zijn, anders is hij een eenrichtingsweg."""
+    monkeypatch.delenv("REQUIRE_AUTH", raising=False)
+    monkeypatch.setenv("MIRO_API_TOKEN", "van-de-beheerder")
+    client, _ = _portaal(tmp_path)
+    client.post("/config/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": "x"}})
+
+    # Leegmaken = terug naar de omgeving; daar is geen apart endpoint voor nodig.
+    client.post("/config/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": ""}})
+
+    rijen = {r["env"]: r for r in client.get("/config/herkomst").json()["velden"]}
+    assert rijen["MIRO_API_TOKEN"]["bron"] == "env"
+    assert os.environ["MIRO_API_TOKEN"] == "van-de-beheerder"
+
+
+def test_gewijzigde_omgeving_achter_een_overschrijving_wordt_gemeld(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Het gevaarlijke rotatiegeval: de beheerder vervangt het Secret en niemand ziet dat
+    de overschrijving die nieuwe waarde blokkeert."""
+    monkeypatch.setenv("MIRO_API_TOKEN", "eerste")
+    c = BronConfig(tmp_path, omgeving={"MIRO_API_TOKEN": "eerste"})
+    c.zet("miro", {"MIRO_API_TOKEN": "van-de-auditor"}, door="a@c.nl")
+    assert c.omgeving_gewijzigd() == set(), "nog niets gewijzigd"
+
+    # Beheerder roteert het Secret; het portaal herstart met de nieuwe omgeving.
+    na = BronConfig(tmp_path, omgeving={"MIRO_API_TOKEN": "geroteerd"})
+    assert na.omgeving_gewijzigd() == {"MIRO_API_TOKEN"}
+    (veld,) = na.status("miro")["velden"]  # type: ignore[index]
+    assert veld["omgeving_gewijzigd"] is True
+
+
 def test_api_weigert_onbekend_veld(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("REQUIRE_AUTH", raising=False)
     client, _ = _portaal(tmp_path)
@@ -255,7 +390,7 @@ def test_geen_configwijziging_tijdens_een_run(
         (Path("examples/auditmemo/memo-input.yaml")).read_text(encoding="utf-8"), encoding="utf-8"
     )
     # Sim-run met een trage pace, zodat hij nog loopt tijdens de configpoging.
-    client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "pace": 5.0})
+    client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "pace": 5.0, "sources": ["drive"]})
 
     r = client.post("/config/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": "x"}})
     assert r.status_code == 409

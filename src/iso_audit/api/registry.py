@@ -39,7 +39,52 @@ MANIFEST = "audit.json"
 RUNS = "runs.jsonl"
 FINDINGS = "findings.json"
 TRAIL = "triage_log.jsonl"
+MEMO_INPUT = "memo-input.yaml"
 ACTIEF = ".actief"
+
+_NORM_NAAM = {"9001": "ISO 9001:2015", "27001": "ISO 27001:2022"}
+
+
+def _schrijf_memo_input(dir_: Path, aid: str, codes: list[str], periode: str) -> None:
+    """Leg een geldige memo-input klaar bij het aanmaken van de audit.
+
+    Zonder dit bestand kan een audit die net is aangemaakt géén live run afronden: de
+    worker vult na afloop de memo-context bij en struikelt op een ontbrekend bestand —
+    gemeten op 2026-08-16, nadat de pipeline alle zeven stappen en alle rapporten al met
+    succes had afgerond. Een audit hoort zelfstandig te zijn vanaf het moment dat hij
+    bestaat.
+
+    De tekst is een steiger, geen inhoud: de auditor bewerkt hem in de memo-editor vóór
+    generatie. Wat hier al klopt is de scope, want die volgt uit de audit zelf.
+    """
+    import yaml
+
+    normen = ", ".join(_NORM_NAAM.get(c, c) for c in codes)
+    data = {
+        "title": f"Auditmemo — Interne audit<br>{normen}",
+        "cycle": periode,
+        "date": datetime.now(UTC).strftime("%d-%m-%Y"),
+        "version": "v1",
+        "lead_summary": (
+            "Nog in te vullen. Vat hier de punten samen die een managementbesluit vragen; "
+            "de volledige bevindingen staan in het detailrapport."
+        ),
+        "detail_report_ref": "",
+        "context": {
+            "audit_cycle": f"Interne audit {periode}, onderdeel van het auditprogramma.",
+            "scope": {_NORM_NAAM.get(c, c): "§4 t/m §10" for c in codes},
+            "sources": [],
+            "dataset_counts": {},
+            "scope_caveat": (
+                "Deze audit is gebaseerd op de bronnen die in het portaal gekoppeld waren "
+                "ten tijde van de run; zie de run-historie voor welke dat waren."
+            ),
+        },
+    }
+    (dir_ / MEMO_INPUT).write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+
 
 _PERIODE = re.compile(r"^\d{4}-[QH][1-4]$")
 """`2026-Q3` of `2026-H2`. Vrije tekst zou sorteren op periode onbetrouwbaar maken;
@@ -207,6 +252,7 @@ class AuditRegistry:
         )
         # Lege maar geldige werkset, zodat AuditSession direct te openen is.
         (dir_ / FINDINGS).write_text("[]\n", encoding="utf-8")
+        _schrijf_memo_input(dir_, aid, codes, periode.strip().upper())
         return aid
 
     # --- activiteit ---------------------------------------------------------

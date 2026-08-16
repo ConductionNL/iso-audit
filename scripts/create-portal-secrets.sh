@@ -23,6 +23,11 @@
 #   # minimaal — alleen oauth2-proxy (verplicht om de pod te laten starten):
 #   KEYCLOAK_CLIENT_SECRET='...' ./scripts/create-portal-secrets.sh
 #
+#   # oauth-Secret staat er al: laat KEYCLOAK_CLIENT_SECRET weg, hij blijft ongemoeid
+#   ANTHROPIC_KEY='sk-ant-...' JIRA_API_TOKEN='ATSTT...' \
+#     GOOGLE_SA_FILE=/pad/naar/service-account.json \
+#     ./scripts/create-portal-secrets.sh
+#
 #   # met de LLM-key erbij (org-workspace-key, geen persoonlijke token):
 #   KEYCLOAK_CLIENT_SECRET='...' ANTHROPIC_KEY='sk-ant-...' \
 #     ./scripts/create-portal-secrets.sh
@@ -37,6 +42,8 @@
 set -euo pipefail
 
 readonly NAMESPACE="iso-platform"
+
+SKIP_OAUTH=false
 
 err() {
   echo "error: $*" >&2
@@ -57,15 +64,29 @@ controleer_vereisten() {
     err "kubectl niet gevonden"
     exit 2
   fi
+  # Alleen verplicht als het oauth-Secret er nog niet is. Stond hij er al, dan zou dit
+  # script je dwingen een correct werkend clientsecret opnieuw uit Keycloak te halen om
+  # de ándere Secrets te kunnen aanmaken — en dan doet iemand het met de hand, wat
+  # precies de reproduceerbaarheid weghaalt waarvoor dit script bestaat.
   if [[ -z "${KEYCLOAK_CLIENT_SECRET:-}" ]]; then
+    if kubectl -n "$NAMESPACE" get secret iso-audit-portal-oauth >/dev/null 2>&1; then
+      SKIP_OAUTH=true
+      return 0
+    fi
     err "KEYCLOAK_CLIENT_SECRET is verplicht — zonder dit start de oauth2-proxy niet."
     err "Haal hem uit Keycloak: realm commonground, client iso-audit-portal, tab Credentials."
+    err "Bestaat het Secret al, dan mag je hem weglaten; dit script laat hem dan staan."
     exit 2
   fi
 }
 
 maak_oauth_secret() {
   local cookie_secret
+  if [[ "${SKIP_OAUTH:-false}" == true ]]; then
+    echo "  bestaat al en geen KEYCLOAK_CLIENT_SECRET meegegeven — ongemoeid gelaten."
+    echo "  Roteren doe je met KEYCLOAK_CLIENT_SECRET erbij, of via rollout-portal.sh."
+    return 0
+  fi
   # 32 bytes, URL-SAFE base64. De `tr` is niet cosmetisch: oauth2-proxy decodeert
   # het cookie-secret met base64.RawURLEncoding, en die verwerpt de tekens `+` en
   # `/` uit standaard-base64. Mislukt het decoderen, dan leest oauth2-proxy de
@@ -112,12 +133,29 @@ maak_sources_secret() {
 
 maak_google_secret() {
   if [[ -z "${GOOGLE_SA_FILE:-}" ]]; then
-    echo "  GOOGLE_SA_FILE niet gezet — overgeslagen (komt met de change"
-    echo "  gsuite-service-account-sources)."
+    # Bewust een waarschuwing en geen stille overslag: Drive en de auditplanning lezen
+    # sinds 2026-08-15 via dit service-account. Zonder dit Secret is de mount leeg
+    # (`optional: true` in deployment.yaml) en melden beide bronnen zich in het portaal
+    # als niet-gekoppeld — zonder dat iemand ziet dát er een Secret ontbreekt.
+    echo "  LET OP: GOOGLE_SA_FILE niet gezet — overgeslagen." >&2
+    echo "  Drive en de auditplanning werken dan NIET; ze verschijnen in het portaal" >&2
+    echo "  als 'niet gekoppeld'. Dit is de enige credential die een auditor niet zelf" >&2
+    echo "  in de UI kan zetten: het is een gemount bestand, geen env-var." >&2
     return 0
   fi
   if [[ ! -f "$GOOGLE_SA_FILE" ]]; then
     err "GOOGLE_SA_FILE bestaat niet: ${GOOGLE_SA_FILE}"
+    exit 2
+  fi
+  # Controleer het type vóór het aanmaken: een `authorized_user`-JSON (uit een
+  # OAuth-login) is persoonsgebonden en werkt niet met `service_account.Credentials`.
+  local soort
+  soort="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("type",""))' \
+    "$GOOGLE_SA_FILE" 2>/dev/null || true)"
+  if [[ "$soort" != "service_account" ]]; then
+    err "GOOGLE_SA_FILE is geen service-account-keyfile (type=${soort:-onbekend})."
+    err "Een 'authorized_user'-bestand hoort bij een persoon en is precies wat deze"
+    err "migratie wegneemt. Vraag een keyfile van het org-service-account."
     exit 2
   fi
   apply_secret "iso-audit-portal-google" \
@@ -130,7 +168,7 @@ main() {
   echo "namespace ${NAMESPACE} controleren…"
   kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
 
-  echo "1/4 oauth2-proxy (verplicht)"
+  echo "1/4 oauth2-proxy"
   maak_oauth_secret
   echo "2/4 LLM-key"
   maak_llm_secret

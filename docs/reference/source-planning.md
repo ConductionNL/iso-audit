@@ -16,9 +16,16 @@ auditor-besluiten in worden bijgehouden, niet een bewijsmateriaal-bron.
 
 | Env-var | Verplicht | Beschrijving |
 |---|---|---|
-| `GOOGLE_SERVICE_ACCOUNT_FILE` | ja | Pad naar service-account JSON-key (gedeeld met DriveSource) |
-| `GOOGLE_IMPERSONATE_USER` | ja | Email die de service-account impersoneert |
-| `AUDIT_PLANNING_SHEETS_ID` | ja | Spreadsheet-ID van de auditplanning |
+| `GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE` | ja | Pad naar de service-account JSON-key (gedeeld met DriveSource). Deployment-breed; niet in de UI. |
+| `GWS_IMPERSONATE_EMAIL` | **nee** | Zie [`source-drive.md`](source-drive.md); leeg laten tenzij nodig. |
+| `AUDIT_PLANNING_SHEETS_ID` | ja | Spreadsheet-ID van de auditplanning. Een geplakte Sheets-URL wordt naar het ID herleid. |
+
+> De namen `GOOGLE_SERVICE_ACCOUNT_FILE` en `GOOGLE_IMPERSONATE_USER` stonden hier eerder;
+> die worden nergens in `src/` gelezen.
+
+De spreadsheet moet gedeeld zijn met het `client_email` uit het keyfile — leesrecht is
+genoeg. Sheets gebruikt een eigen alleen-lezen scope
+(`auth.sheets_read_service()`), los van de Drive-leesscope.
 
 ## Scopes
 

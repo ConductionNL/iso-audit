@@ -4,10 +4,8 @@
 #
 # scripts/rollout-portal.sh — breng het iso-audit-portaal van commit naar draaiend.
 #
-# Doet de hele keten in één run: pushen, wachten tot het image gebouwd is, mergen,
-# wachten tot Argo de nieuwe revisie heeft, het cookie-secret roteren, herstarten en
-# verifiëren. Elke stap controleert zijn eigen resultaat en stopt bij een fout in
-# plaats van door te denderen.
+# Doet de hele keten in één run. Elke stap controleert zijn eigen resultaat en stopt bij
+# een fout in plaats van door te denderen.
 #
 # Werkt zowel vanaf een branch (pusht, PR, merge) als direct vanaf main (dan alleen
 # pushen en verder). Op main is er een kort venster waarin Argo de nieuwe tag al ziet
@@ -28,6 +26,18 @@
 #   ./scripts/rollout-portal.sh --dry-run         # alleen tonen wat er zou gebeuren
 #   ./scripts/rollout-portal.sh --skip-secret     # niet roteren (secret is al goed)
 #   ./scripts/rollout-portal.sh --skip-merge      # push + build, niet mergen
+#
+# Vooraf, vóórdat er iets gepusht wordt — een fout hier kost seconden, dezelfde fout na
+# een push kost een build van vijftien minuten en een uitrol die je moet terugdraaien:
+#
+#   1. kwaliteitspoort — pytest, ruff, ruff format, mypy --strict
+#   2. versieconsistentie — pyproject.toml == kustomization newTag
+#   3. manifest-validatie — vangt velden die de kube-API stil pruunt
+#   4. secrets aanwezig in de namespace, met per ontbrekend Secret wat er dan níet werkt
+#   5. rechten van het serviceaccount: precies één Secret leesbaar, geen `list`
+#
+# Daarna: pushen, wachten op het image, mergen, wachten tot Argo de nieuwe revisie
+# heeft, eventueel het cookie-secret roteren, en verifiëren.
 
 set -euo pipefail
 
@@ -197,8 +207,22 @@ roteer_cookie_secret() {
 }
 
 herstart_en_verifieer() {
-  stap "herstarten"
-  doe kubectl -n "$NS" rollout restart "deploy/${DEPLOY}"
+  # ALLEEN herstarten als er een reden is. `kubectl rollout restart` zet de annotatie
+  # `kubectl.kubernetes.io/restartedAt` in de pod-template, en die staat niet in git.
+  # Argo ziet dat als drift en meldt dan PERMANENT OutOfSync — ook nadat een sync is
+  # geslaagd. Een client-side apply haalt zo'n extra annotatie niet weg, dus selfHeal
+  # ruimt hem ook niet op. Dat verbergt echte drift, en precies dat kostte op 2026-08-14
+  # twee uur: Argo stond OutOfSync met health "Healthy" terwijl de sync al die tijd faalde.
+  #
+  # Bij een versiebump is herstarten overbodig: de gewijzigde image-tag in het manifest
+  # levert al een nieuwe ReplicaSet op zodra Argo synct. Alleen na een cookie-rotatie is
+  # een expliciete herstart nodig, want die wijzigt een Secret en geen manifest.
+  if [[ "$SKIP_SECRET" != true ]]; then
+    stap "herstarten (cookie-secret is geroteerd)"
+    doe kubectl -n "$NS" rollout restart "deploy/${DEPLOY}"
+  else
+    stap "geen herstart nodig — Argo rolt uit op de nieuwe image-tag"
+  fi
   doe kubectl -n "$NS" rollout status "deploy/${DEPLOY}" --timeout=300s
 
   stap "verifiëren"
@@ -231,9 +255,124 @@ herstart_en_verifieer() {
   echo "  https://${HOST}/ -> ${code} (302/403 = auth-gate doet zijn werk)"
 }
 
+kwaliteitspoort() {
+  # Vóór het pushen, niet erna. De CI draait dit ook, maar dan is de commit al onderweg
+  # en wacht je vijftien minuten op een image die toch niet uitgerold had moeten worden.
+  stap "kwaliteitspoort (tests, lint, types)"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo "  dry-run: overgeslagen"
+    return 0
+  fi
+  # `GWS_IMPERSONATE_EMAIL` leegmaken: staat die gevuld in de omgeving van de
+  # ontwikkelaar, dan vallen negen tests in tests/test_auth.py om op een fixture die hem
+  # niet opruimt. Dat is een bekend, apart op te lossen punt en geen reden om een
+  # uitrol te blokkeren.
+  if ! GWS_IMPERSONATE_EMAIL='' uv run pytest -q >/dev/null; then
+    err "tests falen — niet uitrollen"
+    exit 1
+  fi
+  if ! uv run ruff check . >/dev/null; then
+    err "ruff faalt"
+    exit 1
+  fi
+  if ! uv run ruff format --check . >/dev/null; then
+    err "formatting wijkt af"
+    exit 1
+  fi
+  if ! uv run mypy --strict src >/dev/null; then
+    err "mypy faalt"
+    exit 1
+  fi
+  echo "  groen"
+}
+
+controleer_secrets() {
+  # Een ontbrekend Secret laat het portaal starten en pas in het configuratiescherm zien
+  # dat een bron niet gekoppeld is — als je daar kijkt. Liever hier, vóór de uitrol.
+  stap "secrets in ${NS} controleren"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo "  dry-run: overgeslagen"
+    return 0
+  fi
+  # Alleen het oauth-secret is hard vereist: zonder client- en cookie-secret start de
+  # proxy-sidecar niet. De rest degradeert — maar stil, en dat is het probleem.
+  local verplicht=(iso-audit-portal-oauth)
+  local optioneel=(iso-audit-portal-config iso-audit-portal-llm iso-audit-portal-sources iso-audit-portal-google)
+  local s
+  for s in "${verplicht[@]}"; do
+    if ! kubectl -n "$NS" get secret "$s" >/dev/null 2>&1; then
+      err "Secret ${s} ontbreekt — het portaal start hier niet zonder."
+      err "Aanmaken: ./scripts/create-portal-secrets.sh (zie deploy/README.md)"
+      exit 1
+    fi
+  done
+  for s in "${optioneel[@]}"; do
+    if ! kubectl -n "$NS" get secret "$s" >/dev/null 2>&1; then
+      echo "  LET OP: ${s} ontbreekt." >&2
+      case "$s" in
+      iso-audit-portal-google)
+        echo "    Drive en de auditplanning werken dan niet; die credential is de" >&2
+        echo "    enige die een auditor niet zelf in de UI kan zetten." >&2
+        ;;
+      *)
+        echo "    Een auditor kan deze credential wél in het portaal invullen." >&2
+        ;;
+      esac
+    fi
+  done
+}
+
+controleer_rechten() {
+  # Taak 4.1 van change credential-opslag. De pod mag precies één Secret lezen; zonder
+  # die beperking mag hij élk Secret in de namespace lezen, inclusief het oauth2-secret.
+  stap "rechten van het serviceaccount controleren"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo "  dry-run: overgeslagen"
+    return 0
+  fi
+  local sa="system:serviceaccount:${NS}:${DEPLOY}"
+  local mag_config mag_oauth mag_list
+  mag_config="$(kubectl auth can-i --as="$sa" get secret/iso-audit-portal-config -n "$NS" 2>/dev/null || true)"
+  mag_oauth="$(kubectl auth can-i --as="$sa" get secret/iso-audit-portal-oauth -n "$NS" 2>/dev/null || true)"
+  mag_list="$(kubectl auth can-i --as="$sa" list secrets -n "$NS" 2>/dev/null || true)"
+  echo "  config lezen: ${mag_config} · oauth lezen: ${mag_oauth} · secrets opsommen: ${mag_list}"
+  if [[ "$mag_config" != "yes" ]]; then
+    err "het portaal mag zijn eigen configuratie-Secret niet lezen; UI-configuratie valt"
+    err "dan terug op de PVC. Zie deploy/rbac-config.yaml."
+    exit 1
+  fi
+  if [[ "$mag_oauth" == "yes" || "$mag_list" == "yes" ]]; then
+    err "de rechten zijn te ruim: de pod mag meer dan alleen zijn eigen Secret."
+    err "Verwacht 'no' op beide. Zie deploy/rbac-config.yaml (resourceNames, geen list)."
+    exit 1
+  fi
+}
+
+valideer_manifests() {
+  # Pre-flight VOORDAT er iets gepusht wordt. De kube-API pruunt onbekende velden stil;
+  # zie scripts/check-manifest-pruning.py voor wat dat op 2026-08-14 kostte.
+  #
+  # Let op: een gewone `kubectl apply --dry-run=server` (zonder -o json) meldde die fout
+  # NIET. De check doet het mét -o json, want dan rendert de server het op te slaan object.
+  # Nagerekend tegen de echte fout: faalt op de foute vorm, slaagt op de goede.
+  stap "manifests valideren tegen de API"
+  if [[ "$DRY_RUN" == true ]]; then
+    echo "  dry-run: validatie overgeslagen"
+    return 0
+  fi
+  if ! python3 "$(dirname "$0")/check-manifest-pruning.py" --pad deploy; then
+    err "manifests worden door de API aangepast — niet uitrollen voordat dit klopt"
+    exit 1
+  fi
+}
+
 main() {
   parse_args "$@"
   controleer_vereisten
+  kwaliteitspoort
+  valideer_manifests
+  controleer_secrets
+  controleer_rechten
 
   local branch versie
   branch="$(git rev-parse --abbrev-ref HEAD)"

@@ -31,6 +31,15 @@ _READ_SCOPES: list[str] = [
     "https://www.googleapis.com/auth/documents.readonly",
 ]
 
+# Lezen van Sheets, apart van `_READ_SCOPES`. Bewust een derde lijst en niet één regel
+# erbij: anders draagt het Drive-leestoken óók Sheets-leesrechten, en least privilege is
+# in dit bestand het uitgangspunt. `PlanningSource` is een read-only adapter en mag dus
+# niet aan `sheets_service()` hangen — die gebruikt `_WRITE_SCOPES` en kan mail versturen
+# en agenda's schrijven.
+_SHEETS_READ_SCOPES: list[str] = [
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+]
+
 # Schrijven: alleen bestanden die de app zelf aanmaakt (drive.file).
 _WRITE_SCOPES: list[str] = [
     "https://www.googleapis.com/auth/drive.file",
@@ -103,6 +112,11 @@ def docs_read_service() -> Any:
 def docs_write_service() -> Any:
     """Google Docs-service voor app-eigen documenten."""
     return build("docs", "v1", credentials=_get_credentials(_WRITE_SCOPES))
+
+
+def sheets_read_service() -> Any:
+    """Google Sheets-service met alleen leesrechten — voor `PlanningSource`."""
+    return build("sheets", "v4", credentials=_get_credentials(_SHEETS_READ_SCOPES))
 
 
 def sheets_service() -> Any:

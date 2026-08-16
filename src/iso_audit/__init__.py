@@ -13,6 +13,26 @@ Zie ``ARCHITECTURE.md`` voor het volledige plaatje en ``docs/missie.md`` voor
 de positionering van het tool ten opzichte van de auditor-rol.
 """
 
-__version__ = "0.1.0a0"
+
+def _versie() -> str:
+    """De versie uit de pakket-metadata, dus uit `pyproject.toml`.
+
+    Hier stond een losse string. Die liep uit de pas: `pyproject.toml` zei `0.2.0a8`
+    terwijl dit `0.1.0a0` meldde. Bij een uitrol is dat geen cosmetiek — het is de string
+    waaraan je ziet wélke build draait, en juist daar is een tweede waarheid duur. Eén
+    bron, geen synchronisatie.
+
+    De terugval is er voor een omgeving waar het pakket niet geïnstalleerd is (los
+    uitgepakte broncode); dan is er geen metadata om te lezen.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("iso-audit")
+    except PackageNotFoundError:  # pragma: no cover — alleen zonder installatie
+        return "0.0.0+onbekend"
+
+
+__version__ = _versie()
 
 __all__ = ["__version__"]

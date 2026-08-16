@@ -137,11 +137,16 @@ def test_bron_config_valt_terug_op_de_pvc(
 
 
 def test_zonder_secret_backend_gedraagt_alles_zich_als_voorheen(tmp_path: Path) -> None:
-    """De bestaande PVC-route blijft de default; niets verandert lokaal."""
-    c = BronConfig(tmp_path)
+    """De bestaande PVC-route blijft de default; niets verandert lokaal.
+
+    `omgeving={}` zegt expliciet dat er geen beheerderswaarden zijn. Zonder dat legt de
+    store bij constructie `os.environ` vast — inclusief wat een eerdere test daar zette —
+    en dan lijkt dit veld door een beheerder gezet.
+    """
+    c = BronConfig(tmp_path, omgeving={})
     c.zet("miro", {"MIRO_API_TOKEN": "t0k3n"}, door="a@c.nl")
     assert c.pad.is_file()
-    assert BronConfig(tmp_path).ui_waarden()["MIRO_API_TOKEN"] == "t0k3n"
+    assert BronConfig(tmp_path, omgeving={}).ui_waarden()["MIRO_API_TOKEN"] == "t0k3n"
 
 
 def test_foutmelding_bevat_geen_responsbody(

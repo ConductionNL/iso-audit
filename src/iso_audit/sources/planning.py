@@ -7,8 +7,9 @@ de pipeline-DB-tabel `audit_planning` te vullen.
 
 Gemigreerd uit `Ops_to_Biz/audit/planning_ingest.py` + `audit/gsa_client.py`
 per milestone B §2.3.5-§2.3.7. Sheets-API gaat via
-`iso_audit.clients.gws.gws_lees_alle_tabs` — service-account-modus is
-geschrapt; alle auth gaat via `gws auth login` consistent met DriveSource.
+`iso_audit.clients.google_sheets.sheets_lees_alle_tabs`, met het
+org-service-account uit `iso_audit.auth` — consistent met DriveSource, en zonder
+de persoonsgebonden `gws`-CLI-sessie die hier eerder stond.
 """
 
 from __future__ import annotations
@@ -25,7 +26,9 @@ from typing import Any
 
 from dotenv import load_dotenv
 
-from iso_audit.clients.gws import gws_lees_alle_tabs
+from iso_audit.clients.google_sheets import sheets_lees_alle_tabs, sheets_tabnamen
+from iso_audit.config.google_ids import uit_url
+from iso_audit.config.verbinding import normaliseer
 from iso_audit.sources import register
 from iso_audit.sources.base import Document, Finding
 
@@ -37,15 +40,23 @@ PLANNING_SHEETS_ID_ENV = "AUDIT_PLANNING_SHEETS_ID"
 
 
 def _valideer_sheet_id(sid: str) -> str:
-    """Waarschuw als een Sheets-ID misvormd lijkt (validatie aan de config-grens).
+    """Normaliseer een geplakte Sheets-URL naar het ID, en waarschuw bij misvorming.
 
     Een Google Sheets-ID bestaat uit ``[A-Za-z0-9_-]``. Een ``=`` of whitespace
     duidt bijna altijd op een .env-fout — bv. een regel zonder newline die de
     volgende toewijzing aan de waarde plakt (``...37AGOOGLE_SERVICE_ACCOUNT_FILE=
     ...``). We loggen dan een duidelijke waarschuwing i.p.v. verderop een
-    cryptische gws-fout te krijgen. De waarde wordt NIET aangepast: stilletjes
-    een andere sheet aanspreken is erger dan zichtbaar falen.
+    cryptische API-fout te krijgen. In dát geval wordt de waarde NIET aangepast:
+    stilletjes een andere sheet aanspreken is erger dan zichtbaar falen.
+
+    Een volledige Sheets-URL is een ander geval en wordt wél herleid. Dat spreekt
+    geen andere sheet aan maar exact degene die in de URL staat, en het is wat
+    iedereen uit de adresbalk kopieert — gemeten op 2026-08-14, zowel via de UI als
+    uit een omgevingsbestand. Zonder herleiding krijgt de API een "ID" van 80 tekens
+    en antwoordt met 404, wat in het portaal verschijnt als "niet gedeeld met dit
+    account" en dus naar het verkeerde probleem wijst.
     """
+    sid = uit_url(sid)
     if "=" in sid or any(c.isspace() for c in sid):
         logger.warning(
             "%s lijkt misvormd: bevat '=' of whitespace (%d tekens). Waarschijnlijk "
@@ -212,7 +223,7 @@ class PlanningSource:
 
     def _fetch_alle(self) -> list[_PlanningRow]:
         """Lees alle tabs en parse elke tab tot planning-rows."""
-        tabs = gws_lees_alle_tabs(self._spreadsheet_id)
+        tabs = sheets_lees_alle_tabs(self._spreadsheet_id)
         alle: list[_PlanningRow] = []
         for tab_naam, rijen in tabs.items():
             alle.extend(_parse_tab(tab_naam, rijen))
@@ -258,16 +269,43 @@ class PlanningSource:
         del sessie_id
         return iter([])
 
-    def healthcheck(self) -> dict[str, object]:
-        """Verifieer dat de planning-spreadsheet bereikbaar is."""
+    def probe(self) -> dict[str, object]:
+        """Lichte connectiviteits-probe: alleen de tabtitels opvragen.
+
+        `healthcheck()` leest álle tabs volledig, en die werd bij élke keer openen van het
+        configuratiescherm aangeroepen. Eén metadata-call bewijst hetzelfde: de credential
+        werkt en de spreadsheet is bereikbaar.
+        """
         try:
-            tabs = gws_lees_alle_tabs(self._spreadsheet_id)
+            namen = sheets_tabnamen(self._spreadsheet_id)
         except Exception as e:
+            soort, tekst = normaliseer(e, bron=self.naam)
             return {
                 "status": "fail",
                 "naam": self.naam,
                 "tenant": self._spreadsheet_id,
-                "reden": f"gws-fout: {e}",
+                "soort": soort,
+                "reden": tekst,
+            }
+        return {
+            "status": "ok",
+            "naam": self.naam,
+            "tenant": self._spreadsheet_id,
+            "aantal_tabs": len(namen),
+        }
+
+    def healthcheck(self) -> dict[str, object]:
+        """Verifieer dat de planning-spreadsheet bereikbaar is (leest alle tabs)."""
+        try:
+            tabs = sheets_lees_alle_tabs(self._spreadsheet_id)
+        except Exception as e:
+            soort, tekst = normaliseer(e, bron=self.naam)
+            return {
+                "status": "fail",
+                "naam": self.naam,
+                "tenant": self._spreadsheet_id,
+                "soort": soort,
+                "reden": tekst,
             }
         return {
             "status": "ok",
@@ -296,7 +334,7 @@ def run(droog: bool = False, spreadsheet_id: str | None = None) -> None:
 
     sid = spreadsheet_id or os.environ.get(PLANNING_SHEETS_ID_ENV, DEFAULT_PLANNING_SHEETS_ID)
     logger.info("Auditplanning inlezen uit Sheets: %s", sid)
-    tabs = gws_lees_alle_tabs(sid)
+    tabs = sheets_lees_alle_tabs(sid)
     if not tabs:
         logger.error("Geen tabs gevonden — controleer auth en spreadsheet-ID")
         conn.close()

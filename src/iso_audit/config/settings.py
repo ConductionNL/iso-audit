@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
@@ -35,7 +36,10 @@ import yaml
 
 _log = logging.getLogger("iso_audit.audit")
 
-Bron = Literal["env", "yaml", "ui", "default", "leeg"]
+Bron = Literal["ui-override", "env", "yaml", "ui", "default", "leeg"]
+"""`ui-override` staat bewust náást `ui` en vervangt hem niet: het verschil tussen "hier
+ingevuld" en "hier ingevuld terwijl een beheerder iets anders had gezet" is precies wat
+een auditor achteraf moet kunnen zien."""
 """Waar een waarde vandaan komt. `leeg` = nergens gezet en geen default."""
 
 CONFIG_YAML_ENV = "ISO_AUDIT_CONFIG"
@@ -139,8 +143,8 @@ class Settings:
             os.environ.pop(API_KEY_ENV, None)
 
 
-def _uit_env(veld: Veld) -> Waarde | None:
-    ruw = os.environ.get(veld.env)
+def _uit_env(veld: Veld, omgeving: Mapping[str, str]) -> Waarde | None:
+    ruw = omgeving.get(veld.env)
     if ruw is None or not ruw.strip():
         return None
     return Waarde(waarde=ruw.strip(), bron="env", geheim=veld.geheim)
@@ -193,19 +197,48 @@ def _yaml_pad(root: Path) -> Path:
     return Path(expliciet) if expliciet else root / "config.yaml"
 
 
-def load_config(*, root: Path | str, ui_waarden: dict[str, str] | None = None) -> Settings:
-    """Los alle configuratie op volgens env > yaml > ui > default.
+def load_config(
+    *,
+    root: Path | str,
+    ui_waarden: dict[str, str] | None = None,
+    omgeving: Mapping[str, str] | None = None,
+    overschrijvingen: set[str] | None = None,
+) -> Settings:
+    """Los alle configuratie op volgens ui-override > env > yaml > ui > default.
+
+    `overschrijvingen` bevat env-namen die een auditor **expliciet** boven de omgeving
+    heeft gezet. Zonder die mogelijkheid kan een geroteerde of ingetrokken credential niet
+    vervangen worden zonder clusterbeheerder, en dan hangt de auditcapability weer aan een
+    persoon. Het blijft niet stil: overschrijven is een aparte handeling, hij staat in het
+    wijzigingsspoor, en de herkomst heet `ui-override` en niet `ui`.
 
     `ui_waarden` is per **env-naam** gesleuteld, want dat is wat de UI-store bewaart
     (`bron_config.json`). Zo hoeft die store niet te weten dat er puntpaden bestaan.
+
+    `omgeving` is de omgeving die als *env-laag* geldt. Standaard is dat de live
+    `os.environ`, wat klopt voor de CLI. Een langlopend proces moet hier de omgeving
+    **van vóór de eerste `naar_omgeving()`** doorgeven: die methode schrijft opgeloste
+    waarden terug in `os.environ`, dus zonder momentopname leest een tweede
+    `load_config()` een UI-waarde terug als `bron="env"`. Dan meldt
+    `/config/herkomst` "door een beheerder gezet" over iets dat een auditor zelf
+    intypte — precies de vraag die dat endpoint moet beantwoorden — en zou een
+    blokkade op env-velden een UI-veld na één save onbewerkbaar maken.
     """
     root = Path(root)
     data, versie = _laad_yaml(_yaml_pad(root))
     ui = ui_waarden or {}
+    env_laag: Mapping[str, str] = os.environ if omgeving is None else omgeving
+
+    vervangen = overschrijvingen or set()
 
     opgelost: dict[str, Waarde] = {}
     for veld in VELDEN:
-        uit_env = _uit_env(veld)
+        expliciet = (ui.get(veld.env) or "").strip()
+        if veld.env in vervangen and expliciet:
+            opgelost[veld.sleutel] = Waarde(expliciet, "ui-override", geheim=veld.geheim)
+            continue
+
+        uit_env = _uit_env(veld, env_laag)
         if uit_env is not None:
             opgelost[veld.sleutel] = uit_env
             continue

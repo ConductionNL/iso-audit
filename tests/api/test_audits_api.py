@@ -140,7 +140,8 @@ def test_run_wordt_geregistreerd_met_identiteit(tmp_path: Path) -> None:
     _vul(registry, aid, _FINDINGS)
 
     r = client.post(
-        f"/audits/{aid}/run/start", json={"mode": "sim", "norm": "9001", "sources": ["drive"]}
+        f"/audits/{aid}/run/start",
+        json={"mode": "sim", "norm": "9001", "sources": ["drive"], "pace": 0},
     )
     assert r.status_code == 200
 
@@ -150,12 +151,67 @@ def test_run_wordt_geregistreerd_met_identiteit(tmp_path: Path) -> None:
     assert rec["status"] == "klaar"
 
 
+def test_run_zonder_bron_wordt_geweigerd(tmp_path: Path) -> None:
+    """Dit gaf `200 {"status": "running"}` terwijl vier gestapelde `or ["drive"]`-
+    terugvallen er stil een drive-run van maakten. De auditor zag een run die niets deed
+    en geen uitleg."""
+    client, registry = _portaal(tmp_path)
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
+    aid = "9001-2026-Q3"
+    _vul(registry, aid, _FINDINGS)
+
+    r = client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "sources": []})
+
+    assert r.status_code == 400
+    assert "minstens één bron" in r.json()["detail"]
+
+    # De poging staat wél in de historie: "iemand probeerde te draaien zonder bron" is
+    # precies de diagnose die je later mist.
+    (rec,) = client.get(f"/audits/{aid}/runs").json()
+    assert rec["status"] == "fout"
+    assert "minstens één bron" in rec["fout"]
+
+
+def test_onbekende_bron_wordt_geweigerd_met_de_beschikbare_lijst(tmp_path: Path) -> None:
+    client, registry = _portaal(tmp_path)
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
+    aid = "9001-2026-Q3"
+    _vul(registry, aid, _FINDINGS)
+
+    r = client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "sources": ["sharepoint"]})
+
+    assert r.status_code == 400
+    detail = r.json()["detail"]
+    assert "sharepoint" in detail
+    assert "drive" in detail, "noem wat er wél kan"
+
+
+def test_run_record_beweert_niet_klaar_voordat_de_run_klaar_is(tmp_path: Path) -> None:
+    """Het record werd geschreven met `laatste_merge` = (0, 0) direct na het starten van de
+    thread, met `status: "klaar"`. Append-only betekent dat je dat niet kunt rechtzetten."""
+    client, registry = _portaal(tmp_path)
+    client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
+    aid = "9001-2026-Q3"
+    _vul(registry, aid, _FINDINGS)
+
+    # pace > 0 → de sim-run draait in een thread en is bij het lezen nog niet klaar.
+    client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "sources": ["drive"], "pace": 5.0})
+
+    (rec,) = client.get(f"/audits/{aid}/runs").json()
+    assert rec["status"] == "loopt"
+    assert "toegevoegd" not in rec or rec["toegevoegd"] == 0
+
+    # Het ruwe spoor heeft één record; er is niets overschreven.
+    regels = (registry.pad(aid) / "runs.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(regels) == 1
+
+
 def test_bronnen_uit_runs_landen_in_het_overzicht(tmp_path: Path) -> None:
     client, registry = _portaal(tmp_path)
     client.post("/audits", json={"normen": ["9001"], "periode": "2026-Q3"})
     aid = "9001-2026-Q3"
     _vul(registry, aid, _FINDINGS)
-    client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "sources": ["drive"]})
+    client.post(f"/audits/{aid}/run/start", json={"mode": "sim", "sources": ["drive"], "pace": 0})
 
     (regel,) = client.get("/audits").json()
     assert regel["bronnen"] == ["drive"]
@@ -165,8 +221,20 @@ def test_bronnen_uit_runs_landen_in_het_overzicht(tmp_path: Path) -> None:
 # --- audit-onafhankelijke routes -----------------------------------------
 
 
-def test_healthz_en_config_zijn_niet_audit_gescoped(tmp_path: Path) -> None:
-    """Deze twee horen buiten elke audit; anders zijn ze onbruikbaar als probe/overzicht."""
+def test_healthz_en_config_zijn_niet_audit_gescoped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Deze twee horen buiten elke audit; anders zijn ze onbruikbaar als probe/overzicht.
+
+    De koppelstatus wordt gestubd. Deze test gaat over routing, niet over connectiviteit —
+    en zonder stub doen Drive en Planning echte Google-calls met de credentials die uit een
+    lokaal omgevingsbestand komen. Dat duurde 75 seconden en las de live auditmap uit; een
+    testsuite hoort geen productiedata aan te raken.
+    """
+    monkeypatch.setattr(
+        "iso_audit.api.session._check_source",
+        lambda naam: {"connected": False, "status": "fail", "naam": naam, "soort": "netwerk"},
+    )
     client, _ = _portaal(tmp_path)
     assert client.get("/healthz").json() == {"status": "ok"}
     gezondheid = client.get("/config/health").json()
@@ -236,7 +304,12 @@ def test_run_neemt_de_norm_uit_de_audit(tmp_path: Path) -> None:
     aid = "27001_9001-2026-Q3"
     _vul(registry, aid, _FINDINGS)
 
-    assert client.post(f"/audits/{aid}/run/start", json={"mode": "sim"}).status_code == 200
+    assert (
+        client.post(
+            f"/audits/{aid}/run/start", json={"mode": "sim", "sources": ["drive"]}
+        ).status_code
+        == 200
+    )
     (rec,) = client.get(f"/audits/{aid}/runs").json()
     assert rec["norm"] == "beide"
 

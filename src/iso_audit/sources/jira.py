@@ -25,6 +25,7 @@ from typing import Any
 
 import requests
 
+from iso_audit.config.verbinding import normaliseer
 from iso_audit.sources import register
 from iso_audit.sources.base import Document, Finding
 
@@ -33,12 +34,40 @@ logger = logging.getLogger(__name__)
 _DEFAULT_PAGE_SIZE = 100
 _DEFAULT_TIMEOUT_S = 30.0
 
+_OPENSTAAND = "statusCategory != Done"
+"""Welke issues openstaande punten zijn: alles wat nog niet afgerond is, binnen de
+geconfigureerde projectscope (`JIRA_PROJECTS`).
+
+Hier stond eerder `labels in (iso27001, iso9001, compliance) AND statusCategory != Done`.
+Gemeten in een echte tenant: die labels bestonden daar niet — gebruikt werden onder meer
+`interne_audit`, `managementreview2026`, `ISO_algemeen`, `externeaudit`. De filter leverde
+dus stil nul punten op, terwijl er 25 open issues in het ISO-project stonden.
+
+Een project is bovendien de robuustere scope: labels zijn per organisatie verschillend en
+veranderen, een projectsleutel is een afspraak. Wie tóch op labels wil filteren zet
+`JIRA_FINDINGS_JQL`."""
+
+_ONBEGRENSD_VANGNET = "updated >= -365d"
+"""Begrenzing als er noch `JIRA_PROJECTS` noch `JIRA_JQL` is ingesteld.
+
+Jira Cloud antwoordt op een lege query met HTTP 400 ("Unbounded JQL queries are not
+allowed here"). Een jaar terugkijken is voor een auditperiode een verdedigbare ondergrens
+en het is zichtbaar in de logregel; stil niets lezen is dat niet. Wie een andere scope wil,
+zet `JIRA_PROJECTS` of `JIRA_JQL`."""
+
 
 @register
 class JiraSource:
     """Source-adapter voor Jira Cloud issues."""
 
     naam: str = "jira"
+
+    levert_opvolgpunten: bool = True
+    """Jira levert **openstaande punten**, geen bewijsmateriaal.
+
+    Een ticket met label `iso27001` is een afgesproken verbeteractie die nog loopt. Het
+    tegen elke clausule classificeren leverde bevindingen als "dit ticket bewijst §4.1
+    niet" — ruis, plus LLM-kosten per ticket. Zie `sources/opvolgpunten.py`."""
 
     def __init__(
         self,
@@ -64,6 +93,46 @@ class JiraSource:
         ]
         self._page_size = page_size
         self._timeout_s = timeout_s
+        self._api_basis: str | None = None
+
+    @property
+    def scoped(self) -> bool:
+        """Is dit een scoped service-token (`ATSTT…`) in plaats van een gebruikerstoken?
+
+        Atlassian kent twee soorten. Een **gebruikers**-token (`ATATT…`) hoort bij een
+        persoon en gaat via Basic auth met diens e-mailadres als gebruikersnaam. Een
+        **service**-token hoort bij een service-account, gaat via `Authorization: Bearer`
+        en heeft géén e-mailadres nodig — dat laatste is precies wat je wil als de
+        koppeling niet aan een persoon mag hangen.
+
+        Onderscheid op prefix en niet op configuratie: dan hoeft niemand een extra keuze
+        te maken die de credential zelf al weggeeft, en kan hij ook niet fout staan.
+        """
+        return self._api_token.startswith("ATSTT")
+
+    def _basis(self) -> str:
+        """Het URL-voorvoegsel voor API-calls.
+
+        Een scoped token werkt **niet** op de site-URL; die geeft 403 op elk endpoint,
+        ook op `serverInfo`. Hij moet naar de gateway `api.atlassian.com/ex/jira/{cloudId}`.
+        De cloud-ID is zonder authenticatie op te halen via `/_edge/tenant_info`, dus dat
+        hoeft niemand te configureren; het antwoord wordt per instantie onthouden.
+        """
+        if not self.scoped:
+            return self._base_url
+        if self._api_basis is None:
+            resp = requests.get(
+                f"{self._base_url}/_edge/tenant_info",
+                headers={"Accept": "application/json"},
+                timeout=self._timeout_s,
+            )
+            if not resp.ok:
+                raise OSError(f"Cloud-ID opvragen mislukte: HTTP {resp.status_code}")
+            cloud_id = str(resp.json().get("cloudId") or "")
+            if not cloud_id:
+                raise OSError("Geen cloudId in het antwoord van tenant_info")
+            self._api_basis = f"https://api.atlassian.com/ex/jira/{cloud_id}"
+        return self._api_basis
 
     def _scope_jql(self, base_jql: str) -> str:
         """Beperk een JQL tot de geconfigureerde projecten (`JIRA_PROJECTS`).
@@ -73,7 +142,12 @@ class JiraSource:
         binnen de ISO-scope blijft, ongeacht de onderliggende query.
         """
         if not self._projects:
-            return base_jql
+            # Jira Cloud weigert een onbegrensde query: HTTP 400 "Unbounded JQL queries
+            # are not allowed here". Zonder projectscope en zonder eigen JQL stuurde deze
+            # adapter een lege string, en dan leverde een gekozen Jira-bron stil nul
+            # documenten. Een tijdvenster is de minst verrassende begrenzing: het beperkt
+            # wat je leest, niet wélke projecten je ziet.
+            return base_jql if base_jql.strip() else _ONBEGRENSD_VANGNET
         quoted = ", ".join(f'"{p}"' for p in self._projects)
         scope = f"project in ({quoted})"
         return f"({scope}) AND ({base_jql})" if base_jql.strip() else scope
@@ -101,7 +175,7 @@ class JiraSource:
         comments. Rich-content rendering komt mee met §3.4.6 docs of bij
         eerste integer-run als het nodig blijkt.
         """
-        url = f"{self._base_url}/rest/api/3/issue/{doc.id}"
+        url = f"{self._basis()}/rest/api/3/issue/{doc.id}"
         resp = self._http_get(url, params={"fields": "description,comment"})
         data = resp.json()
         return _render_issue_inhoud(data)
@@ -117,23 +191,37 @@ class JiraSource:
         statusCategory != Done`. Override mogelijk via env-var
         `JIRA_FINDINGS_JQL`.
         """
-        findings_jql = os.environ.get(
-            "JIRA_FINDINGS_JQL",
-            "labels in (iso27001, iso9001, compliance) AND statusCategory != Done",
-        )
+        findings_jql = os.environ.get("JIRA_FINDINGS_JQL", _OPENSTAAND)
         for issue in self._iterate_issues(self._scope_jql(findings_jql)):
             yield _issue_to_finding(issue, sessie_id)
 
     def healthcheck(self) -> dict[str, object]:
-        """Status + tenant (`base_url`) en config-staat."""
-        if not self._base_url or not self._email or not self._api_token:
+        """Status + tenant (`base_url`) en config-staat.
+
+        `/rest/api/3/myself` is Atlassian's "wie ben ik"-endpoint: de lichtste read-only
+        call die bewijst dat de credential geldig is. `user` erbij is geen sier — die laat
+        zien op wélk account het token staat, en dat is precies de vraag bij het
+        loskoppelen van persoonsgebonden credentials.
+        """
+        # Bij een scoped service-token is een e-mailadres niet nodig: dat is alleen de
+        # gebruikersnaam voor Basic auth met een persoonlijk token. Het als verplicht
+        # opvoeren zou vragen om een persoonsgebonden gegeven dat de koppeling juist niet
+        # mag hebben.
+        vereist = [("het Jira-adres", self._base_url), ("het API-token", self._api_token)]
+        if not self.scoped:
+            vereist.insert(1, ("de service-account e-mail", self._email))
+        ontbreekt = [label for label, waarde in vereist if not waarde]
+        if ontbreekt:
+            # Eigen tekst, geen leveranciersrespons — die mag dus letterlijk door. Wel in
+            # auditor-taal: het configuratiescherm is niet de plek om env-var-namen te leren.
             return {
                 "status": "fail",
                 "naam": self.naam,
-                "reden": "JIRA_BASE_URL / JIRA_USER_EMAIL / JIRA_API_TOKEN ontbreken",
+                "soort": "niet_geconfigureerd",
+                "reden": f"Nog niet ingevuld: {', '.join(ontbreekt)}.",
             }
         try:
-            resp = self._http_get(f"{self._base_url}/rest/api/3/myself")
+            resp = self._http_get(f"{self._basis()}/rest/api/3/myself")
             user = resp.json()
             return {
                 "status": "ok",
@@ -142,10 +230,15 @@ class JiraSource:
                 "user": user.get("displayName", ""),
             }
         except Exception as e:
+            # `_http_get` bouwt zijn fout als "Jira API {code} op {url}: {resp.text}" — dus
+            # tenant-URL plus responsbody. Die tekst hoort in het serverlog, niet in de
+            # browser en niet in een 400 van `/run/start`.
+            soort, tekst = normaliseer(e, bron=self.naam)
             return {
                 "status": "fail",
                 "naam": self.naam,
-                "reden": str(e),
+                "soort": soort,
+                "reden": tekst,
             }
 
     def _iterate_issues(self, jql: str) -> Iterator[dict[str, Any]]:
@@ -158,7 +251,7 @@ class JiraSource:
         """
         if not self._base_url:
             return
-        url = f"{self._base_url}/rest/api/3/search/jql"
+        url = f"{self._basis()}/rest/api/3/search/jql"
         next_token: str | None = None
         while True:
             params: dict[str, object] = {
@@ -177,12 +270,18 @@ class JiraSource:
                 break
 
     def _http_get(self, url: str, params: dict[str, object] | None = None) -> requests.Response:
+        kop: dict[str, str] = {"Accept": "application/json"}
+        auth: tuple[str, str] | None = None
+        if self.scoped:
+            kop["Authorization"] = f"Bearer {self._api_token}"
+        else:
+            auth = (self._email, self._api_token)
         # requests accepts a mapping; cast for mypy precision.
         resp = requests.get(
             url,
             params=params or {},  # type: ignore[arg-type]
-            auth=(self._email, self._api_token),
-            headers={"Accept": "application/json"},
+            auth=auth,
+            headers=kop,
             timeout=self._timeout_s,
         )
         if not resp.ok:

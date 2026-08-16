@@ -30,6 +30,26 @@ def test_geen_subcommand_geeft_argparse_error() -> None:
 # ---------- _resolve_sources ----------
 
 
+def test_local_only_is_bereikbaar_vanaf_de_cli(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bestond in de vorige repo en werkt nog via `python -m iso_audit.pipeline`, maar was
+    bij de verhuizing niet doorgezet naar de `iso-audit`-CLI. De gedocumenteerde ingang
+    kende de dry-run dus niet meer — een stille regressie in bereikbaarheid.
+
+    Ook: `--source`/`--mode` zijn hier niet vereist, want dit pad leest geen enkele bron.
+    """
+    from iso_audit import pipeline
+
+    gezien: dict[str, str] = {}
+
+    def _nep(norm: str) -> str:
+        gezien["norm"] = norm
+        return "/pad/rapport.md"
+
+    monkeypatch.setattr(pipeline, "run_local_only", _nep)
+    assert cli.main(["pipeline", "--local-only", "--norm", "9001"]) == 0
+    assert gezien["norm"] == "9001"
+
+
 def test_resolve_sources_cli_eerst(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(cli._SOURCE_ENV_VAR, "miro")
     out = cli._resolve_sources(["drive"])

@@ -176,6 +176,15 @@ def _resolve_sources(args_sources: list[str] | None) -> list[str]:
 def _run_pipeline(args: argparse.Namespace) -> int:
     from iso_audit import pipeline
 
+    if args.local_only:
+        # Bestond in de oude codebase (`python -m audit.pipeline --local-only`) en werkt
+        # nog in `pipeline.main()`, maar was bij de verhuizing niet doorgezet naar de
+        # `iso-audit`-CLI. Daardoor kende de gedocumenteerde ingang de dry-run niet meer.
+        logger.info("Local-only: alleen een lokaal rapport uit de bestaande DB.")
+        pad = pipeline.run_local_only(args.norm)
+        logger.info("Rapport geschreven: %s", pad)
+        return 0
+
     if args.report_only:
         # Near-idempotente regeneratie: alleen rapport uit bestaande DB, geen
         # ingest/classificatie/Drive/Miro. --source/--mode zijn dan niet vereist.
@@ -353,6 +362,14 @@ def _voeg_pipeline_args_toe(parser: argparse.ArgumentParser) -> None:
             "Regenereer alleen het rapport uit de bestaande bevindingen-DB "
             "(geen ingest/classificatie/Drive/Miro). --source/--mode niet vereist. "
             "Near-idempotent: bedoeld voor iteratie op rapporttaal."
+        ),
+    )
+    parser.add_argument(
+        "--local-only",
+        action="store_true",
+        help=(
+            "Lees en classificeer niets; genereer alleen een lokaal rapport uit de "
+            "bestaande DB. Geen Drive, geen Miro, geen Claude. --source/--mode niet vereist."
         ),
     )
 

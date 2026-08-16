@@ -1,0 +1,171 @@
+"""Tests voor `clients/google_drive.py` — de service-account-vervanger van de gws-CLI.
+
+Deze tests dekken drie dingen die in de gws-variant nooit getest zijn: paginatie,
+recursie in submappen, en welke parameters er per call meegaan. Dat laatste is geen
+detail: `files.export` kent géén `supportsAllDrives` (de CLI slikte hem, de python-client
+raist erop), en `corpora`/`driveId` mogen alleen mee bij een Shared Drive.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+from unittest.mock import patch
+
+import pytest
+
+from iso_audit.clients import google_drive as gd
+
+_MAP = "application/vnd.google-apps.folder"
+
+
+class _Call:
+    """Onthoudt de kwargs en geeft een vastgezet antwoord terug."""
+
+    def __init__(self, opnames: list[dict[str, Any]], antwoord: Any) -> None:
+        self._opnames = opnames
+        self._antwoord = antwoord
+
+    def execute(self, **kwargs: Any) -> Any:
+        self._opnames[-1]["execute_kwargs"] = kwargs
+        if isinstance(self._antwoord, Exception):
+            raise self._antwoord
+        return self._antwoord
+
+
+class _Files:
+    def __init__(self, opnames: list[dict[str, Any]], antwoorden: list[Any]) -> None:
+        self._opnames = opnames
+        self._antwoorden = antwoorden
+
+    def _volgende(self, methode: str, kwargs: dict[str, Any]) -> _Call:
+        self._opnames.append({"methode": methode, **kwargs})
+        antwoord = self._antwoorden.pop(0) if self._antwoorden else {}
+        return _Call(self._opnames, antwoord)
+
+    def list(self, **kwargs: Any) -> _Call:
+        return self._volgende("list", kwargs)
+
+    def export_media(self, **kwargs: Any) -> _Call:
+        return self._volgende("export_media", kwargs)
+
+    def get_media(self, **kwargs: Any) -> _Call:
+        return self._volgende("get_media", kwargs)
+
+
+class _Service:
+    def __init__(self, opnames: list[dict[str, Any]], antwoorden: list[Any]) -> None:
+        self._files = _Files(opnames, antwoorden)
+
+    def files(self) -> _Files:
+        return self._files
+
+
+@pytest.fixture
+def dienst():  # type: ignore[no-untyped-def]
+    """Geef `(opnames, zet_antwoorden)` en patch `auth.drive_read_service`."""
+    opnames: list[dict[str, Any]] = []
+    antwoorden: list[Any] = []
+
+    def maak() -> _Service:
+        return _Service(opnames, antwoorden)
+
+    gd._dienst.cache_clear()
+    with patch.object(gd.auth, "drive_read_service", side_effect=maak):
+        yield opnames, antwoorden
+    gd._dienst.cache_clear()
+
+
+def test_lijst_pagineert_door(dienst: Any) -> None:
+    """Zonder `nextPageToken`-lus mist een auditmap met >100 bestanden stil documenten."""
+    opnames, antwoorden = dienst
+    antwoorden.extend(
+        [
+            {"files": [{"id": "a", "name": "A", "mimeType": "text/plain"}], "nextPageToken": "p2"},
+            {"files": [{"id": "b", "name": "B", "mimeType": "text/plain"}]},
+        ]
+    )
+
+    uit = gd.drive_lijst_bestanden("map1")
+
+    assert [b["id"] for b in uit] == ["a", "b"]
+    assert opnames[1]["pageToken"] == "p2"
+    assert "pageToken" not in opnames[0]
+
+
+def test_lijst_volgt_submappen_en_laat_de_map_zelf_weg(dienst: Any) -> None:
+    opnames, antwoorden = dienst
+    antwoorden.extend(
+        [
+            {
+                "files": [
+                    {"id": "sub", "name": "Submap", "mimeType": _MAP},
+                    {"id": "a", "name": "A", "mimeType": "text/plain"},
+                ]
+            },
+            {"files": [{"id": "c", "name": "C", "mimeType": "text/plain"}]},
+        ]
+    )
+
+    uit = gd.drive_lijst_bestanden("map1")
+
+    assert [b["id"] for b in uit] == ["c", "a"], "submap-inhoud erbij, de map zelf niet"
+    assert opnames[1]["q"] == "'sub' in parents and trashed=false"
+
+
+def test_shared_drive_parameters_alleen_bij_een_drive_id(dienst: Any) -> None:
+    """Een lege `driveId` levert een 400; daarom alleen zetten als er een drive is."""
+    opnames, antwoorden = dienst
+    antwoorden.extend([{"files": []}, {"files": []}])
+
+    gd.drive_lijst_bestanden("map1")
+    assert "driveId" not in opnames[0] and "corpora" not in opnames[0]
+
+    gd.drive_lijst_bestanden("0ABC", drive_id="0ABC")
+    assert opnames[1]["driveId"] == "0ABC"
+    assert opnames[1]["corpora"] == "drive"
+    assert opnames[1]["includeItemsFromAllDrives"] is True
+    assert opnames[1]["supportsAllDrives"] is True
+
+
+def test_export_krijgt_geen_supports_all_drives(dienst: Any) -> None:
+    """`files.export` heeft die parameter niet. Dit is de gate tegen 'terugrepareren'."""
+    opnames, antwoorden = dienst
+    antwoorden.append(b"platte tekst")
+
+    uit = gd.drive_exporteer_google_doc("doc1")
+
+    assert uit == "platte tekst"
+    assert opnames[0]["methode"] == "export_media"
+    assert "supportsAllDrives" not in opnames[0]
+    assert opnames[0]["mimeType"] == "text/plain"
+
+
+def test_download_krijgt_wel_supports_all_drives(dienst: Any) -> None:
+    """`files.get` kent hem wél — anders is een bestand in een Shared Drive onvindbaar."""
+    opnames, antwoorden = dienst
+    antwoorden.append(b"\x00binair")
+
+    assert gd.drive_download_bestand("f1") == b"\x00binair"
+    assert opnames[0]["methode"] == "get_media"
+    assert opnames[0]["supportsAllDrives"] is True
+
+
+def test_probe_is_bounded(dienst: Any) -> None:
+    """De probe mag de map niet enumereren; dat is wat `healthcheck()` doet."""
+    opnames, antwoorden = dienst
+    antwoorden.append({"files": []})
+
+    gd.drive_bereikbaar("map1")
+
+    assert opnames[0]["pageSize"] == 1
+    assert opnames[0]["fields"] == "files(id)"
+
+
+def test_retries_worden_meegegeven(dienst: Any) -> None:
+    """De eigen retry-lus uit de gws-variant is vervangen door `num_retries`."""
+    opnames, antwoorden = dienst
+    antwoorden.append({"files": []})
+
+    gd.drive_bereikbaar("map1")
+
+    assert opnames[0]["execute_kwargs"]["num_retries"] == gd._MAX_RETRIES

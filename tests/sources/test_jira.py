@@ -80,6 +80,79 @@ def test_healthcheck_met_creds_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     assert h["user"] == "Mark"
 
 
+def test_scoped_token_gebruikt_bearer_en_de_gateway(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Atlassian kent twee tokensoorten en ze werken verschillend.
+
+    Gemeten op 2026-08-15 met een echt service-token: Basic auth op de site-URL gaf 401,
+    Bearer op de site-URL gaf 403 op élk endpoint (ook `serverInfo`), en Bearer op
+    `api.atlassian.com/ex/jira/{cloudId}` gaf 200. Zonder dit onderscheid is een
+    Jira-koppeling zonder persoonsgebonden account niet mogelijk.
+    """
+    from iso_audit.sources.jira import JiraSource
+
+    bron = JiraSource(base_url="https://x.atlassian.net", api_token="ATSTT3xxxx", email="")
+    assert bron.scoped is True
+
+    gezien: dict[str, object] = {}
+
+    def _nep_get(url: str, **kw: object) -> object:
+        gezien.setdefault("urls", []).append(url)  # type: ignore[union-attr]
+        gezien["headers"] = kw.get("headers")
+        gezien["auth"] = kw.get("auth")
+        if url.endswith("/_edge/tenant_info"):
+            return _fake_response(data={"cloudId": "wolk-123"})
+        return _fake_response(data={"displayName": "Iso-tool"})
+
+    with patch("iso_audit.sources.jira.requests.get", side_effect=_nep_get):
+        h = bron.healthcheck()
+
+    assert h["status"] == "ok"
+    urls = gezien["urls"]
+    assert urls[0].endswith("/_edge/tenant_info"), "cloud-ID eerst ophalen"
+    assert urls[1] == "https://api.atlassian.com/ex/jira/wolk-123/rest/api/3/myself"
+    assert gezien["headers"]["Authorization"] == "Bearer ATSTT3xxxx"  # type: ignore[index]
+    assert gezien["auth"] is None, "geen Basic auth bij een scoped token"
+
+
+def test_scoped_token_vraagt_geen_e_mailadres(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Een e-mailadres is alleen de gebruikersnaam voor Basic auth met een persoonlijk
+    token. Het verplicht stellen zou vragen om een persoonsgebonden gegeven dat deze
+    koppeling juist niet mag hebben."""
+    from iso_audit.sources.jira import JiraSource
+
+    bron = JiraSource(base_url="https://x.atlassian.net", api_token="ATSTT3xxxx", email="")
+    with patch("iso_audit.sources.jira.requests.get", side_effect=OSError("niet gebeld")):
+        h = bron.healthcheck()
+    # Faalt op het netwerk, niet op ontbrekende configuratie.
+    assert h["soort"] != "niet_geconfigureerd"
+
+    zonder_token = JiraSource(base_url="https://x.atlassian.net", api_token="", email="")
+    assert zonder_token.healthcheck()["soort"] == "niet_geconfigureerd"
+
+
+def test_gebruikerstoken_blijft_basic_auth_op_de_site_url() -> None:
+    """Geen stille breaking change voor een bestaande `ATATT`-configuratie."""
+    from iso_audit.sources.jira import JiraSource
+
+    bron = JiraSource(base_url="https://x.atlassian.net", api_token="ATATTxxxx", email="a@b.nl")
+    assert bron.scoped is False
+
+    gezien: dict[str, object] = {}
+
+    def _nep_get(url: str, **kw: object) -> object:
+        gezien["url"] = url
+        gezien["auth"] = kw.get("auth")
+        gezien["headers"] = kw.get("headers")
+        return _fake_response(data={"displayName": "Iemand"})
+
+    with patch("iso_audit.sources.jira.requests.get", side_effect=_nep_get):
+        bron.healthcheck()
+
+    assert gezien["url"] == "https://x.atlassian.net/rest/api/3/myself"
+    assert gezien["auth"] == ("a@b.nl", "ATATTxxxx")
+    assert "Authorization" not in gezien["headers"]  # type: ignore[operator]
+
+
 def test_healthcheck_api_fail_geeft_fail(monkeypatch: pytest.MonkeyPatch) -> None:
     from iso_audit.sources.jira import JiraSource
 
@@ -90,7 +163,13 @@ def test_healthcheck_api_fail_geeft_fail(monkeypatch: pytest.MonkeyPatch) -> Non
     ):
         h = notif.healthcheck()
     assert h["status"] == "fail"
-    assert "401" in str(h["reden"])
+    # `_http_get` bouwt zijn fout als "Jira API {code} op {url}: {resp.text}". Die tekst
+    # asserteerde deze test eerder ("401" moest erin staan) en legde daarmee het lek vast
+    # als gewenst gedrag: tenant-URL en responsbody bereikten de browser. De soort draagt
+    # de betekenis nu, de ruwe melding gaat naar het serverlog.
+    assert h["soort"] == "auth"
+    assert "401" not in str(h["reden"])
+    assert "https://" not in str(h["reden"])
 
 
 # ---------- list_documents ----------

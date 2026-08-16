@@ -153,7 +153,7 @@ def test_list_documents_yields_alleen_ondersteunde() -> None:
         },
     ]
     src = drive.DriveSource(folder_id="x")
-    with patch.object(drive, "gws_lijst_bestanden", return_value=bestanden):
+    with patch.object(drive, "drive_lijst_bestanden", return_value=bestanden):
         docs = list(src.list_documents())
     ids = {d.id for d in docs}
     assert ids == {"f1", "f2"}
@@ -169,7 +169,7 @@ def test_list_documents_geeft_metadata_door() -> None:
         }
     ]
     src = drive.DriveSource(folder_id="x")
-    with patch.object(drive, "gws_lijst_bestanden", return_value=bestanden):
+    with patch.object(drive, "drive_lijst_bestanden", return_value=bestanden):
         doc = next(iter(src.list_documents()))
     assert doc.id == "f1"
     assert doc.titel == "Beleid.docx"
@@ -185,7 +185,7 @@ def test_list_documents_lege_modifiedtime() -> None:
         {"id": "f1", "name": "x.txt", "mimeType": "text/plain"},
     ]
     src = drive.DriveSource(folder_id="y")
-    with patch.object(drive, "gws_lijst_bestanden", return_value=bestanden):
+    with patch.object(drive, "drive_lijst_bestanden", return_value=bestanden):
         doc = next(iter(src.list_documents()))
     assert doc.laatst_gewijzigd == ""
 
@@ -214,7 +214,7 @@ def test_list_documents_multi_folder_unie() -> None:
     def _fake_list(fid: str, drive_id: str | None = None) -> list[dict[str, Any]]:
         return folder_a if fid == "foldA" else folder_b
 
-    with patch.object(drive, "gws_lijst_bestanden", side_effect=_fake_list):
+    with patch.object(drive, "drive_lijst_bestanden", side_effect=_fake_list):
         ids = {d.id for d in src.list_documents()}
     assert ids == {"a1", "b1"}
 
@@ -229,7 +229,7 @@ def test_list_documents_multi_folder_dedup_op_file_id() -> None:
         },
     ]
     src = drive.DriveSource(folder_id=["foldA", "foldB"])
-    with patch.object(drive, "gws_lijst_bestanden", return_value=overlap):
+    with patch.object(drive, "drive_lijst_bestanden", return_value=overlap):
         docs = list(src.list_documents())
     assert len(docs) == 1
     assert docs[0].id == "same-1"
@@ -259,7 +259,7 @@ def test_fetch_content_google_doc() -> None:
         laatst_gewijzigd="",
         inhoud_uri="d1",
     )
-    with patch.object(drive, "gws_exporteer_google_doc", return_value="text!") as mock:
+    with patch.object(drive, "drive_exporteer_google_doc", return_value="text!") as mock:
         out = src.fetch_content(doc)
     assert out == "text!"
     mock.assert_called_once_with("d1")
@@ -275,7 +275,7 @@ def test_fetch_content_plain_text() -> None:
         laatst_gewijzigd="",
         inhoud_uri="d1",
     )
-    with patch.object(drive, "gws_download_bestand", return_value=b"hello"):
+    with patch.object(drive, "drive_download_bestand", return_value=b"hello"):
         out = src.fetch_content(doc)
     assert out == "hello"
 
@@ -318,19 +318,25 @@ def test_list_findings_geeft_lege_iterator() -> None:
 
 def test_healthcheck_ok() -> None:
     src = drive.DriveSource(folder_id="x")
-    with patch.object(drive, "gws_lijst_bestanden", return_value=[{"id": "a"}]):
+    with patch.object(drive, "drive_lijst_bestanden", return_value=[{"id": "a"}]):
         h = src.healthcheck()
     assert h["status"] == "ok"
     assert h["naam"] == "drive"
     assert h["aantal_bestanden"] == 1
 
 
-def test_healthcheck_fail_op_exception() -> None:
+def test_healthcheck_fail_geeft_een_soort_en_lekt_de_ruwe_melding_niet() -> None:
+    """De melding van de leverancier hoort in het serverlog, niet in het antwoord.
+
+    Deze test asserteerde eerder dat "boom" in `reden` stond — dat legde het lek vast als
+    gewenst gedrag. De ruwe tekst kan een URL met credential of een responsbody bevatten.
+    """
     src = drive.DriveSource(folder_id="x")
-    with patch.object(drive, "gws_lijst_bestanden", side_effect=RuntimeError("boom")):
+    with patch.object(drive, "drive_lijst_bestanden", side_effect=RuntimeError("boom")):
         h = src.healthcheck()
     assert h["status"] == "fail"
-    assert "boom" in str(h["reden"])
+    assert h["soort"]
+    assert "boom" not in str(h["reden"])
 
 
 def test_healthcheck_multi_folder_aggregeert() -> None:
@@ -340,7 +346,7 @@ def test_healthcheck_multi_folder_aggregeert() -> None:
     def _fake_list(fid: str, drive_id: str | None = None) -> list[dict[str, Any]]:
         return [{"id": f"{fid}-1"}, {"id": f"{fid}-2"}] if fid == "foldA" else [{"id": "b-1"}]
 
-    with patch.object(drive, "gws_lijst_bestanden", side_effect=_fake_list):
+    with patch.object(drive, "drive_lijst_bestanden", side_effect=_fake_list):
         h = src.healthcheck()
     assert h["status"] == "ok"
     assert h["aantal_bestanden"] == 3
@@ -356,10 +362,13 @@ def test_healthcheck_multi_folder_fail_eerste_folder() -> None:
             raise RuntimeError("permission denied op foldB")
         return [{"id": "a-1"}]
 
-    with patch.object(drive, "gws_lijst_bestanden", side_effect=_fake_list):
+    with patch.object(drive, "drive_lijst_bestanden", side_effect=_fake_list):
         h = src.healthcheck()
     assert h["status"] == "fail"
-    assert "foldB" in str(h["reden"])
+    # De folder staat in `tenant` (die hoort bewust in de trail), niet in de vrije tekst:
+    # daar zou de ruwe leveranciersmelding mee naar binnen komen.
+    assert h["tenant"] == "foldB"
+    assert "permission denied" not in str(h["reden"])
 
 
 # ---------- Registry-registratie ----------
@@ -378,7 +387,7 @@ def test_drivesource_geregistreerd() -> None:
 
 def test_haal_documenten_op_lege_lijst_raised() -> None:
     with (
-        patch.object(drive, "gws_lijst_bestanden", return_value=[]),
+        patch.object(drive, "drive_lijst_bestanden", return_value=[]),
         pytest.raises(RuntimeError, match="Geen bestanden"),
     ):
         drive.haal_documenten_op(folder_id="x")
@@ -389,8 +398,8 @@ def test_haal_documenten_op_happy_path() -> None:
         {"id": "f1", "name": "x.txt", "mimeType": "text/plain", "modifiedTime": "2026-01-01"},
     ]
     with (
-        patch.object(drive, "gws_lijst_bestanden", return_value=bestanden),
-        patch.object(drive, "gws_download_bestand", return_value=b"content"),
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=b"content"),
     ):
         docs, review = drive.haal_documenten_op(folder_id="x")
     assert len(docs) == 1
@@ -402,7 +411,7 @@ def test_haal_documenten_op_niet_tekstueel_naar_review() -> None:
     bestanden = [
         {"id": "f1", "name": "afb.png", "mimeType": "image/png", "modifiedTime": ""},
     ]
-    with patch.object(drive, "gws_lijst_bestanden", return_value=bestanden):
+    with patch.object(drive, "drive_lijst_bestanden", return_value=bestanden):
         docs, review = drive.haal_documenten_op(folder_id="x")
     assert docs == []
     assert len(review) == 1
@@ -419,8 +428,8 @@ def test_haal_documenten_op_leesfout_naar_review() -> None:
         },
     ]
     with (
-        patch.object(drive, "gws_lijst_bestanden", return_value=bestanden),
-        patch.object(drive, "gws_exporteer_google_doc", side_effect=RuntimeError("oops")),
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_exporteer_google_doc", side_effect=RuntimeError("oops")),
     ):
         docs, review = drive.haal_documenten_op(folder_id="x")
     assert docs == []

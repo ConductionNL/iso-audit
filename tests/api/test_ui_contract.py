@@ -17,6 +17,9 @@ UI = Path("src/iso_audit/api/ui.html")
 # Paden die bewust NIET onder een audit vallen.
 ONGESCOPED = {
     "/audits",
+    # Het documentenlandschap hoort bij de organisatie en niet bij één audit: één
+    # voorraad die alle audits gebruiken. Daarom bewust zonder audit-prefix.
+    "/landschap",
     "/config/health",
     "/config/options",
     "/config/bronnen",
@@ -81,6 +84,73 @@ def test_configscherm_kan_een_bron_koppelen() -> None:
     assert 'id="view-config"' in bron
     assert "toonBronForm" in bron and "bewaarBron" in bron
     assert "/config/bronnen/" in bron
+
+
+def test_openen_van_een_audit_laadt_ook_de_bronselectie() -> None:
+    """Zonder deze aanroep is #config-form leeg tot iemand op een knop klikt, en stuurt
+    `selectedConfig()` `sources: []` mee — een run die niets leest terwijl de auditor
+    bronnen dénkt te hebben gekozen."""
+    bron = _bron()
+    lichaam = bron.split("async function openAudit(")[1].split("\nasync function")[0]
+    assert "loadConfig()" in lichaam
+
+
+def test_elk_configuratieveld_is_gewoon_invulbaar() -> None:
+    """Geen `readonly`, geen extra bevestigingsstap.
+
+    Er hebben hier achtereenvolgens een badge, een slot en een bevestigingsknop gestaan.
+    De badge was te zwak (typen had geen effect), het slot te hard (een geroteerde key
+    was niet te vervangen) en de knop overbodig zodra invullen écht werkt. Wat blijft is
+    de projectregel uit `bron_config.py`: registratie is de controle, niet het moeilijk
+    maken van configureren.
+    """
+    bron = _bron()
+    invoer = bron.split("function toonBronForm(")[1].split("// Meteen zeggen")[0]
+    assert "readonly" not in invoer.lower()
+    assert "Toch overschrijven" not in invoer
+    assert "Terug naar de omgeving" in invoer, "een overschrijving moet terug te draaien zijn"
+
+
+def test_er_is_een_testknop_met_zichtbaar_resultaat() -> None:
+    """Zonder terugkoppeling vul je een token in, krijg je "opgeslagen", en weet je nog
+    steeds niet of de koppeling werkt."""
+    bron = _bron()
+    assert "async function testBron(" in bron
+    assert "/config/health/" in bron, "test één bron, niet alle bronnen"
+    assert ">Testen</button>" in bron
+    bewaar = bron.split("async function bewaarBron(")[1].split("\nasync function")[0]
+    assert "testBron(naam)" in bewaar, "na opslaan meteen testen"
+
+
+def test_de_ui_wordt_niet_gecachet(tmp_path: Path) -> None:
+    """Eén HTML-bestand zonder buildstap heeft geen versie in de URL. Zonder `no-store`
+    zit een auditor na een uitrol op een oud scherm zonder het te merken — dat kostte hier
+    een sessie aan verwarring over knoppen die er wél waren."""
+    from fastapi.testclient import TestClient
+
+    from iso_audit.api.app import create_app
+    from iso_audit.api.registry import AuditRegistry
+
+    from .conftest import AUDITOR, EXAMPLES, NORMS
+
+    registry = AuditRegistry(tmp_path / "audits")
+    registry.root.mkdir(parents=True)
+    app = create_app(registry, profile=str(EXAMPLES / "conduction.profile.yaml"), norms_dir=NORMS)
+    r = TestClient(app, headers={"X-Forwarded-Email": AUDITOR}).get("/")
+
+    assert r.status_code == 200
+    assert "no-store" in r.headers.get("cache-control", "")
+
+
+def test_de_ui_kent_alle_herkomsten_die_de_server_kan_geven() -> None:
+    """Een single-file UI heeft geen buildstap; dit is de enige manier om te merken dat de
+    backend een herkomst toevoegt die het scherm niet kan tonen."""
+    from iso_audit.config.settings import Bron
+
+    bron = _bron()
+    labels = bron.split("const BRON_LABEL")[1].split("};")[0]
+    for waarde in Bron.__args__:  # type: ignore[attr-defined]
+        assert waarde in labels, f"herkomst {waarde!r} heeft geen label in de UI"
 
 
 def test_geheime_velden_worden_als_wachtwoord_getoond() -> None:

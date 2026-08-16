@@ -137,6 +137,13 @@ spec:
             # deze naam, geen list, geen ClusterRole.
             - name: ISO_AUDIT_CONFIG_SECRET
               value: iso-audit-portal-config
+            # Tweede weg naar de namespace, naast het bestand in het projected volume.
+            # De code prefereert het bestand; dit voorkomt dat een terugval op een
+            # hardcoded naam uitkomt wanneer iemand in een andere namespace uitrolt.
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             # Waar de browser heen gaat ná het wissen van de proxy-sessie, zodat
             # uitloggen ook echt uitloggen is en een volgende login niet stil
             # doorloopt op de bestaande Keycloak-sessie. `client_id` is verplicht:
@@ -300,9 +307,16 @@ spec:
                   items:
                     - key: ca.crt
                       path: ca.crt
-              - fieldRef:
-                  fieldPath: metadata.namespace
-                  path: namespace
+              # `downwardAPI`, NIET `fieldRef` rechtstreeks: een projected volume kent
+              # `fieldRef` niet als source. Kubernetes pruunde die entry stil naar `{}`,
+              # waarna `kubectl` waarschuwde met "has no sources provided" en het
+              # namespace-bestand ontbrak. De code viel dan terug op een hardcoded
+              # namespace — hier per ongeluk goed, elders stil fout.
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace
         - name: data
           persistentVolumeClaim:
             claimName: iso-audit-portal-data

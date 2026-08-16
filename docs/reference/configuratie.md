@@ -27,15 +27,31 @@ deployment without it being visible in Git.
 
 ## Provenance
 
-Every resolved value carries its own source (`env`, `yaml`, `ui`, `default`, `leeg`).
-Provenance is a property of the value, not a separate bookkeeping table — that way it
-cannot fall away between resolving and using.
+Every resolved value carries its own source (`ui-override`, `env`, `yaml`, `ui`,
+`default`, `leeg`). Provenance is a property of the value, not a separate bookkeeping
+table — that way it cannot fall away between resolving and using.
 
 - At startup, one audit-log line per field records which source won. Never the value.
 - `GET /config/herkomst` returns the same information, so an auditor can check it without
   cluster access.
 - In the portal, each input shows a badge with its source. Fields set from the environment
-  or `config.yaml` are marked as fixed, because a value typed over them has no effect.
+  or `config.yaml` are read-only, because a value typed over them would have no effect.
+
+## Overriding an administrator value
+
+A field set from the environment can still be replaced from the portal, but only as an
+**explicit** action (`POST /config/bronnen/{bron}?overschrijf=true`). Its provenance then
+becomes `ui-override`, and the change trail records `overschrijft_omgeving: true` with who
+and when — never the value. Clearing the field restores the environment value.
+
+This exists for one reason: a credential that expires or is revoked must be replaceable by
+the person doing the audit. If that requires a cluster administrator, the audit capability
+is tied to one person again — see
+[`credential-rotatie-door-auditor`](../../openspec/changes/credential-rotatie-door-auditor/proposal.md).
+
+If the environment value changes *after* an override was made — an administrator rotating
+a Secret, for instance — the portal says so on that field. The override stays in effect
+until someone removes it; the comparison uses a fingerprint, so neither value is shown.
 
 ## Secrets
 

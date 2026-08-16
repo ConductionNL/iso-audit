@@ -38,6 +38,10 @@ class RunStartRequest(BaseModel):
     """
 
     mode: str = "sim"
+    """`sim` (indexatie-timer) of `live` (de volledige pipeline).
+
+    Bronnen inlezen zit niet hier maar op `POST /landschap/ingest`."""
+
     sources: list[str] = []
     chapter: str | None = None
     top_n: int = 0
@@ -59,8 +63,13 @@ def maak_router(audits: Audits) -> APIRouter:
 
     @router.get("/runs")
     def run_historie(audit_id: str) -> list[dict[str, object]]:
-        """Append-only run-historie, oudste eerst — inclusief mislukte runs."""
-        return runs_mod.lijst(audits.dir(audit_id))
+        """Run-historie, oudste eerst — inclusief mislukte en lopende runs.
+
+        `samengevat()` en niet `lijst()`: een run heeft twee append-only records (start en
+        afsluiting) en de UI wil de laatste stand per run. Het ruwe spoor blijft
+        onaangetast in `runs.jsonl`.
+        """
+        return runs_mod.samengevat(audits.dir(audit_id))
 
     @router.post("/run/start")
     def run_start(
@@ -79,9 +88,51 @@ def maak_router(audits: Audits) -> APIRouter:
         except RegistryError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        dir_ = audits.dir(audit_id)
+
+        # Eerst het startrecord, dan starten. Dat record reserveert het run-nummer en
+        # zorgt dat een run die halverwege sneuvelt (pod-restart, OOM) een spoor heeft.
+        # De worker sluit het af met de echte tellingen.
+        record = runs_mod.registreer(
+            dir_,
+            door=wie,
+            modus=r.mode,
+            norm=norm,
+            bronnen=r.sources,
+            hoofdstuk=r.chapter,
+        )
+        run_id = str(record["run_id"])
+
+        try:
+            resultaat = sessie.start_run(
+                mode=r.mode,
+                norm=norm,
+                sources=r.sources,
+                chapter=r.chapter,
+                top_n=r.top_n,
+                pace_s=r.pace,
+                run_id=run_id,
+            )
+        except (SessionError, ValueError, OSError) as exc:
+            # Ook een geweigerde run hoort in de historie: "iemand probeerde te draaien
+            # zonder bron" is precies de diagnose die je later mist. Afsluiten, niet
+            # opnieuw registreren — anders krijgt de audit een tweede run-nummer.
+            runs_mod.afsluiten(dir_, run_id, fout=str(exc))
+            log_event(
+                "run_geweigerd",
+                wie,
+                audit=audit_id,
+                modus=r.mode,
+                bronnen=",".join(r.sources),
+                reden=str(exc)[:200],
+            )
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
         # Kosten-attributie (sec-bevinding 6 van change iso-portal, besluit "loggen,
         # niet begrenzen"): de classifier houdt token-verbruik al bij, maar niet wie
         # de run startte. Zonder die koppeling is een kostenpiek niet adresseerbaar.
+        # Ná `start_run`, want anders staat er "gestart" in het toegangslog bij een run
+        # die geweigerd is.
         log_event(
             "run_gestart",
             wie,
@@ -92,41 +143,11 @@ def maak_router(audits: Audits) -> APIRouter:
             hoofdstuk=r.chapter or "",
         )
 
-        dir_ = audits.dir(audit_id)
-        try:
-            resultaat = sessie.start_run(
-                mode=r.mode,
-                norm=norm,
-                sources=r.sources,
-                chapter=r.chapter,
-                top_n=r.top_n,
-                pace_s=r.pace,
-            )
-        except (SessionError, ValueError, OSError) as exc:
-            # Ook een mislukte run hoort in de historie: een run die faalde op een
-            # ontbrekende credential is precies wat je later wil terugzien.
-            runs_mod.registreer(
-                dir_,
-                door=wie,
-                modus=r.mode,
-                norm=norm,
-                bronnen=r.sources,
-                hoofdstuk=r.chapter,
-                fout=str(exc),
-            )
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-        toegevoegd, overgeslagen = sessie.laatste_merge
-        runs_mod.registreer(
-            dir_,
-            door=wie,
-            modus=r.mode,
-            norm=norm,
-            bronnen=r.sources,
-            hoofdstuk=r.chapter,
-            toegevoegd=toegevoegd,
-            overgeslagen=overgeslagen,
-        )
+        # Een sim-run met `pace<=0` is al klaar als `start_run` terugkeert (synchroon,
+        # voor tests); die sluit hier af, want er is geen worker die het doet.
+        if r.mode != "live" and resultaat.get("status") == "done":
+            toegevoegd, overgeslagen = sessie.laatste_merge
+            runs_mod.afsluiten(dir_, run_id, toegevoegd=toegevoegd, overgeslagen=overgeslagen)
         return resultaat
 
     @router.get("/run/progress")

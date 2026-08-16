@@ -46,7 +46,10 @@ def _miro_health() -> dict[str, object]:
         "connected": False,
         "status": "fail",
         "naam": "miro",
-        "soort": "auth",
+        # Niet `auth`: er is niets geweigerd, er is niets ingevuld. "De credential is
+        # geweigerd" sturen bij een leeg veld stuurt iemand naar de leverancier terwijl
+        # hij hier één veld moet vullen.
+        "soort": "niet_geconfigureerd",
         "reden": "Er is nog geen API-token ingevuld.",
     }
 
@@ -81,7 +84,25 @@ def _check_source(naam: str) -> dict[str, object]:
             "soort": soort,
             "reden": tekst,
         }
-    return {"connected": hc.get("status") == "ok", **hc}
+
+    if hc.get("status") == "ok":
+        return {"connected": True, **hc}
+
+    # Een adapter die zijn fout zélf afvangt en als `reden` teruggeeft, ging tot
+    # 2026-08-14 volledig om de normalisatie heen — en `ui.html` rendert die tekst
+    # rechtstreeks. Gemeten was dat onder andere een Jira-401 met tenant-URL en
+    # responsbody, en een subprocess-dump met de volledige commandoregel.
+    #
+    # Daarom hier één uitgang: ontbreekt `soort`, dan is de tekst niet door de
+    # normalisatie gegaan en gaat hij er alsnog door. Een adapter die het wél zelf doet
+    # (en dus een `soort` meestuurt) blijft ongemoeid. Zo is vergeten niet mogelijk in
+    # plaats van "we moeten eraan denken".
+    from iso_audit.config.verbinding import normaliseer as _norm
+
+    if not hc.get("soort"):
+        soort, tekst = _norm(RuntimeError(str(hc.get("reden", ""))), bron=naam)
+        hc = {**hc, "soort": soort, "reden": tekst}
+    return {"connected": False, **hc}
 
 
 def bron_health() -> dict[str, dict[str, object]]:
@@ -100,6 +121,47 @@ def bron_health() -> dict[str, dict[str, object]]:
     from iso_audit.ingest import beschikbare_bronnen
 
     return {naam: _check_source(naam) for naam in beschikbare_bronnen()}
+
+
+def valideer_bronselectie(gekozen: list[str], *, streng: bool) -> None:
+    """Weiger een run die niets zou lezen. Raist `SessionError` met een leesbare reden.
+
+    Tot 2026-08-14 gaf `POST /run/start` `200 {"status": "running"}` op een lege selectie,
+    waarna vier gestapelde `or ["drive"]`-terugvallen er stil een drive-run van maakten.
+    Voor normen bestond die harde check al (`registry.run_code`); voor bronnen niet.
+
+    `streng` staat aan bij een live-run: dan wordt ook de koppelstatus meegewogen. Bij een
+    sim-run niet — die leest per definitie niets, dus een verbindingseis stellen is theater.
+    """
+    if not gekozen:
+        raise SessionError(
+            "Kies minstens één bron. Een run zonder bron leest niets en levert geen bevindingen."
+        )
+
+    # De adapters registreren zich via side-effect-imports in `beschikbare_bronnen()`.
+    # Zonder deze aanroep gooit `sources.get()` een KeyError en lijkt élke bron kapot.
+    from iso_audit.ingest import beschikbare_bronnen
+
+    bekend = beschikbare_bronnen()
+    onbekend = sorted(set(gekozen) - set(bekend))
+    if onbekend:
+        raise SessionError(
+            f"Onbekende bron(nen): {', '.join(onbekend)}. Beschikbaar: {', '.join(bekend)}."
+        )
+
+    if not streng:
+        return
+
+    # Alleen de gekozen bronnen controleren, niet `bron_health()` over álle bronnen: dat
+    # laatste liet `run/start` op een niet-gekoppelde Jira wachten terwijl de run over
+    # Drive ging, en dat kostte meer dan een minuut voordat de run begon.
+    health = {n: _check_source(n) for n in gekozen}
+    stuk = [n for n in gekozen if not health[n].get("connected")]
+    if stuk:
+        redenen = "; ".join(f"{n}: {health[n].get('reden', 'niet gekoppeld')}" for n in stuk)
+        raise SessionError(
+            f"Deze bron(nen) zijn niet gekoppeld, dus een run zou er niets uit lezen: {redenen}"
+        )
 
 
 @dataclass
@@ -136,9 +198,11 @@ class AuditSession:
         self._memo_input_path = Path(memo_input_path)
         self._run = _RunState()
         self.laatste_merge: tuple[int, int] = (0, 0)
-        """``(toegevoegd, overgeslagen)`` van de laatste run — de route registreert
-        dit bij het run-record, zodat een run die dertig kandidaten opleverde waarvan
-        achttien al bekend waren niet lijkt alsof hij niets deed."""
+        """``(toegevoegd, overgeslagen)`` van de laatste run, zodat een run die dertig
+        kandidaten opleverde waarvan achttien al bekend waren niet lijkt alsof hij niets
+        deed. De **worker** geeft deze tellingen aan `runs.afsluiten()`; de route deed dat
+        eerder, maar die las ze op het moment dat de thread net gestart was en dus altijd
+        `(0, 0)`."""
 
     # --- findings + triage ---------------------------------------------------
 
@@ -245,15 +309,24 @@ class AuditSession:
         chapter: str | None = None,
         top_n: int = 0,
         pace_s: float = 0.05,
+        run_id: str | None = None,
     ) -> dict[str, object]:
         """Stap 2: start de run. ``mode='live'`` = echte pipeline (Drive+LLM);
         ``mode='sim'`` = indexatie-timer (fallback). ``pace_s<=0`` = synchroon (tests).
+
+        `run_id` is het record dat de route al heeft aangelegd; de worker sluit dat af met
+        de echte tellingen.
         """
+        gekozen = list(sources or [])
+        # Inlezen zit niet hier maar op `POST /landschap/ingest`: het documentenlandschap
+        # is van de organisatie en niet van één audit, en twee ingangen naar dezelfde
+        # opslag laten een auditor geloven dat hij iets eigens heeft.
+        valideer_bronselectie(gekozen, streng=(mode == "live"))
         if mode == "live":
             self._run = _RunState(status="running", total=7, start=time.monotonic(), mode="live")
             threading.Thread(
                 target=self._run_live_worker,
-                args=(norm, sources or ["drive"], chapter, top_n),
+                args=(norm, gekozen, chapter, top_n, run_id),
                 daemon=True,
             ).start()
             return {"mode": "live", "status": "running"}
@@ -266,20 +339,31 @@ class AuditSession:
             self._run.done = total
             self._run.status = "done"
         else:
-            threading.Thread(target=self._run_worker, daemon=True).start()
+            threading.Thread(target=self._run_worker, args=(run_id,), daemon=True).start()
         return {"mode": "sim", "total": total, "status": self._run.status}
 
-    def _run_worker(self) -> None:
+    def _run_worker(self, run_id: str | None = None) -> None:
+        from iso_audit.api.runs import afsluiten
+
         run = self._run
         for i in range(run.total):
             time.sleep(run.pace)
             run.done = i + 1
         run.status = "done"
+        # Ook een sim-run moet zijn record afsluiten, anders blijft hij eeuwig "loopt".
+        if run_id:
+            afsluiten(self.dir, run_id)
 
     def _run_live_worker(
-        self, norm: str, sources: list[str], chapter: str | None, top_n: int
+        self,
+        norm: str,
+        sources: list[str],
+        chapter: str | None,
+        top_n: int,
+        run_id: str | None = None,
     ) -> None:
         from iso_audit.api.run_job import draft_from_db, run_live_pipeline
+        from iso_audit.api.runs import afsluiten
 
         def _on_log(msg: str) -> None:
             self._run.log.append(msg)
@@ -288,7 +372,12 @@ class AuditSession:
                 self._run.done, self._run.total = int(m.group(1)), int(m.group(2))
 
         try:
-            run_live_pipeline(norm=norm, sources=sources, chapter=chapter, on_log=_on_log)
+            run_live_pipeline(
+                norm=norm,
+                sources=sources,
+                chapter=chapter,
+                on_log=_on_log,
+            )
             self._run.log.append("Findings exporteren + kop-NC's draften…")
             drafted = draft_from_db(
                 norm=norm, norms_dir=str(self._norms_dir), language="nl", top_n=top_n
@@ -300,12 +389,28 @@ class AuditSession:
             from iso_audit.api.runs import voeg_toe
 
             self.laatste_merge = voeg_toe(self.dir, [f.model_dump() for f in drafted])
-            self._update_memo_context(norm, sources, chapter)
+            # De memo-context bijwerken is cosmetiek ná het echte werk: de bevindingen
+            # staan op dit punt al in `findings.json`. Op 2026-08-16 liet een ontbrekende
+            # `memo-input.yaml` een run die alle zeven stappen én alle rapporten had
+            # afgerond, alsnog als `fout` met `0 toegevoegd` in de trail belanden. Het
+            # spoor moet vertellen wat er gebeurd is; een cosmetische stap mag dat niet
+            # omkeren. Wel gelogd, want stil is het ook niet.
+            try:
+                self._update_memo_context(norm, sources, chapter)
+            except Exception as exc:
+                self._run.log.append(f"Memo-context niet bijgewerkt: {exc}")
             self._run.done = self._run.total
             self._run.status = "done"
+            # Hier, en niet in de route: de uitkomst is van de worker. De route kende bij
+            # het starten alleen `(0, 0)`.
+            if run_id:
+                toegevoegd, overgeslagen = self.laatste_merge
+                afsluiten(self.dir, run_id, toegevoegd=toegevoegd, overgeslagen=overgeslagen)
         except Exception as exc:  # surface elke pipeline-fout in de UI
             self._run.log.append(f"FOUT: {exc}")
             self._run.status = "error"
+            if run_id:
+                afsluiten(self.dir, run_id, fout=str(exc))
 
     def run_progress(self) -> dict[str, object]:
         """Voortgang van stap 2: done/total, verstreken tijd, ETA en (live) logregels."""

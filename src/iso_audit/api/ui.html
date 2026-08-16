@@ -86,6 +86,7 @@
 <h1>iso-audit — auditorportaal</h1>
 <nav>
   <a href="#/" id="nav-dash">Audits</a>
+  <a href="#/landschap" id="nav-landschap">Landschap</a>
   <a href="#/config" id="nav-config">Configuratie</a>
   <span class="spacer"></span>
   <span id="wie"></span>
@@ -108,6 +109,31 @@
   <div class="step">
     <h2>Audits</h2>
     <div id="dash-wrap"><p class="note">laden…</p></div>
+  </div>
+</section>
+
+<!-- ============ landschap ============ -->
+<section id="view-landschap" hidden>
+  <div class="step">
+    <h2>Documentenlandschap</h2>
+    <p class="note">Wat het tool heeft ingelezen. Eén voorraad voor alle audits — het
+      landschap is van de organisatie, een audit kijkt ernaar.</p>
+    <div id="ls-staat"><p class="note">laden…</p></div>
+    <div style="margin-top:.6rem">
+      <span id="ls-bronnen" class="mini"></span>
+      <button onclick="landschapInlezen()">Inlezen</button>
+      <span id="ls-msg" class="ok"></span>
+    </div>
+    <p class="mini">Inlezen raakt de classificatie niet: het legt vast wát er is, zonder
+      oordeel en zonder API-key.</p>
+  </div>
+  <div class="step">
+    <h2>Documenten</h2>
+    <p class="note">Controleer of dit klopt vóór je een audit draait.
+      <input id="ls-zoek" placeholder="zoeken in naam en inhoud" style="width:16rem"
+        onkeydown="if(event.key==='Enter')landschapDocumenten()">
+      <button class="alt" onclick="landschapDocumenten()">Zoeken</button></p>
+    <div id="ls-docs"><p class="note">laden…</p></div>
   </div>
 </section>
 
@@ -225,7 +251,7 @@ function uitloggen(){
 }
 
 function toon(id){
-  for(const v of ["view-dashboard","view-audit","view-config"]){
+  for(const v of ["view-dashboard","view-audit","view-landschap","view-config"]){
     document.getElementById(v).hidden = (v !== id);
   }
 }
@@ -233,6 +259,8 @@ async function route(){
   const h = location.hash || "#/";
   document.getElementById("nav-dash").setAttribute("aria-current", h === "#/" ? "page" : "false");
   document.getElementById("nav-config").setAttribute("aria-current", h === "#/config" ? "page" : "false");
+  document.getElementById("nav-landschap").setAttribute("aria-current",
+    h === "#/landschap" ? "page" : "false");
   if(h.startsWith("#/audit/")){
     AUDIT = decodeURIComponent(h.slice("#/audit/".length));
     toon("view-audit");
@@ -241,6 +269,7 @@ async function route(){
   }
   AUDIT = null;
   if(h === "#/config"){ toon("view-config"); await loadConfigView(); return; }
+  if(h === "#/landschap"){ toon("view-landschap"); await loadLandschap(); return; }
   toon("view-dashboard");
   await loadDashboard();
 }
@@ -413,7 +442,80 @@ async function postBron(naam, velden){
   return r.ok;
 }
 
+// --- landschap -------------------------------------------------------------
+// Eén voorraad documenten, los van welke audit dan ook. Het scherm bestaat om één vraag te
+// beantwoorden vóórdat er geauditeerd wordt: klopt dit, is dit wat we hebben gezien?
+
+async function loadLandschap(){
+  const [staat, opties] = await Promise.all([j("/landschap"), j("/config/options")]);
+  const wrap = document.getElementById("ls-staat");
+  const perBron = Object.entries(staat.per_bron || {});
+  wrap.innerHTML = staat.documenten
+    ? `<p><strong>${staat.documenten}</strong> document(en) ingelezen —
+        ${perBron.map(([b,n])=>`${esc(b)}: ${n}`).join(" · ")}
+        ${staat.laatste ? `<br><span class="mini">laatst bijgewerkt ${esc(staat.laatste)}</span>` : ""}</p>`
+    : `<p class="note">Nog niets ingelezen. Kies hieronder de bronnen en lees het landschap in.</p>`;
+
+  // Bronnen om in te lezen: dezelfde lijst als bij een run.
+  const health = await j("/config/health");
+  document.getElementById("ls-bronnen").innerHTML =
+    (opties.sources||[]).map(s => {
+      const off = !(health[s]||{}).connected;
+      return `<label class="${off?'src-off':''}" ${off?'title="niet gekoppeld — zie Configuratie"':''}>
+        <input type="checkbox" class="ls-src" value="${esc(s)}" ${off?'disabled':'checked'}> ${esc(s)}</label> `;
+    }).join("");
+
+  await landschapDocumenten();
+}
+
+async function landschapDocumenten(){
+  const zoek = document.getElementById("ls-zoek").value.trim();
+  const docs = await j(`/landschap/documenten?limiet=200&zoek=${encodeURIComponent(zoek)}`);
+  const wrap = document.getElementById("ls-docs");
+  if(!docs.length){
+    wrap.innerHTML = `<p class="note">${zoek ? "Niets gevonden voor deze zoekterm." :
+      "Nog geen documenten ingelezen."}</p>`;
+    return;
+  }
+  const rijen = docs.map(d => `<tr>
+      <td>${esc(d.naam)}</td>
+      <td>${esc(d.herkomst)}</td>
+      <td>${(d.clausules||[]).map(esc).join(", ") || '<span class="mini">geen koppeling</span>'}</td>
+      <td class="mini">${esc((d.gewijzigd||"").slice(0,10))}</td>
+    </tr>`).join("");
+  wrap.innerHTML = `<table><thead><tr>
+      <th>Document</th><th>Bron</th><th>Clausules</th><th>Gewijzigd</th>
+    </tr></thead><tbody>${rijen}</tbody></table>
+    <p class="note">${docs.length} getoond. Een document zonder clausule-koppeling wordt in
+     een run niet aan een norm getoetst — controleer of dat klopt.</p>`;
+}
+
+async function landschapInlezen(){
+  const bronnen = [...document.querySelectorAll(".ls-src:checked")].map(e=>e.value);
+  const msg = document.getElementById("ls-msg");
+  if(!bronnen.length){ msg.textContent = "⚠ kies minstens één bron"; return; }
+  msg.textContent = "bezig met inlezen… dit kan enkele minuten duren";
+  const r = await fetch("/landschap/ingest",
+    {method:"POST", headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({bronnen})});
+  if(!r.ok){
+    const d = await r.json().catch(()=>({detail:"onbekende fout"}));
+    msg.textContent = "⚠ " + (d.detail || r.status);
+    return;
+  }
+  const uit = await r.json();
+  const stuk = Object.entries(uit.mislukt || {});
+  msg.innerHTML = stuk.length
+    ? `<span class="badge-off">⚠ ${stuk.length} bron(nen) leverden niets</span> `
+      + stuk.map(([b,r])=>`${esc(b)}: ${esc(r)}`).join("; ")
+    : "✓ ingelezen";
+  await loadLandschap();
+}
+
 async function loadConfigView(){
+  // Een ontgrendeling geldt voor één handeling. Bij het herladen weer dicht, zodat
+  // overschrijven een bewuste keuze blijft en geen toestand die blijft hangen.
+  _overschrijf = new Set();
   await loadAnthropic();
   const [health, bronnen, herk] = await Promise.all([
     j("/config/health"), j("/config/bronnen"), j("/config/herkomst")]);
@@ -426,7 +528,7 @@ async function loadConfigView(){
       ? `<span class="badge-on">● gekoppeld</span>`
       : `<span class="badge-off">⚠ niet gekoppeld</span>`;
     const reden = h.connected ? "" : `<div class="mini">${esc(h.reden||"")}</div>`;
-    return `<div class="bronkaart">
+    return `<div class="bronkaart" id="kaart-${esc(b.naam)}">
       <div class="bronkop">
         <strong>${esc(b.label)}</strong> ${badge}
         <button class="alt" onclick="toonBronForm('${esc(b.naam)}')">Configureer</button>
@@ -446,17 +548,34 @@ async function loadConfigView(){
 // in dat stil geen effect heeft.
 const BRON_LABEL = {
   env: "uit de omgeving", yaml: "uit config.yaml", ui: "hier ingevuld",
+  "ui-override": "hier ingevuld, overschrijft de omgeving",
   default: "standaardwaarde", leeg: "",
 };
+// Door een beheerder gezet? Dan is het veld niet te overschrijven vanuit de UI. Een
+// badge alleen bleek te zwak: er is iemand in zo'n veld gaan typen, kreeg "opgeslagen",
+// en er veranderde niets. Daarom ook `readonly` op het veld en niet meesturen.
+function veldVast(env){
+  const h = _herkomst[env];
+  return !!h && (h.bron === "env" || h.bron === "yaml");
+}
+
 function bronBadge(env){
   const h = _herkomst[env];
   if(!h || !h.bron || h.bron === "leeg") return "";
-  const vast = (h.bron === "env" || h.bron === "yaml");
+  const vast = veldVast(env);
   const titel = vast
     ? "Door een beheerder gezet; een waarde die je hier invult wordt niet gebruikt."
     : "";
   return ` <span class="bronbadge${vast ? " vast" : ""}"${titel ? ` title="${esc(titel)}"` : ""}>`
     + `${esc(BRON_LABEL[h.bron] || h.bron)}</span>`;
+}
+
+async function terugNaarOmgeving(bron, veld){
+  await fetch(`/config/bronnen/${encodeURIComponent(bron)}`,
+    {method:"POST", headers:{"Content-Type":"application/json"},
+     body:JSON.stringify({velden:{[veld]: ""}})});
+  _overschrijf.delete(bron+"|"+veld);
+  await loadConfigView();
 }
 
 function toonBronForm(naam){
@@ -469,16 +588,54 @@ function toonBronForm(naam){
     const tip = v.hint ? ` data-tip="${esc(v.hint)}"` : "";
     const status = v.geheim && v.ingesteld ? ` <span class="ok">ingesteld</span>` : "";
     const bron = bronBadge(v.naam);
-    const ph = v.geheim && v.ingesteld ? "laat leeg om te behouden" : (v.verplicht ? "" : "optioneel");
+    const ph = v.geheim && v.ingesteld ? "laat leeg om te behouden"
+      : (v.verplicht ? "" : "optioneel");
+    // Elk veld is gewoon invulbaar. Wat een beheerder in de omgeving zette wint zolang je
+    // hier niets invult; vul je wél iets in, dan geldt dat en staat het in het
+    // wijzigingsspoor. Registratie is de controle, niet het moeilijk maken van
+    // configureren.
+    let onder = "";
+    if(v.overschreven){
+      onder = `<div class="mini">Vervangt de waarde uit de omgeving.
+        <button type="button" onclick="terugNaarOmgeving('${esc(naam)}','${esc(v.naam)}')"
+        >Terug naar de omgeving</button>
+        ${v.omgeving_gewijzigd ? `<br><strong>Let op:</strong> de omgeving heeft inmiddels
+          een andere waarde. Die wordt niet gebruikt zolang deze hier ingevuld staat.`
+        : ""}</div>`;
+    } else if(v.uit_omgeving){
+      onder = `<div class="mini">Komt nu uit de omgeving. Vul je hier iets in, dan geldt
+        dat en wordt het vastgelegd.</div>`;
+    }
     return `<label class="veld"${tip}>${esc(v.label)}${status}${bron}<br>
       <input id="v-${esc(naam)}-${esc(v.naam)}" style="width:100%"
         type="${v.geheim ? "password" : "text"}" placeholder="${esc(ph)}"
-        value="${esc(v.geheim ? "" : (v.waarde||""))}"></label>`;
+        value="${esc(v.geheim ? "" : (v.waarde||""))}"></label>${onder}`;
   }).join("") +
   `<div style="margin-top:.5rem">
-     <button onclick="bewaarBron('${esc(naam)}')">Opslaan</button>
+     <button onclick="bewaarBron('${esc(naam)}')">Opslaan en testen</button>
+     <button type="button" onclick="testBron('${esc(naam)}')">Testen</button>
      <span id="bs-${esc(naam)}" class="ok"></span>
-   </div>`;
+   </div>
+   <div id="bt-${esc(naam)}" class="mini"></div>`;
+}
+
+// Meteen zeggen of het werkt. Zonder deze terugkoppeling vul je een token in, krijg je
+// "opgeslagen", en moet je zelf ergens anders gaan kijken of de koppeling het doet.
+async function testBron(naam){
+  const uit = document.getElementById("bt-"+naam);
+  uit.innerHTML = "bezig met testen…";
+  try {
+    const h = await j(`/config/health/${encodeURIComponent(naam)}`);
+    uit.innerHTML = h.connected
+      ? `<span class="ok">● gekoppeld</span>`
+        + (h.user ? ` — account: ${esc(h.user)}` : "")
+        + (h.tenant ? ` (${esc(h.tenant)})` : "")
+        + (h.aantal_tabs !== undefined ? ` — ${h.aantal_tabs} tabs gelezen` : "")
+        + (h.folders ? ` — ${(h.folders||[]).length} map(pen)` : "")
+      : `<span class="badge-off">⚠ niet gekoppeld</span> ${esc(h.reden||"")}`;
+  } catch(e){
+    uit.innerHTML = `<span class="badge-off">⚠ testen mislukte</span> ${esc(String(e))}`;
+  }
 }
 
 async function bewaarBron(naam){
@@ -501,7 +658,12 @@ async function bewaarBron(naam){
     return;
   }
   msg.textContent = "✓ opgeslagen";
+  // Eerst de kaarten verversen (badges, herkomst), dan het formulier weer openen en
+  // meteen testen. Zonder dat laatste sluit het scherm en weet je nog steeds niet of de
+  // koppeling werkt — dat is precies de terugkoppeling die hier ontbrak.
   await loadConfigView();
+  toonBronForm(naam);
+  await testBron(naam);
 }
 
 // ============ audit-detail ============
@@ -528,7 +690,26 @@ async function openAudit(){
     document.getElementById(id).innerHTML = "";
   }
   document.getElementById("run-out").hidden = true;
-  await Promise.all([loadRuns(), loadFindings(""), refreshGate()]);
+  // Ook de bronselectie laden. Zonder deze aanroep is #config-form leeg tot iemand op
+  // "Opnieuw testen" klikt, en stuurt selectedConfig() `sources: []` mee — een run die
+  // niets leest terwijl de auditor bronnen dénkt te hebben gekozen.
+  await Promise.all([loadRuns(), loadFindings(""), refreshGate(), loadConfig()]);
+}
+
+// Drie statussen, niet twee. Een lopende run toonde eerder "+0 nieuw" — dat was de
+// leugen: het record werd geschreven vóórdat de run iets had gelezen.
+function runResultaat(r){
+  if(r.status === "fout")
+    return `<span class="badge-off">⚠ fout</span><br><span class="mini">${esc(r.fout||"")}</span>`;
+  if(r.status === "loopt")
+    return `<span class="mini">⏳ loopt nog…</span>`;
+  // Een ingest-run levert geen bevindingen — die ontstaan pas bij de classificatie.
+  // "+0 nieuw" leest daar als "er is niets gevonden", terwijl er honderden documenten
+  // zijn vastgelegd.
+  if(r.modus === "ingest")
+    return `<span class="mini">bronnen ingelezen en vastgelegd — nog niet geclassificeerd</span>`;
+  return `+${r.toegevoegd||0} nieuw`
+    + ((r.overgeslagen||0) ? `, ${r.overgeslagen} al bekend` : "");
 }
 
 async function loadRuns(){
@@ -541,9 +722,7 @@ async function loadRuns(){
       <td>${esc(r.door)}</td>
       <td>${esc(r.modus)} · ${esc(r.norm)}${r.hoofdstuk ? " · §"+esc(r.hoofdstuk) : ""}</td>
       <td>${(r.bronnen||[]).map(esc).join(", ") || "—"}</td>
-      <td>${r.status === "fout"
-            ? `<span class="badge-off">⚠ fout</span><br><span class="mini">${esc(r.fout||"")}</span>`
-            : `+${r.toegevoegd} nieuw${r.overgeslagen ? `, ${r.overgeslagen} al bekend` : ""}`}</td>
+      <td>${runResultaat(r)}</td>
     </tr>`).join("");
   wrap.innerHTML = `<table><thead><tr>
       <th>Run</th><th>Door</th><th>Modus</th><th>Bronnen</th><th>Resultaat</th>

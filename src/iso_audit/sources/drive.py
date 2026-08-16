@@ -1,4 +1,4 @@
-"""Drive-source-adapter — Google Drive documenten lezen via `gws` CLI.
+"""Drive-source-adapter — Google Drive documenten lezen via het org-service-account.
 
 Implementeert het `Source` Protocol. Zoekt in de geconfigureerde Drive-map
 (`AUDIT_SOURCE_FOLDER_ID` of `AUDIT_DRIVE_FOLDER_ID`) naar procedures,
@@ -20,11 +20,14 @@ from typing import Any
 
 import docx
 
-from iso_audit.clients.gws import (
-    gws_download_bestand,
-    gws_exporteer_google_doc,
-    gws_lijst_bestanden,
+from iso_audit.clients.google_drive import (
+    drive_bereikbaar,
+    drive_download_bestand,
+    drive_exporteer_google_doc,
+    drive_lijst_bestanden,
 )
+from iso_audit.config.google_ids import uit_url
+from iso_audit.config.verbinding import normaliseer
 from iso_audit.sources import register
 from iso_audit.sources.base import Document, Finding
 
@@ -60,8 +63,13 @@ FOLDER_ENV_VARS: tuple[str, ...] = ("AUDIT_SOURCE_FOLDER_ID", "AUDIT_DRIVE_FOLDE
 
 
 def _split_ids(raw: str) -> list[str]:
-    """Splits een komma-gescheiden string in losse, gestripte folder-ids."""
-    return [v.split("?")[0].strip() for v in raw.split(",") if v.strip()]
+    """Splits een komma-gescheiden string in losse folder-ids.
+
+    Een geplakte Drive-URL wordt naar het ID herleid: dat is wat mensen uit de adresbalk
+    kopiëren, en de API antwoordt op een URL met een 404 die in de UI verschijnt als "niet
+    gedeeld met dit account" — een melding die naar het verkeerde probleem wijst.
+    """
+    return [uit_url(v) for v in raw.split(",") if v.strip()]
 
 
 def _resolve_folder_ids(expliciet: str | list[str] | None = None) -> list[str]:
@@ -107,8 +115,8 @@ def _is_uitgesloten(naam: str) -> bool:
 def _fetch_tekst(file_id: str, mime: str) -> str:
     """Haal de tekst-inhoud op voor een Drive-bestand op basis van MIME."""
     if mime == "application/vnd.google-apps.document":
-        return gws_exporteer_google_doc(file_id)
-    inhoud = gws_download_bestand(file_id)
+        return drive_exporteer_google_doc(file_id)
+    inhoud = drive_download_bestand(file_id)
     if mime == ("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
         doc = docx.Document(io.BytesIO(inhoud))
         return "\n".join(p.text for p in doc.paragraphs)
@@ -117,7 +125,7 @@ def _fetch_tekst(file_id: str, mime: str) -> str:
 
 @register
 class DriveSource:
-    """Google Drive `Source`-adapter via `gws` CLI."""
+    """Google Drive `Source`-adapter via het org-service-account (`auth.py`)."""
 
     naam = "drive"
 
@@ -161,7 +169,7 @@ class DriveSource:
         )
         gezien: set[str] = set()
         for fid in self._folder_ids:
-            for bestand in gws_lijst_bestanden(fid, drive_id=self._drive_id_voor[fid]):
+            for bestand in drive_lijst_bestanden(fid, drive_id=self._drive_id_voor[fid]):
                 file_id = bestand["id"]
                 if file_id in gezien:
                     continue
@@ -209,13 +217,18 @@ class DriveSource:
         Eén bounded `files list` per folder (pageSize=1, niet-recursief) — bewijst
         auth + bereikbaarheid in een fractie van de tijd van ``healthcheck()``.
         """
-        from iso_audit.clients.gws import gws_drive_bereikbaar
-
         for fid in self._folder_ids:
             try:
-                gws_drive_bereikbaar(fid, drive_id=self._drive_id_voor[fid])
+                drive_bereikbaar(fid, drive_id=self._drive_id_voor[fid])
             except Exception as e:
-                return {"status": "fail", "naam": self.naam, "tenant": fid, "reden": str(e)[:200]}
+                soort, tekst = normaliseer(e, bron=self.naam)
+                return {
+                    "status": "fail",
+                    "naam": self.naam,
+                    "tenant": fid,
+                    "soort": soort,
+                    "reden": tekst,
+                }
         return {"status": "ok", "naam": self.naam, "folders": list(self._folder_ids)}
 
     def healthcheck(self) -> dict[str, object]:
@@ -223,13 +236,15 @@ class DriveSource:
         per_folder: dict[str, int] = {}
         for fid in self._folder_ids:
             try:
-                bestanden = gws_lijst_bestanden(fid, drive_id=self._drive_id_voor[fid])
+                bestanden = drive_lijst_bestanden(fid, drive_id=self._drive_id_voor[fid])
             except Exception as e:
+                soort, tekst = normaliseer(e, bron=self.naam)
                 return {
                     "status": "fail",
                     "naam": self.naam,
                     "tenant": fid,
-                    "reden": f"gws-fout op {fid}: {e}",
+                    "soort": soort,
+                    "reden": tekst,
                 }
             per_folder[fid] = len(bestanden)
         return {
@@ -315,7 +330,7 @@ def haal_documenten_op(
     gezien_ids: set[str] = set()
     for fid in resolved_ids:
         drive_id = fid if fid.startswith("0A") else None
-        bestanden = gws_lijst_bestanden(fid, drive_id=drive_id)
+        bestanden = drive_lijst_bestanden(fid, drive_id=drive_id)
         for b in bestanden:
             if b["id"] in gezien_ids:
                 continue
@@ -331,7 +346,9 @@ def haal_documenten_op(
     if not alle_bestanden:
         raise RuntimeError(
             f"Geen bestanden gevonden in Drive-locaties {resolved_ids}. "
-            "Controleer de map-IDs en gws-authenticatie (`gws auth login`)."
+            "Controleer de map-IDs, en of de map gedeeld is met het service-account "
+            "(het `client_email` uit het keyfile). Bij een Shared Drive (`0A...`-ID) is "
+            "delen op mapniveau niet genoeg: het account moet lid van de Shared Drive zijn."
         )
     logger.info("Totaal uniek gevonden: %d bestanden", len(alle_bestanden))
 

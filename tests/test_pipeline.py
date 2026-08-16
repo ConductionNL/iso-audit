@@ -213,23 +213,32 @@ def _jira_doc() -> dict[str, Any]:
     }
 
 
-def test_run_audit_jira_zonder_drive_skipt_drive() -> None:
-    """sources=['jira'] → Drive/Miro overgeslagen, Jira via protocol-ingest."""
+def test_run_audit_jira_levert_opvolgpunten_geen_documenten() -> None:
+    """Jira gaat niet door de documentingest.
+
+    Deze test verwachtte eerder `ingest_documenten("jira")`. Dat pad classificeerde elk
+    ticket tegen elke clausule en leverde bevindingen als "dit ticket bewijst §4.1 niet" —
+    ruis plus LLM-kosten per ticket. Een Jira-issue met een ISO-label is een openstaande
+    verbeteractie, geen bewijsmateriaal; die gaat nu buiten de classificatie om.
+    """
     from unittest.mock import MagicMock
 
     drive = MagicMock(return_value=([], []))
-    jira = MagicMock(return_value=[_jira_doc()])
+    docs = MagicMock(return_value=[_jira_doc()])
+    punten = MagicMock(return_value=[])
     with (
         patch("iso_audit.sources.drive.haal_documenten_op", drive),
-        patch("iso_audit.sources.protocol_ingest.ingest_documenten", jira),
+        patch("iso_audit.sources.protocol_ingest.ingest_documenten", docs),
+        patch("iso_audit.sources.opvolgpunten.haal_op", punten),
         patch("iso_audit.miro.ingest.haal_notities_op") as miro,
         patch("iso_audit.classification.findings.schat_kosten", return_value={}),
     ):
-        # dry_run_cost stopt vóór LLM-classificatie en rapportage.
         pipeline.run_audit("9001", dry_run_cost=True, sources=["jira"])
     drive.assert_not_called()
-    jira.assert_called_once_with("jira")
     miro.assert_not_called()
+    docs.assert_not_called(), "Jira hoort niet als documentbron te worden ingelezen"
+    assert punten.call_count == 1
+    assert punten.call_args.args[0] == "jira"
 
 
 def test_run_audit_default_bronnen_drive_en_miro() -> None:

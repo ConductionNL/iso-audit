@@ -32,11 +32,11 @@ from iso_audit.api.registry import AuditRegistry, RegistryError
 from iso_audit.api.routes_audit import maak_router as router_audit
 from iso_audit.api.routes_memo import maak_router as router_memo
 from iso_audit.api.routes_triage import maak_router as router_triage
-from iso_audit.api.session import bron_health
+from iso_audit.api.session import SessionError, bron_health, valideer_bronselectie
 from iso_audit.classification.findings import KIESBARE_MODELLEN, PRIJZEN_PEILDATUM
 from iso_audit.config import anthropic_auth as aa
 from iso_audit.config import herkomst as hk
-from iso_audit.config.settings import Settings, load_config
+from iso_audit.config.settings import VELDEN, Settings, load_config
 from iso_audit.memo.norm_lookup import laad_norm_db
 
 AUDITS_ROOT_ENV = "ISO_AUDIT_AUDITS_ROOT"
@@ -57,6 +57,12 @@ class LoginCode(BaseModel):
 
     sessie: str
     code: str
+
+
+class LandschapVerzoek(BaseModel):
+    """Welke bronnen ingelezen worden voor het documentenlandschap."""
+
+    bronnen: list[str] = []
 
 
 class BronVelden(BaseModel):
@@ -104,17 +110,40 @@ def create_app(
     app = FastAPI(title="iso-audit — auditorportaal", version="0.2.0")
     installeer_auth_gate(app)
 
+    # Wat een beheerder van buiten meegaf, vastgelegd vóórdat er iets naar `os.environ`
+    # is geschreven. Zonder deze momentopname is "komt deze waarde uit de omgeving?"
+    # zelfreferentieel — zie `BronConfig.basis` en `load_config(omgeving=...)`.
+    basis_omgeving = dict(os.environ)
+
     # Bron-configuratie naast de audits op de PVC, en meteen in de omgeving zodat de
-    # adapters hem zien. Waarden uit het manifest of een Secret blijven voorgaan.
-    bronnen = BronConfig(registry.root.parent)
+    # adapters hem zien. Waarden uit het manifest of een Secret blijven voorgaan, tenzij
+    # een auditor expliciet voor overschrijven heeft gekozen.
+    bronnen = BronConfig(registry.root.parent, omgeving=basis_omgeving)
 
     # Eén loader bepaalt welke waarde wint (env > config.yaml > UI) en levert per veld
     # de herkomst mee. Alles wat configuratie nodig heeft, komt hierlangs — niet
     # rechtstreeks bij os.environ, want dan is de herkomst weg.
     def _laad_settings() -> Settings:
-        s = load_config(root=registry.root.parent, ui_waarden=bronnen.ui_waarden())
+        s = load_config(
+            root=registry.root.parent,
+            ui_waarden=bronnen.ui_waarden(),
+            omgeving=basis_omgeving,
+            overschrijvingen=set(bronnen.overschrijvingen()),
+        )
         s.naar_omgeving()
         return s
+
+    def _vastgezette_velden() -> frozenset[str]:
+        """Env-namen die een beheerder heeft gezet en die niet zijn overschreven.
+
+        Alleen `env` en `yaml` tellen. `default` niet: dat is een ingebouwde waarde die
+        een auditor juist wél mag vervangen. `ui-override` ook niet — daar heeft iemand de
+        beheerderswaarde al bewust opzij gezet.
+        """
+        huidig = _laad_settings()
+        return frozenset(
+            veld.env for veld in VELDEN if huidig[veld.sleutel].bron in ("env", "yaml")
+        )
 
     settings = _laad_settings()
     hk.log_herkomst(settings)
@@ -202,7 +231,18 @@ def create_app(
 
     @app.post("/config/bronnen/{bron}")
     def config_bron_zetten(bron: str, body: BronVelden, request: Request) -> dict[str, object]:
-        """Koppel een bron of pas zijn scope aan — zonder cluster, zonder beheerder."""
+        """Koppel een bron of pas zijn scope aan — zonder cluster, zonder beheerder.
+
+        Een ingevulde waarde geldt, ook als er een beheerderswaarde in de omgeving staat.
+        Dat is nodig om een geroteerde of ingetrokken credential te kunnen vervangen; kan
+        dat niet, dan is de auditcapability weer gebonden aan iemand met clustertoegang.
+
+        Er zit geen extra bevestigingsstap omheen. Die heeft hier even gestaan en was
+        fout: hij loste een probleem op dat toen al verholpen was (een save die slaagde en
+        genegeerd werd), en maakte configureren moeilijker in plaats van beter
+        registreerbaar. De controle is dat het vastligt — herkomst `ui-override`, plus een
+        regel in het append-only spoor — niet dat het gedoe is.
+        """
         loopt = _run_loopt()
         if loopt:
             raise HTTPException(
@@ -213,11 +253,18 @@ def create_app(
                 ),
             )
         wie = identiteit_van(request)
+        vast = _vastgezette_velden()
+        vervangt = sorted(n for n, w in body.velden.items() if n in vast and w.strip())
         try:
             bronnen.zet(bron, body.velden, door=wie)
         except ConfigError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        log_event("bron_geconfigureerd", wie, bron=bron, velden=",".join(sorted(body.velden)))
+        log_event(
+            "bron_overschreven" if vervangt else "bron_geconfigureerd",
+            wie,
+            bron=bron,
+            velden=",".join(sorted(body.velden)),
+        )
         # De herkomst is nu veranderd: leg de nieuwe situatie vast, zodat de trail en
         # /config/herkomst niet uiteenlopen met wat de adapters straks lezen.
         hk.log_herkomst(_laad_settings())
@@ -302,9 +349,83 @@ def create_app(
         """
         return bron_health()
 
+    @app.get("/landschap")
+    def landschap_staat() -> dict[str, object]:
+        """Wat er is ingelezen: hoeveel documenten, per bron, en wanneer voor het laatst.
+
+        Bewust buiten elke audit: de voorraad is van de organisatie en wordt door alle
+        audits gebruikt. De opslag was al gedeeld; alleen de handeling hing er nog onder.
+        """
+        from iso_audit.api import landschap
+
+        return landschap.staat()
+
+    @app.get("/landschap/documenten")
+    def landschap_documenten(
+        zoek: str = "", bron: str = "", limiet: int = 200
+    ) -> list[dict[str, object]]:
+        """De ingelezen documenten met hun clausule-koppelingen, doorzoekbaar.
+
+        Dit is waarop een auditor controleert óf het landschap klopt: welke bestanden zijn
+        gezien, waar komen ze vandaan, aan welke clausules zitten ze. Zonder dat scherm is
+        een run een black box.
+        """
+        from iso_audit.api import landschap
+
+        return landschap.documenten(zoek=zoek, bron=bron, limiet=limiet)
+
+    @app.post("/landschap/ingest")
+    def landschap_inlezen(
+        request: Request, body: LandschapVerzoek | None = None
+    ) -> dict[str, object]:
+        """Lees de gekozen bronnen in en leg vast wat er gelezen is.
+
+        Raakt de classificatie-API niet, dus dit werkt zonder Anthropic-key en is de manier
+        om de keten naar de bronnen te verifiëren los van het oordeel.
+
+        Synchroon: dit kan minuten duren, maar het is een expliciete handeling waarvan de
+        auditor de uitkomst wil zien. Een achtergrondtaak zou hier een tweede
+        voortgangs-administratie vragen naast die van de runs.
+        """
+        from iso_audit.api import landschap
+
+        r = body or LandschapVerzoek()
+        wie = identiteit_van(request)
+        try:
+            valideer_bronselectie(r.bronnen, streng=True)
+        except SessionError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        log_event("landschap_ingest", wie, bronnen=",".join(r.bronnen))
+        uit = landschap.lees_in(r.bronnen)
+        return uit
+
+    @app.get("/config/health/{bron}")
+    def config_health_bron(bron: str) -> dict[str, object]:
+        """Koppelstatus van één bron — de "Testen"-knop naast het formulier.
+
+        Apart van `/config/health` omdat dat álle bronnen langsgaat: wie een Jira-token
+        invult wil niet wachten op een Drive-listing, en wil ook niet zelf ergens anders
+        gaan kijken of het gelukt is.
+        """
+        from iso_audit.api.session import _check_source
+        from iso_audit.ingest import beschikbare_bronnen
+
+        if bron not in beschikbare_bronnen():
+            raise HTTPException(status_code=404, detail=f"Onbekende bron: {bron}")
+        return _check_source(bron)
+
     @app.get("/", response_class=HTMLResponse)
-    def index() -> str:
-        return _UI_HTML
+    def index() -> HTMLResponse:
+        """Het portaal is één HTML-bestand, zonder buildstap en dus zonder versie in de URL.
+
+        Daarom expliciet `no-store`: zonder cache-header stuurde deze route een kale 200 en
+        cachet een browser hem heuristisch. Na een uitrol zit een auditor dan op een oud
+        scherm zonder het te weten — precies het soort stille afwijking dat dit tool juist
+        hoort te voorkomen. Het bestand is klein en wordt uit het geheugen geserveerd, dus
+        opnieuw ophalen kost niets.
+        """
+        return HTMLResponse(_UI_HTML, headers={"Cache-Control": "no-store"})
 
     # Drie routers op hetzelfde prefix, gescheiden per onderwerp zodat geen enkel
     # route-bestand over de 200-regelgrens gaat.

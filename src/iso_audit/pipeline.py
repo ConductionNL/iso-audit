@@ -271,6 +271,88 @@ def run_setup_template() -> None:
         logger.info("Template klaar. Voeg toe aan .env: AUDIT_TEMPLATE_DOC_ID=%s", doc_id)
 
 
+def _bewaar_opvolgpunten(punten: list[dict[str, Any]], norm: str) -> None:
+    """Schrijf openstaande punten weg als bevindingen, zonder classificatie.
+
+    Hergebruikt de `bevindingen`-tabel en dus het bestaande pad naar triage en memo — één
+    administratie, geen tweede tabel voor iets dat in de kern hetzelfde is: een punt dat de
+    auditor moet wegen.
+    """
+    if not punten:
+        return
+    from iso_audit.classification.findings import _upsert_bevindingen
+    from iso_audit.store import initialiseer, verbinding
+
+    conn = verbinding()
+    try:
+        initialiseer(conn)
+        _upsert_bevindingen(conn, punten, norm)
+    finally:
+        conn.close()
+
+
+def _veilige_reden(exc: Exception, bron: str) -> str:
+    """Genormaliseerde reden voor een mislukte bron-ingest.
+
+    De ruwe melding kan een URL met credential of een responsbody bevatten; die hoort in
+    het serverlog en niet in een run-record dat de browser toont.
+    """
+    from iso_audit.config.verbinding import normaliseer
+
+    _, tekst = normaliseer(exc, bron=bron)
+    return tekst
+
+
+class BronIngestError(RuntimeError):
+    """Eén of meer gekozen bronnen leverden niets door een fout.
+
+    Wordt door `run_audit` gegooid nadat de rest van de ingest is vastgelegd, zodat de
+    documenten die wél gelezen zijn bewaard blijven én de run niet ten onrechte `klaar`
+    meldt. `bronnen` is per bron de genormaliseerde reden.
+    """
+
+    def __init__(self, bronnen: dict[str, str]) -> None:
+        self.bronnen = bronnen
+        deel = "; ".join(f"{n}: {r}" for n, r in sorted(bronnen.items()))
+        super().__init__(f"Bron(nen) leverden niets: {deel}")
+
+
+def _bewaar_ingest(documenten: list[dict[str, Any]], norm: str, bronnen: list[str]) -> None:
+    """Leg de ingelezen documenten en hun clausule-koppelingen vast in de audit-DB.
+
+    Idempotent (`upsert`), zodat een tweede run niets dupliceert. Fouten worden gelogd en
+    niet doorgegooid: het vastleggen mag een run niet laten sneuvelen, en de documenten
+    zitten op dat moment al in het geheugen van de lopende run.
+    """
+    from iso_audit.store import (
+        initialiseer,
+        log_ingest,
+        upsert_clause_match,
+        upsert_document,
+        verbinding,
+    )
+
+    if not documenten:
+        return
+    try:
+        conn = verbinding()
+        initialiseer(conn)
+        for doc in documenten:
+            herkomst = doc.get("herkomst", "Drive")
+            upsert_document(conn, doc)
+            for clausule_id in doc.get("clausules", []):
+                upsert_clause_match(conn, doc["id"], herkomst, clausule_id, norm)
+            for clausule_id, sub_punt_id in doc.get("sub_punt_matches", []):
+                upsert_clause_match(conn, doc["id"], herkomst, clausule_id, norm, sub_punt_id)
+        conn.commit()
+        log_ingest(conn, ",".join(bronnen), None, len(documenten))
+        conn.commit()
+        conn.close()
+        logger.info("%d document(en) vastgelegd in de audit-DB", len(documenten))
+    except Exception as exc:  # vastleggen mag de run niet breken
+        logger.warning("Documenten vastleggen mislukt (run gaat door): %s", exc)
+
+
 def run_audit(
     norm: str,
     no_review: bool = False,
@@ -283,8 +365,14 @@ def run_audit(
     mode: Mode | None = None,
     audit_id: str | None = None,
     sources: list[str] | None = None,
+    alleen_ingest: bool = False,
 ) -> None:
     """Volledige auditpipeline uitvoeren.
+
+    :param alleen_ingest: Stop na stap 4 (inlezen + clausule-koppeling + vastleggen).
+        Raakt de Claude-API niet en werkt dus zonder API-key. Bedoeld om de keten naar de
+        bronnen te kunnen verifiëren los van de classificatie, en om een dure Drive-lezing
+        niet te verspillen wanneer de classificatie nog niet kan draaien.
 
     :param mode: Actieve :class:`iso_audit.modes.base.Mode`-instantie.
         Bij `None` (legacy pad) wordt elk Decision-voorstel direct
@@ -329,6 +417,7 @@ def run_audit(
     from iso_audit.reporting.slide_summary import genereer_slides
     from iso_audit.reporting.tabular_report import schrijf_csv, schrijf_excel
     from iso_audit.sources.drive import haal_documenten_op
+    from iso_audit.sources.opvolgpunten import haal_op, levert_opvolgpunten
     from iso_audit.sources.protocol_ingest import ingest_documenten
 
     logger.info(
@@ -362,6 +451,7 @@ def run_audit(
     )
     documenten: list[dict[str, Any]] = []
     handmatige_review: list[dict[str, Any]] = []
+    mislukt: dict[str, str] = {}
     if "drive" in actieve_bronnen:
         documenten, handmatige_review = haal_documenten_op()
         if handmatige_review:
@@ -376,10 +466,21 @@ def run_audit(
     for bron in actieve_bronnen:
         if bron in ("drive", "miro"):
             continue
+        if levert_opvolgpunten(bron):
+            # Deze bron levert openstaande punten, geen bewijsmateriaal. Ze gaan buiten
+            # de classificatie om rechtstreeks naar de bevindingen — zie stap 5.
+            continue
         try:
             extra = ingest_documenten(bron)
             documenten.extend(extra)
+            logger.info("Bron %s: %d document(en) ingelezen", bron, len(extra))
         except Exception as e:
+            # Doorgaan is juist — één kapotte bron mag een audit niet stilleggen — maar
+            # het mag niet stil. Dit stond alleen in het serverlog, waardoor een run
+            # `klaar` meldde terwijl een gekozen bron nul documenten leverde. De auditor
+            # concludeert dan dat er niets te vinden was.
+            _norm = _veilige_reden(e, bron)
+            mislukt[bron] = _norm
             logger.warning("Bron %s overgeslagen (ingest-fout, niet kritiek): %s", bron, e)
 
     logger.info("Stap 3/7: Miro-notities inlezen...")
@@ -405,6 +506,48 @@ def run_audit(
         len(gekoppeld),
         len(gearchiveerd),
     )
+
+    # Wat er gelezen is, wordt bewaard — vóór de classificatie en los daarvan.
+    #
+    # Dit ontbrak: `run_audit` hield alles in het geheugen en schreef pas na stap 5 iets
+    # weg. Een run die op de classificatie strandde (bv. een ontbrekende API-key) gooide
+    # daarmee een Drive-lezing van tweeënhalve minuut en 149 documenten volledig weg. De
+    # losse `ingest.ingest_drive()` deed dit al wél; die twee paden liepen uit elkaar.
+    #
+    # Los daarvan is het ook wat een auditwerktuig hoort te doen: je hebt bewijs
+    # ingezien, dus leg vast wát je hebt ingezien. En het maakt hergebruik mogelijk —
+    # zonder opgeslagen documenten valt er niets te cachen.
+    _bewaar_ingest(gekoppeld_alle + niet_geclassificeerd, norm, actieve_bronnen)
+
+    # Openstaande punten gaan buiten de classificatie om: ze zijn al beoordeeld door
+    # degene die ze aanmaakte. Daarom ook in alleen-ingest — geen API-key nodig.
+    aantal_punten = 0
+    for bron in actieve_bronnen:
+        if not levert_opvolgpunten(bron):
+            continue
+        try:
+            punten = haal_op(bron, audit_id)
+            _bewaar_opvolgpunten(punten, norm)
+            aantal_punten += len(punten)
+        except Exception as e:
+            mislukt[bron] = _veilige_reden(e, bron)
+            logger.warning("Opvolgpunten uit %s overgeslagen: %s", bron, e)
+
+    if alleen_ingest:
+        logger.info(
+            "Alleen-ingest: %d document(en) en %d openstaand(e) punt(en) vastgelegd, "
+            "geen classificatie. Dit pad raakt de Claude-API niet.",
+            len(gekoppeld_alle) + len(niet_geclassificeerd),
+            aantal_punten,
+        )
+        # Ná het vastleggen: wat gelezen is blijft bewaard, maar de run meldt niet
+        # `klaar` als een gekozen bron niets opleverde.
+        if mislukt:
+            raise BronIngestError(mislukt)
+        return
+
+    if mislukt:
+        raise BronIngestError(mislukt)
 
     ontbrekend = ontbrekende_dekking(gekoppeld, miro_notities, clause_map)
 

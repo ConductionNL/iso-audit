@@ -179,12 +179,69 @@ def test_mislukte_run_blijft_zichtbaar(tmp_path: Path) -> None:
     assert "JIRA_API_TOKEN" in rec["fout"]
 
 
+def test_nieuwe_audit_is_zelfstandig_compleet(tmp_path: Path) -> None:
+    """Een audit moet vanaf het aanmaken een live run kunnen afronden.
+
+    Gemeten op 2026-08-16: `memo-input.yaml` ontbrak, waardoor een run die alle zeven
+    pipelinestappen én alle rapporten met succes had afgerond, alsnog als `fout` in de
+    trail belandde — met `0 toegevoegd`, terwijl er 87 bevindingen waren geland.
+    """
+    import yaml
+
+    from iso_audit.api.registry import FINDINGS, MANIFEST, MEMO_INPUT
+    from iso_audit.memo.models import MemoInput
+
+    r = AuditRegistry(tmp_path)
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
+
+    for bestand in (MANIFEST, FINDINGS, MEMO_INPUT):
+        assert (d / bestand).is_file(), f"{bestand} ontbreekt in een verse audit"
+
+    # En geldig volgens het model, niet alleen aanwezig: een kapotte steiger faalt pas
+    # bij het renderen, en dat is te laat.
+    MemoInput(**yaml.safe_load((d / MEMO_INPUT).read_text(encoding="utf-8")))
+
+
+def test_memo_input_neemt_de_scope_van_de_audit_over(tmp_path: Path) -> None:
+    import yaml
+
+    from iso_audit.api.registry import MEMO_INPUT
+
+    r = AuditRegistry(tmp_path)
+    d = r.pad(r.maak(normen=["9001", "27001"], periode="2026-H2", door="a@c.nl"))
+    data = yaml.safe_load((d / MEMO_INPUT).read_text(encoding="utf-8"))
+
+    assert data["cycle"] == "2026-H2"
+    assert set(data["context"]["scope"]) == {"ISO 9001:2015", "ISO 27001:2022"}
+
+
 def test_geraadpleegde_bronnen_over_runs_heen(tmp_path: Path) -> None:
     r = AuditRegistry(tmp_path)
     d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
-    runs_mod.registreer(d, door="a@c.nl", modus="sim", norm="9001", bronnen=["drive"])
-    runs_mod.registreer(d, door="a@c.nl", modus="sim", norm="9001", bronnen=["jira", "drive"])
+    # Een run heeft twee records: een start (`loopt`) en een afsluiting. Alleen afgeronde
+    # runs tellen mee — een run die faalde heeft niets geraadpleegd.
+    een = runs_mod.registreer(d, door="a@c.nl", modus="sim", norm="9001", bronnen=["drive"])
+    runs_mod.afsluiten(d, str(een["run_id"]))
+    twee = runs_mod.registreer(
+        d, door="a@c.nl", modus="sim", norm="9001", bronnen=["jira", "drive"]
+    )
+    runs_mod.afsluiten(d, str(twee["run_id"]))
     assert runs_mod.geraadpleegde_bronnen(d) == ["drive", "jira"]
+
+
+def test_een_lopende_of_mislukte_run_telt_niet_als_geraadpleegd(tmp_path: Path) -> None:
+    """De kolom "Bronnen" is een bewijsuitspraak, geen intentie."""
+    r = AuditRegistry(tmp_path)
+    d = r.pad(r.maak(normen=["9001"], periode="2026-Q3", door="a@conduction.nl"))
+
+    runs_mod.registreer(d, door="a@c.nl", modus="live", norm="9001", bronnen=["drive"])
+    assert runs_mod.geraadpleegde_bronnen(d) == [], "lopende run telt nog niet mee"
+
+    mislukt = runs_mod.registreer(d, door="a@c.nl", modus="live", norm="9001", bronnen=["jira"])
+    runs_mod.afsluiten(d, str(mislukt["run_id"]), fout="credential geweigerd")
+    assert runs_mod.geraadpleegde_bronnen(d) == [], "mislukte run heeft niets gelezen"
+
+    assert runs_mod.som(d) == 2, "twee runs, ook al zijn er drie records"
 
 
 # --- gelijktijdigheid ----------------------------------------------------

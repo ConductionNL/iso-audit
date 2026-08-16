@@ -129,11 +129,20 @@ def run_live_pipeline(
     sources: list[str],
     chapter: str | None,
     on_log: Callable[[str], None],
+    alleen_ingest: bool = False,
 ) -> None:
-    """Draai de echte audit-pipeline met opgevangen voortgang (geen review-prompt)."""
+    """Draai de echte audit-pipeline met opgevangen voortgang (geen review-prompt).
+
+    `alleen_ingest` stopt na het inlezen en vastleggen; die modus raakt de Claude-API niet.
+    """
     from iso_audit import pipeline
     from iso_audit.modes.autonoom import AutonoomMode
     from iso_audit.store import initialiseer, verbinding
+
+    if not sources:
+        # Laatste gate vóór de pipeline. Hier stond `sources or ["drive"]`, waardoor een
+        # lege selectie stil een drive-run werd — ook als Drive niet gekoppeld was.
+        raise ValueError("Geen bronnen opgegeven; een run zonder bron leest niets.")
 
     handler = _ProgressHandler(on_log)
     pijplijn_logger = logging.getLogger("iso_audit")
@@ -150,7 +159,8 @@ def run_live_pipeline(
             no_review=True,
             chapter=chapter,
             mode=AutonoomMode(conn=conn),
-            sources=sources or ["drive"],
+            sources=sources,
+            alleen_ingest=alleen_ingest,
         )
     finally:
         pijplijn_logger.removeHandler(handler)

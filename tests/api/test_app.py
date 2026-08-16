@@ -315,7 +315,13 @@ def test_check_source_prefers_probe(monkeypatch: pytest.MonkeyPatch) -> None:
     drive = sess._check_source("drive")
     assert drive["connected"] is True and _MetProbe.gebruikt == "probe"
     jira = sess._check_source("jira")
-    assert jira["connected"] is False and jira["reden"] == "geen creds"
+    assert jira["connected"] is False
+    # De adapter gaf hier "geen creds" mee zonder `soort`; die tekst werd eerder
+    # ongefilterd doorgegeven. Dat is precies het pad waarlangs een Jira-401 met
+    # tenant-URL en responsbody de browser bereikte. Zonder `soort` normaliseert
+    # `_check_source` nu alsnog.
+    assert jira["soort"]
+    assert jira["reden"] != "geen creds"
 
 
 def test_check_source_miro_via_token(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -345,7 +351,9 @@ def test_run_zonder_body(tmp_path: Path) -> None:
 
 def test_run_progress_synchroon(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    start = client.post("/run/start", json={"mode": "sim", "pace": 0}).json()  # synchroon
+    start = client.post(
+        "/run/start", json={"mode": "sim", "pace": 0, "sources": ["drive"]}
+    ).json()  # synchroon
     assert start == {"mode": "sim", "total": 2, "status": "done"}
     p = client.get("/run/progress").json()
     assert p["status"] == "done"

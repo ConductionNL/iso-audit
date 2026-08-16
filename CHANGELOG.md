@@ -6,6 +6,510 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-16 — `rollout-portal.sh` doet de hele keten, met pre-flight
+
+Het script pushte, wachtte op de build en rolde uit — maar controleerde vooraf niets.
+Een fout die je vóór het pushen vindt kost seconden; dezelfde fout erna kost een build van
+vijftien minuten en een uitrol die je moet terugdraaien. Vijf poorten erbij, allemaal
+vóórdat er iets naar origin gaat:
+
+1. **kwaliteitspoort** — pytest, ruff, ruff format, mypy --strict
+2. **versieconsistentie** — bestond al: `pyproject.toml` == `newTag`
+3. **manifest-validatie** — bestond al in de ci-fix-checkout, nu hier
+4. **secrets aanwezig**, met per ontbrekend Secret wat er dán niet werkt
+5. **rechten van het serviceaccount** — precies een Secret leesbaar, geen `list`
+
+Die laatste is taak 4.1 uit change `credential-opslag`, die openstond. Gemeten tegen het
+echte cluster: `yes` op het eigen config-Secret, `no` op het oauth-Secret, `no` op
+`list secrets`. De grens is dus smal en blijft dat, want het script faalt nu als hij
+verschuift.
+
+De secret-check is bewust niet overal fataal. Alleen `iso-audit-portal-oauth` is hard
+vereist — zonder client- en cookie-secret start de proxy-sidecar niet. De rest
+degradeert, en dat is het probleem: zonder `iso-audit-portal-config` valt UI-configuratie
+stil terug op de PVC terwijl `ISO_AUDIT_CONFIG_SECRET` in het manifest staat. Het script
+benoemt per Secret het gevolg in plaats van te weigeren.
+
+Ik had die check eerst wel fataal gezet op `iso-audit-portal-config`. Dat was strenger dan
+de werkelijkheid: het portaal start er prima zonder. Gecorrigeerd na meting.
+
+**Meegenomen uit de ci-fix-checkout** (commits `df19729` en `cbeda7a`, die alleen daar
+stonden): de voorwaardelijke herstart — een `rollout restart` zet een annotatie die niet
+in git staat, waardoor Argo permanent `OutOfSync` meldt en echte drift verbergt — plus
+`scripts/check-manifest-pruning.py` en de `downwardAPI`-fix voor het projected volume, dat
+het namespace-bestand miste waardoor `secret_store` terugviel op een hardcoded namespace.
+
+### Fixed — 2026-08-16 — een verse audit kon geen live run afronden
+
+`registry.maak` legde `audit.json` en `findings.json` aan, maar geen `memo-input.yaml`.
+De live-worker vult daarin na afloop de scope en de geraadpleegde bronnen bij, en
+struikelde op het ontbrekende bestand — **nadat** alle zeven pipelinestappen waren
+gedraaid, alle rapporten waren geschreven en 87 bevindingen in de triage stonden. De run
+belandde als `fout` met `0 toegevoegd` in de append-only trail.
+
+Twee dingen daaraan:
+
+- Een audit hoort zelfstandig te zijn vanaf het moment dat hij bestaat. Bij het aanmaken
+  komt er nu een geldige `memo-input.yaml` mee, met de norm en periode van de audit zelf.
+  Het is een steiger, geen inhoud — de auditor bewerkt hem in de memo-editor.
+- Het bijwerken van de memo-context is niet-fataal gemaakt. Dat is cosmetiek ná het echte
+  werk; het mag een geslaagde run niet als mislukt wegschrijven. Wel gelogd in de
+  run-log, want stil is het ook niet.
+
+Na de fix: `status: klaar`, **87 toegevoegd, 166 overgeslagen** — dat tweede getal was er
+nooit geweest zolang het spoor loog.
+
+### Changed — 2026-08-16 — versie op één plek, en `0.2.0a9`
+
+`pyproject.toml` stond op `0.2.0a8` en `src/iso_audit/__init__.py` op `0.1.0a0`. Bij een
+uitrol is dat de string waaraan je ziet wélke build draait; een tweede waarheid is daar
+duur. `__version__` komt nu uit de pakket-metadata, en twee tests bewaken dat
+`pyproject.toml`, `__version__` en de `newTag` in `deploy/kustomization.yaml` gelijk zijn.
+Die laatste is niet theoretisch: een tag die niet meebeweegt betekent dat Argo dezelfde
+image synct en er niets verandert — precies de stille stilstand van 14 augustus.
+
+### Changed — 2026-08-16 — secrets-script en -documentatie kloppen weer
+
+`scripts/create-portal-secrets.sh` meldde bij een ontbrekende `GOOGLE_SA_FILE` dat die
+"komt met de change gsuite-service-account-sources". Dat klopt niet meer: Drive en de
+auditplanning lezen sinds 15 augustus via dat service-account. Zonder het Secret is de
+mount leeg (`optional: true`) en melden beide bronnen zich als niet-gekoppeld, zonder dat
+iemand ziet dát er iets ontbreekt. Nu een expliciete waarschuwing, plus een controle die
+een `authorized_user`-keyfile weigert — dat is een persoonsgebonden credential en precies
+wat deze migratie wegneemt.
+
+`deploy/README.md` heeft een sectie **Secrets aanmaken** met het onderscheid dat er
+werkelijk toe doet: Jira-, Miro- en Anthropic-credentials zijn óók vanuit de UI te zetten
+(en winnen dan van de omgeving), de Google-keyfile niet — dat is een gemount bestand.
+
+### Added — 2026-08-15 — landschap los van audits, en Jira als opvolgpunten
+
+Twee modelleerfouten die pas zichtbaar werden toen de keten voor het eerst echt liep. Zie
+`openspec/changes/landschap-en-opvolgpunten/`.
+
+**Het documentenlandschap is van de organisatie, niet van één audit.** De opslag was al
+gedeeld — één `AUDIT_DB_PATH` — maar de handeling hing als runmodus ónder een audit. Twee
+audits zouden dezelfde tweeënhalve minuut Drive-lezen herhalen tegen dezelfde tabel, en
+"welk landschap heeft déze audit gezien" was onbeantwoordbaar.
+
+Nu: `GET /landschap`, `POST /landschap/ingest` en `GET /landschap/documenten`, met een
+eigen scherm naast de audits. De ingest-runmodus op de audit is weer weg — één ingang, niet
+twee.
+
+**Er was geen enkel scherm waarop je kon zien wát er was ingelezen.** Een run was daarmee
+een black box: je zag pas achteraf uit de bevindingen of het landschap klopte. Het
+Landschap-scherm toont per document de bron, de clausule-koppelingen en de wijzigdatum, en
+is doorzoekbaar op naam én inhoud — via de `documents_fts`-index die al bestond en nergens
+werd gebruikt. Een document zonder clausule-koppeling wordt als zodanig getoond: dat wordt
+in een run niet aan een norm getoetst, en dat hoor je vooraf te weten.
+
+**Jira levert openstaande punten, geen bewijsmateriaal.** Tickets gingen via
+`list_documents` en werden tegen elke clausule geclassificeerd. In de referentie-output van
+juni staat het resultaat: een ticket met een NC omdat het clausule 4.1 niet bewijst. Ruis,
+plus LLM-kosten per ticket.
+
+`list_findings` bestond op het `Source`-protocol, `JiraSource` implementeerde het, en het
+had **nul aanroepers**. Nu aangesloten via `sources/opvolgpunten.py`: gelabelde open issues
+gaan zonder classificatie naar de bevindingen, herkenbaar als herkomst `Jira-opvolging`.
+Gemeten: 83 punten in 1,3 seconde, zonder één API-call.
+
+**En de standaardfilter daarvoor was aantoonbaar fout.** Hij zocht op labels
+`iso27001`/`iso9001`/`compliance`; gemeten in de echte tenant bestaan die daar niet — men
+gebruikt `interne_audit`, `managementreview2026`, `ISO_algemeen`, `externeaudit`. De filter
+leverde stil nul punten terwijl er 25 open issues in het ISO-project stonden. De scope is nu
+het project (`JIRA_PROJECTS`) plus "nog niet afgerond"; een projectsleutel is een afspraak,
+labels verschillen per organisatie. `JIRA_FINDINGS_JQL` blijft de knop voor wie het anders
+wil, nu ook in `env.example`.
+
+**Open punt:** opvolgpunten zonder label-naar-clausule-match landen op clausule `0`. Dat is
+eerlijk (we weten de clausule niet) maar leest slecht in de triage. En in de gemeten tenant
+bevat het ISO-project ook regulier werk, dus de scope verdient een keuze van de auditor.
+
+### Added — 2026-08-15 — ingest als eigen runmodus, en wat gelezen is blijft bewaard
+
+`mode: "ingest"` op `POST /audits/{id}/run/start` leest de gekozen bronnen, koppelt ze aan
+clausules en legt dat vast — **zonder de Claude-API te raken**. Gemeten met een echte run
+over Drive en Jira, hoofdstuk 5, zonder API-key: 409 documenten (Drive 149, Jira 260), 70
+clausule-koppelingen, run-record `klaar`.
+
+Dit legde twee dingen bloot die daarvóór onzichtbaar waren.
+
+**`run_audit` bewaarde niets van wat het las.** Alles bleef in het geheugen tot ná de
+classificatie. Een run die op een ontbrekende API-key strandde gooide daarmee een
+Drive-lezing van tweeënhalve minuut en 149 documenten volledig weg — gemeten: de
+`documents`-tabel bleef leeg terwijl het log 149 ingelezen documenten meldde. De losse
+`ingest.ingest_drive()` deed dit al wél; die twee paden waren uit elkaar gelopen.
+
+Nu legt `run_audit` de ingest vast vóór de classificatie, idempotent (`upsert`). Dat is
+ook wat een auditwerktuig hoort te doen: je hebt bewijs ingezien, dus leg vast wát je
+hebt ingezien. En het maakt hergebruik mogelijk — zonder opgeslagen documenten valt er
+niets te cachen.
+
+**Een gekozen bron kon stil nul documenten leveren.** `pipeline.py` ving een ingest-fout af
+als "niet kritiek", logde een regel, en de run meldde `klaar`. Gemeten geval: Jira gaf
+`HTTP 400 — "Unbounded JQL queries are not allowed here"` en leverde nul documenten,
+terwijl de auditor hem expliciet had gekozen. Alleen het serverlog wist dat.
+
+Doorgaan blijft juist — één kapotte bron mag een audit niet stilleggen — maar het gebeurt
+niet meer stil: `BronIngestError` met per bron de **genormaliseerde** reden, gegooid ná het
+vastleggen, zodat het werk van de andere bronnen bewaard blijft.
+
+De onderliggende Jira-fout is ook verholpen: zonder `JIRA_PROJECTS` en zonder `JIRA_JQL`
+stuurde de adapter een lege query, en Jira Cloud weigert onbegrensde zoekopdrachten. Er is
+nu een zichtbare begrenzing (`updated >= -365d`) die wijkt zodra je zelf een scope zet.
+
+### Fixed — 2026-08-15 — Jira werkt met een service-account in plaats van een persoon
+
+`sources/jira.py` deed uitsluitend HTTP Basic auth met een e-mailadres als gebruikersnaam.
+Dat werkt met een **persoonlijk** Atlassian-token (`ATATT…`), maar niet met het
+service-account-token dat deze koppeling juist persoonsonafhankelijk moet maken.
+
+Atlassian kent twee soorten, en ze verschillen op twee assen tegelijk. Gemeten met het
+echte token (`ATSTT3…`):
+
+| aanroep | resultaat |
+|---|---|
+| Basic (`mail:token`) op de site-URL | **401** |
+| Bearer op de site-URL | **403** op élk endpoint, ook `serverInfo` |
+| Bearer op `api.atlassian.com/ex/jira/{cloudId}` | **200** |
+
+Een scoped service-token gaat dus via `Authorization: Bearer` én via de gateway met de
+cloud-ID erin. Die 403-op-alles was misleidend: het leek op een rechtenprobleem bij het
+service-account, terwijl het de verkeerde host was.
+
+`JiraSource` herkent nu het tokentype aan de prefix — de credential geeft zelf weg welk
+schema hij nodig heeft, dus dat hoeft niemand te configureren en het kan ook niet fout
+staan. Bij een scoped token wordt de cloud-ID eenmalig opgehaald via
+`/_edge/tenant_info` (geen auth nodig) en onthouden. Een bestaande `ATATT`-configuratie
+blijft ongewijzigd op Basic auth en de site-URL werken; daar is een test voor.
+
+**En daarmee vervalt de eis van een e-mailadres.** Dat is alleen de gebruikersnaam voor
+Basic auth. Het verplicht stellen bij een service-token vraagt om een persoonsgebonden
+gegeven dat deze koppeling juist niet mag hebben — precies de vraag die de opdrachtgever
+stelde toen hij dat veld moest invullen.
+
+Resultaat in het portaal: Jira `connected`, met als account **"Iso-tool"**. Dat is de hele
+migratie in één regel: de verbindingstest laat zien op welk account de koppeling draait, en
+dat is geen mens meer.
+
+### Fixed — 2026-08-15 — twee stille regressies uit de verhuizing
+
+Gevonden door de oude codebase (`Ops_to_Biz/audit/`, nog opvraagbaar op `2edc146^`) naast
+de huidige te leggen. Van de 34 productiemodules zijn er 26 één-op-één overgezet; dit zijn
+de twee dingen die zonder besluit zijn weggevallen.
+
+- **`--local-only` was niet bereikbaar vanaf `iso-audit`.** De functie werkt nog
+  (`pipeline.run_local_only`) en de vlag bestaat in `pipeline.main()`, maar de
+  gedocumenteerde ingang kende hem niet meer. Nu weer een vlag op `iso-audit pipeline`,
+  met test.
+- **Negen env-vars die de code leest, stonden nergens meer.** `AUDIT_TEMPLATE_DOC_ID`,
+  `AUDIT_DB_PATH`, `AUDIT_SHEETS_ID`, `AUDIT_DRIVE_FOLDER_ID`, `MIRO_BOARD_ID`,
+  `AUDIT_NORM`, `AUDIT_SCHERPTE`, `LOCAL_REPORT_DIR`, `AUDIT_CALENDAR_ID`,
+  `AUDIT_NOTIFICATIE_ONTVANGERS`. Geen verlies in de code, wél in vindbaarheid — en dat is
+  hier geen detail: zonder `AUDIT_TEMPLATE_DOC_ID` slaat de pipeline het Docs-rapport en
+  de Slides **stil** over (`pipeline.py:512`), en zonder `MIRO_BOARD_ID` wordt Miro tijdens
+  een run stil overgeslagen. Allemaal terug in `env.example`, met vermelding van wat er
+  gebeurt als je ze leeg laat.
+
+**Correctie op een aanname van vandaag.** Ik heb de omzetting van Drive en planning naar
+het service-account beschreven alsof de oude codebase op persoonlijke OAuth draaide. Dat
+klopt niet: `Ops_to_Biz/audit/auth.py` was al een service account met exact dezelfde
+scopes, en `gws` was daar een *tweede* kanaal. Bij de verhuizing is het service-account-pad
+uit de bron-adapters geschrapt (`gsa_client.py` verdween) en bleef alleen `gws` over. De
+wijziging van vandaag herstelt dus iets dat er was, in plaats van iets nieuws te bouwen.
+
+### Added — 2026-08-15 — end-to-end tests in een echte browser, en een testknop
+
+**Waarom dit er moest komen.** Het configuratiescherm was aantoonbaar correct aan de
+serverkant — de juiste velden in `/config/bronnen`, de juiste JS in `ui.html`, alle
+contract-tests groen — terwijl een auditor in de browser **niets kon invullen**. Een test
+op de HTML-brontekst ziet dat niet: die voert de JS nooit uit. Er is een hele sessie
+verloren gegaan aan heen-en-weer over een scherm dat ik zelf had kunnen openen.
+
+`tests/e2e/` draait het portaal en bedient het met Chromium (Playwright, dev-dependency):
+typen, klikken, kijken wat er staat. Zes tests, waaronder de klacht zelf ("dit veld is
+niet typbaar") en het rotatiescenario helemaal door de browser heen. De fixture faalt ook
+op elke JavaScript-fout in de pagina — dat is hoe "ik kan niets invullen" ontstaat bij een
+correcte backend. Zonder browser slaan ze zichzelf over in plaats van de suite rood te
+maken.
+
+Twee dingen die daarbij zijn rechtgezet:
+
+- **De bevestigingsknop is weg.** Er stond een "Toch overschrijven" tussen de auditor en
+  zijn invoer. Daar was niet om gevraagd, en hij loste een probleem op dat toen al
+  verholpen was: zolang opslaan stil genegeerd werd was blokkeren eerlijk, maar zodra de
+  ingevulde waarde écht geldt is er niets meer te blokkeren. Ik had die stap moeten
+  weghalen toen hij overbodig werd in plaats van hem te laten staan.
+- **Er is een testknop.** Per bron, met de uitslag onder het formulier, plus "Opslaan en
+  testen" dat na het bewaren meteen test. Nieuw endpoint `GET /config/health/{bron}` zodat
+  een Jira-token invullen niet wacht op een Drive-listing. Zonder terugkoppeling vul je
+  iets in, krijg je "opgeslagen", en weet je nog steeds niets.
+
+**En de reden dat het scherm bij de gebruiker niet veranderde:** `GET /` stuurde een kale
+200 zonder `Cache-Control`, dus browsers cachen het portaal heuristisch. Eén HTML-bestand
+zonder buildstap heeft geen versie in de URL, dus na een uitrol zit iedereen op een oud
+scherm zonder het te merken — in het cluster net zo goed. Nu `no-store`, met een test.
+
+### Changed — 2026-08-15 — een credential is te vervangen zonder clusterbeheerder
+
+De precedence-regel was absoluut: **environment verslaat de UI**. Dat bleek te breken op
+een geval dat zeker gaat gebeuren — een credential die roteert. Komt de waarde uit een
+cluster-Secret, dan kon de auditor hem niet vervangen en was er een clusterbeheerder
+nodig. Dat is precies de persoonsafhankelijkheid die deze migratie wegneemt, en na eind
+augustus is er niemand die dat "even doet".
+
+Aanleiding was concreet: een auditor kon de service-account-key voor Jira niet in het
+configuratiescherm plakken, omdat de oude waarde uit de omgeving kwam. De maatregel die
+dat blokkeerde was een dag eerder toegevoegd om een ánder probleem op te lossen (een save
+die slaagde en niets deed), maar liet de gebruiker zonder uitweg. Een slot zonder deur.
+
+**De rationale van de oude regel blijft overeind.** Er stond: *"environment bovenaan
+betekent dat een deployment nooit **stil** een via-de-UI ingevulde waarde gebruikt."* Het
+probleem is stilte, niet dat de UI wint. Een expliciete, geregistreerde overschrijving is
+niet stil. Daarom:
+
+- precedence wordt `ui-override` > env > `config.yaml` > ui > default;
+- `ui-override` staat náást `ui` en vervangt hem niet — het verschil tussen "hier
+  ingevuld" en "hier ingevuld terwijl een beheerder iets anders had gezet" is precies wat
+  een auditor achteraf moet kunnen zien;
+- invullen over een omgevingswaarde heen werkt gewoon, zonder extra bevestigingsstap;
+- de handeling staat append-only in `bron_config_log.jsonl` met `overschrijft_omgeving`,
+  met wie en wanneer, nooit de waarde;
+- terugdraaien is het veld leegmaken — geen apart endpoint nodig;
+- **het rotatiegeval wordt gemeld**: wijzigt de omgeving nadat er een overschrijving op
+  staat, dan zegt het portaal dat bij dat veld. Anders vervangt een beheerder het Secret,
+  gebeurt er niets, en gaat diegene in het cluster zoeken naar een fout die er niet is.
+  De vergelijking gaat via een hash; geen van beide waarden wordt getoond of gelogd.
+
+Uniform voor alle velden, niet alleen geheimen: één regel is beter uit te leggen en te
+bewaken dan twee, en ook een map-ID veroudert.
+
+**Voor de derde keer vandaag dezelfde valstrik, nu in mijn eigen code.** `BronConfig`
+schrijft naar `os.environ` en gebruikte diezelfde `os.environ` om te bepalen óf er een
+beheerderswaarde achter een veld zat. Zelfreferentieel: elke opgeslagen waarde leek dan
+uit de omgeving te komen. Opgelost zoals eerder — de omgeving wordt één keer vastgelegd,
+nu in `BronConfig.basis` bij constructie, in plaats van per methode doorgegeven.
+
+Wijzigt een afgeronde spec; zie
+`openspec/changes/credential-rotatie-door-auditor/` met `## MODIFIED Requirements` op
+`config-precedence`. Open punt daar: verifiëren in het cluster met een echt geroteerd
+Secret.
+
+### Fixed — 2026-08-14 — een run zonder bron werd geaccepteerd, en het run-record loog
+
+Twee dingen die samen "er gebeurt niets en de UI legt niet uit waarom" veroorzaakten.
+
+**Een run zonder bron gaf `200 {"status": "running"}`.** Vier gestapelde terugvallen
+maakten er stil een drive-run van: `routes_audit.py:41`, `session.py:256`,
+`run_job.py:153` en `pipeline.py:347`. Voor normen bestond de harde check al
+(`registry.run_code` → 400); voor bronnen niet. Nu weigert `start_run` met een leesbare
+reden, en de drie terugvallen in de API-laag zijn weg. `pipeline.py` houdt zijn default
+voor de legacy-CLI-entrypoint — dat is een andere aanroeper met een ander contract.
+
+Bij een live-run weegt de koppelstatus mee; bij een sim-run niet, want die leest per
+definitie niets en dan is een verbindingseis theater. **Alleen de gekozen bronnen worden
+gecontroleerd**: eerst deed dit `bron_health()` over álle bronnen, waardoor een run over
+Drive stond te wachten op een niet-gekoppelde Jira.
+
+**Het run-record beweerde "klaar, 0 toegevoegd, 0 overgeslagen" voordat er iets gelezen
+was.** De route las `sessie.laatste_merge` direct nadat de worker-thread was gestart — dus
+altijd `(0, 0)` — en `runs.py:127` zette `status: "klaar"`. `runs.jsonl` is append-only,
+dus dat viel niet te corrigeren.
+
+Nu twee records per run: een startrecord (`status: "loopt"`, dat het run-nummer reserveert
+en een spoor achterlaat als de pod halverwege sneuvelt) en een afsluitrecord van de
+**worker**, die de echte tellingen kent. `runs.samengevat()` vouwt ze per `run_id`;
+`runs.lijst()` blijft de ruwe waarheid. `runs.som()` telt nu unieke `run_id`s in plaats
+van regels — anders telt élke run dubbel, ook in `aantal_runs` op het dashboard.
+`geraadpleegde_bronnen()` slaat runs met status `loopt` of `fout` over: die hebben niets
+gelezen, en die kolom is een bewijsuitspraak.
+
+Ook: `log_event("run_gestart")` stond vóór de start, dus een geweigerde run kwam als
+"gestart" in het toegangslog. Dat is nu `run_geweigerd` met de reden.
+
+### Fixed — 2026-08-14 — de foutnormalisatie dekte het hoofdfaalpad niet
+
+De normalisatie van eerder vandaag zat alleen op de **exception**-tak van
+`api/session.py:_check_source`. Adapters die hun fout zélf afvangen en
+`{"status": "fail", "reden": ...}` teruggeven gingen er volledig omheen, en `ui.html`
+rendert die tekst rechtstreeks. Gemeten in de browser:
+
+- `Jira API 401 op https://conduction.atlassian.net/rest/api/3/myself: Client must be
+  authenticated…` — tenant-URL plus responsbody, en `soort` was leeg
+- 174 tekens ruwe subprocess-dump met de volledige `gws`-commandoregel
+
+`tests/config/test_verbinding.py` was groen omdat de testadapter een exception **gooit** —
+precies de enige tak die wél gesanitiseerd werd.
+
+**De reparatie is routering, geen scherpere regex.** `classificeer()` zou die 401 correct
+als `auth` hebben ingedeeld; hij werd alleen nooit aangeroepen. `_check_source` heeft nu
+één uitgang: ontbreekt `soort`, dan gaat de tekst er alsnog door de normalisatie. Vergeten
+is daarmee niet mogelijk in plaats van "we moeten eraan denken".
+
+En de normalisatie mag geen bruikbare informatie meer weggooien. De echte drive-fout was
+`OSError: Geen Drive-map geconfigureerd…` — onze eigen tekst, zonder gevoelige inhoud — en
+daar maakte de sanitizer "Zie het serverlog voor details" van. Er is daarom een vijfde
+soort `niet_geconfigureerd`, die **nooit** uit `classificeer()` komt: hij hoort bij een
+fout die wij zelf vaststellen, en dan is er niets te beschermen. `JiraSource` noemt nu de
+ontbrekende velden in auditor-taal (`"Nog niet ingevuld: het Jira-adres, …"`) in plaats van
+env-var-namen, en Miro's lege token is `niet_geconfigureerd` en niet meer `auth` — "de
+credential is geweigerd" sturen bij een leeg veld stuurt iemand naar de leverancier.
+
+**De gate is een structurele, niet één per geval.**
+`tests/api/test_bron_health_lekt_niet.py` loopt over **elke** geregistreerde bron, langs
+beide takken, met een markerstring die een URL en een tokenfragment bevat. Nagerekend:
+zonder de reparatie vallen zes van de twaalf gevallen om, precies op de zelf-afgevangen
+tak. Hij faalt ook op een bron die volgend jaar wordt toegevoegd.
+
+Drie bestaande tests asserteerden dát de ruwe tekst doorkwam (`"401" in reden`,
+`reden == "geen creds"`); die legden het lek vast als gewenst gedrag en zijn omgedraaid.
+
+**Bijkomend gevonden:** de suite deed echte Google- en Jira-calls, omdat
+`test_healthz_en_config_zijn_niet_audit_gescoped` `/config/health` live aanriep en de
+adapters sinds de service-account-omzetting daadwerkelijk verbinden. Die test duurde 75
+seconden en las de live auditmap uit. Nu gestubd: hij gaat over routing, niet over
+connectiviteit — en een testsuite hoort geen productiedata aan te raken.
+
+### Changed — 2026-08-14 — Drive en planning lopen op het org-service-account
+
+`sources/drive.py` en `sources/planning.py` gingen via de `gws`-CLI, en die authenticeert
+met een **persoonlijke** OAuth-sessie (`gws auth login`). Daarmee hing de auditcapability
+aan één medewerker. De binary stond bovendien niet in het container-image, dus in het
+cluster konden die twee bronnen helemaal niet werken — `deploy/deployment.yaml:148-153`
+zei dat zelf al.
+
+De service-account-implementatie in `src/iso_audit/auth.py` bestond wél, maar had **nul
+productie-gebruikers**: alleen twee testbestanden importeerden hem. Het cluster mount de
+keyfile al op precies de variabele die `auth.py` leest, en niets las hem.
+
+Nu: `clients/google_drive.py` en `clients/google_sheets.py` doen hetzelfde werk via
+`google-api-python-client` met de credentials uit `auth.py`. De functienamen en
+returnshapes zijn gelijk gehouden aan de `gws_*`-varianten die ze vervangen, zodat de
+adapters één importregel wisselden en de bestaande tests in `tests/sources/` inhoudelijk
+gelijk bleven — die suite is daarmee het bewijs dat het gedrag niet verschoof.
+
+Gemeten in deze sessie, in deze volgorde, en elke stap vóór de volgende:
+
+1. keyfile is `type: service_account`, org-eigendom (`iso-agent@gws-conduction…`);
+2. authenticatie werkt, maar **0 zichtbare bestanden** — er was niets mee gedeeld;
+3. na toevoegen aan de Shared Drive: `drives.get` OK, 25 items, submappen leesbaar;
+4. na de omzetting: drive en planning `connected` in het portaal, 7 tabs gelezen.
+
+Domain-wide delegation blijkt **niet** nodig zolang de Shared Drive het account als lid
+heeft. Dat spaart een eenmalige actie van een Workspace-super-admin uit, en dus
+kalendertijd. `GWS_IMPERSONATE_EMAIL` moet dan leeg zijn; hij stond op het
+service-account zelf, en een account namens zichzelf laten handelen faalt met
+`unauthorized_client`.
+
+Meegenomen omdat het bij de omzetting hoorde:
+
+- `auth.py` krijgt `sheets_read_service()` met een eigen `spreadsheets.readonly`-scope.
+  Bewust een derde scope-lijst en niet één regel bij `_READ_SCOPES`: anders draagt het
+  Drive-leestoken óók Sheets-rechten. `PlanningSource` is read-only en mag niet aan
+  `sheets_service()` hangen — die heeft `_WRITE_SCOPES` en kan mail en agenda schrijven.
+  De scope-tripwires in `tests/test_auth.py` blijven ongewijzigd gelden.
+- `PlanningSource.probe()` is nieuw: één metadata-call in plaats van álle tabs lezen. Dat
+  gebeurde bij élke keer openen van het configuratiescherm.
+- `files.export` krijgt géén `supportsAllDrives` — die parameter bestaat daar niet
+  (nagemeten in de discovery-doc: `export` heeft er twee, `get` en `list` wel). De CLI
+  slikte hem, de python-client raist erop. Met een test erop, want dit is precies iets
+  dat iemand "terugrepareert".
+- De foutteksten van beide adapters lopen nu door `config/verbinding.normaliseer`. Ze
+  gaven eerder `f"gws-fout op {fid}: {e}"` en `f"gws-fout: {e}"` rechtstreeks aan de
+  browser; gemeten was dat 174 tekens ruwe subprocess-dump inclusief commandoregel. Drie
+  bestaande tests asserteerden dát de ruwe tekst in `reden` stond — die legden het lek
+  vast als gewenst gedrag en zijn omgedraaid.
+- De `RuntimeError` bij "geen bestanden gevonden" adviseerde `gws auth login`. Dat stuurt
+  na deze change de verkeerde kant op; hij wijst nu naar het delen met het service-account
+  en naar het lidmaatschap van de Shared Drive.
+
+**Nog niet gedaan:** `clients/gws.py` krimpen. De zes Drive- en Sheets-functies daarin
+hebben nu geen klant meer, maar `_gws` blijft nodig voor rapportage, notificatie,
+`sinks/drive.py` en `verify_docs.py`. Ook de `sys.exit(1)` op een ontbrekende `gws` in
+`pipeline._valideer_env()` staat er nog; het portaal komt daar niet langs
+(`api/run_job.py` roept `run_audit()` direct aan), waardoor dit in de container nooit
+opviel.
+
+### Fixed — 2026-08-14 — een geplakte URL in een ID-veld faalde misleidend
+
+De velden "Map-ID van de auditmap" en "Spreadsheet-ID van de planning" vragen een ID, maar
+in de praktijk plakt iedereen de URL uit de adresbalk. Gemeten: beide waarden waren
+volledige URL's — één via de UI ingevuld, één uit een omgevingsbestand. De API krijgt dan
+een "ID" van 80 tekens en antwoordt 404, wat in het portaal verschijnt als *"bestaat niet
+of is niet gedeeld met dit account"*. Die melding stuurt iemand naar het deelbeleid terwijl
+er niets mis is met de rechten — en dat kostte hier ook echt tijd.
+
+`config/google_ids.uit_url()` herleidt de vier vormen die Drive en Sheets zelf produceren,
+elk als expliciet patroon. Geen "pak de langste tekenreeks"-heuristiek: die pakt bij een
+onbekende URL-vorm stil het verkeerde deel, en dan is de fout verderop weer misleidend.
+Wat niet matcht gaat ongewijzigd door.
+
+De bestaande waarschuwing in `planning._valideer_sheet_id` op `=` en whitespace blijft, met
+de bijbehorende keuze om die waarde **niet** aan te passen: dat duidt op een kapotte
+regel in een omgevingsbestand, en stil een andere sheet aanspreken is erger dan zichtbaar
+falen. Een volledige URL is een ander geval — die verwijst naar exact één sheet.
+
+De tests gebruiken de échte gemeten URL's als invoer, niet verzonnen strings.
+
+### Fixed — 2026-08-14 — opslaan in de UI slaagde en deed niets
+
+Een auditor typte een Jira-adres en -token in het configuratiescherm, kreeg
+"✓ opgeslagen", en er veranderde niets. De save was ook echt geslaagd: `POST
+/config/bronnen/jira` gaf 200 en er stond een regel in `bron_config_log.jsonl`. Maar
+beide velden kwamen uit de omgeving, en env wint van de UI-store — dus de waarde werd
+opgeslagen, gelogd, en genegeerd.
+
+`ui.html:444-446` benoemde dat risico al letterlijk ("anders typt een auditor iets in
+dat stil geen effect heeft") en loste het op met een badge plus tooltip. Dat was te
+zwak: het veld bleef typbaar en `bewaarBron` stuurde het gewoon mee. Een badge is geen
+slot.
+
+Nu weigert `POST /config/bronnen/{bron}` zo'n veld met een 400 die zegt wélk veld het
+is, en toont de UI het als `readonly`. **Beide** kanten, want een UI-only maatregel
+laat de API liegen.
+
+**Onderweg een ernstiger fout gevonden, die deze maatregel schadelijk zou hebben
+gemaakt.** `Settings.naar_omgeving()` schrijft opgeloste waarden in `os.environ` en
+`_uit_env` leest daaruit. Eén kanaal, twee betekenissen: bij de tweede `load_config()`
+kwam een via de UI ingevulde waarde terug als `bron="env"`. Nagemeten met het oude
+codepad — ronde 1 `ui`, ronde 2 `env`.
+
+Dat is twee dingen tegelijk. Het maakt `/config/herkomst` onwaar op precies de vraag
+waarvoor dat endpoint bestaat ("liep die run op een cluster-Secret of op iets dat
+iemand in de UI had ingetypt?"), en het zou de blokkade hierboven élk UI-veld na één
+save onbewerkbaar hebben gemaakt.
+
+`load_config()` krijgt daarom een `omgeving`-parameter; `create_app` legt de omgeving
+vast vóór de eerste `naar_omgeving()` en geeft die mee. Expliciet doorgeven, geen
+module-globale: geen verborgen toestand, en het CLI-gedrag blijft ongewijzigd (default
+is de live `os.environ`).
+
+De gate is tegen de echte fout nagerekend: met de momentopname eruit valt
+`test_ui_waarde_promoveert_niet_naar_env` om met `assert 'env' == 'ui'`. Een gate die
+niet vangt is erger dan geen gate.
+
+Ook meegenomen: `openAudit()` roept nu `loadConfig()` aan. Zonder die aanroep bleef de
+bronselectie leeg tot iemand op "Laad opties" klikte, en stuurde `selectedConfig()`
+`sources: []` mee — een run die niets leest terwijl de auditor bronnen dacht te hebben
+gekozen.
+
+979 passed, 1 skipped; ruff + format + mypy --strict clean.
+
+**Bekend en niet opgelost** (aparte beslissingen):
+
+- `tests/test_auth.py` ruimt `GWS_IMPERSONATE_EMAIL` niet op en erft hem uit de
+  omgeving van de ontwikkelaar — via de module-level `load_dotenv()` in
+  `sources/planning.py:32`. Staat die variabele lokaal gevuld, dan falen 9 tests op
+  `AttributeError: 'str' object has no attribute 'with_subject'`. Zonder die variabele:
+  20 passed. De suite leest dus mee met een lokaal omgevingsbestand.
+- `pyproject.toml` staat op `0.2.0a8`, `src/iso_audit/__init__.py:16` op `0.1.0a0`.
+- `sources/jira.py:184` doet uitsluitend Basic auth (`auth=(email, token)`). Een
+  Atlassian **service-account**-credential wordt daar afgewezen met 401, terwijl
+  dezelfde credential via `Authorization: Bearer` een 403 geeft — dus herkend, maar
+  zonder rechten in de tenant. Voor een persoonsonafhankelijke Jira-koppeling is
+  Bearer-ondersteuning nodig **en** moet het service-account in Atlassian toegang
+  krijgen.
+
 ### Fixed — 2026-08-14 — Argo weigerde de hele sync op Role/RoleBinding
 
 Na de laatste push bleef het portaal op `0.2.0a3` staan. Argo stond `OutOfSync` maar

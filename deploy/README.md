@@ -187,6 +187,38 @@ Algemener: `kubectl describe pod` en de `Failed`-events zeggen hier meer dan de
 containerlogs, omdat een container die de kubelet weigert aan te maken geen logs
 heeft.
 
+## Secrets aanmaken
+
+Eén script, idempotent (`create --dry-run=client | apply`), zodat bijwerken hetzelfde
+commando is als aanmaken:
+
+    KEYCLOAK_CLIENT_SECRET='...' ANTHROPIC_KEY='sk-ant-...' \
+      JIRA_BASE_URL='https://ORGANISATIE.atlassian.net' \
+      JIRA_API_TOKEN='ATSTT...' \
+      GOOGLE_SA_FILE=/pad/naar/service-account.json \
+      ./scripts/create-portal-secrets.sh
+
+Wat er per credential nodig is, verschilt — en dat verschil is de moeite waard om te
+kennen vóór je gaat rondzoeken:
+
+| Credential | Ook via de UI te zetten? |
+|---|---|
+| Jira-token, Miro-token, Anthropic-key | **Ja.** Een auditor vult ze in het configuratiescherm in; die waarde landt in Secret `iso-audit-portal-config` en gaat vóór op wat hier in de omgeving staat (herkomst `ui-override`). Zo is een geroteerde key te vervangen zonder clusterbeheerder. |
+| Google-service-account-keyfile | **Nee.** Dit is een gemount *bestand* (`/etc/iso-audit/google/service-account.json`), geen env-var, en dus niet vanuit de UI te zetten. Moet als Secret bestaan. |
+| Keycloak-clientsecret, cookie-secret | Nee — die horen bij de proxy, niet bij de auditor. |
+
+Het script weigert een keyfile die geen `service_account` is: een `authorized_user`-JSON
+komt uit een persoonlijke OAuth-login en is precies wat deze opzet wegneemt.
+
+Ontbreekt het Google-Secret, dan is de mount leeg (`optional: true`) en melden Drive en
+de auditplanning zich in het portaal als **niet gekoppeld**. Het script waarschuwt daarop
+in plaats van stil over te slaan.
+
+Verifiëren zonder waarden te tonen:
+
+    kubectl -n iso-platform get secret iso-audit-portal-sources \
+      -o jsonpath='{.data}' | tr ',' '\n' | cut -d'"' -f2
+
 ## Credential-herleidbaarheid
 
 Elke credential die het portaal gebruikt, met eigenaar als **rol** en niet als
@@ -212,6 +244,23 @@ migratie is pas af als het persoonlijke credential is *ingetrokken*, met een
 De 12-maandstermijn is een keuze, niet een technische grens: de meeste van deze
 credentials verlopen niet uit zichzelf. Zonder vastgelegd plafond is "rotatiemoment"
 een intentie zonder datum.
+
+**Roteren kan ook zonder clusterbeheerder.** Een auditor kan een credential die uit een
+Secret komt vanuit het portaal vervangen, als expliciete handeling. De herkomst wordt dan
+`ui-override` en er staat een regel in het wijzigingsspoor met wie en wanneer — nooit de
+waarde. Dat is bewust toegestaan: een key die verloopt terwijl niemand met clustertoegang
+beschikbaar is, legt anders de hele auditcapability stil.
+
+Twee dingen om te weten bij het roteren van een Secret:
+
+- vervang je hier een Secret terwijl er een overschrijving op staat, dan blijft die
+  overschrijving in gebruik. Het portaal meldt bij dat veld dat de omgeving inmiddels een
+  andere waarde heeft, zodat je niet in het cluster gaat zoeken naar een fout die er niet
+  is;
+- de overschrijving verdwijnt door het veld in het portaal leeg te maken; daarna geldt de
+  Secret-waarde weer.
+
+Zie [`credential-rotatie-door-auditor`](../openspec/changes/credential-rotatie-door-auditor/proposal.md).
 
 ## Kube-API-toegang: waarom de app een token heeft
 
