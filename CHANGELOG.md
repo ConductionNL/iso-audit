@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Storing — 2026-08-17 — portaal 45 minuten plat na een versiebump zonder image
+
+`0.2.0a11` is naar `main` gepusht terwijl de image-build voor die commit nog in de wachtrij
+van GitHub Actions stond. Argo staat op `automated` met **`selfHeal: true`** en synct op de
+commit, niet op het uitrolscript: het zette de deployment direct op `0.2.0a11`, een tag die
+op dat moment niet bestond. Gevolg: `Init:ImagePullBackOff`, 0/2 ready, `/ping` 503, en de
+werkende pod was al vervangen. Ongeveer 09:07–09:52 UTC.
+
+De aanname bovenaan `deploy/kustomization.yaml` — *"het image wordt op de PR gebouwd, dus de
+tag bestaat vóór de merge en Argo vindt hem direct"* — houdt alleen bij een PR-flow. Bij een
+directe push naar `main` bestaat de tag per definitie nog niet, en `selfHeal` wacht niet.
+
+**Regel die hieruit volgt: met `selfHeal` aan mag een versiebump `main` niet raken voordat
+het image gepubliceerd is.** Dus via een PR, of het image eerst bouwen. `rollout-portal.sh`
+beschermt hier niet tegen — dat script draait ná de push, en Argo is dan al langs geweest.
+Wat het script wél goed deed: het stopte op de ontbrekende tag vóór de cookie-rotatie en de
+herstart, dus het heeft de storing niet verergerd.
+
+**Hersteld door `0.2.0a11` lokaal te bouwen en naar ghcr te pushen**, omdat de Actions-
+wachtrij bleef staan (alle vier de workflows, inclusief GitHub's eigen CodeQL en Dependency
+Graph, ruim een uur `queued` terwijl GitHub "Actions: operational" meldde — vermoedelijk een
+spending limit op de organisatie; niet te controleren zonder `admin:org`).
+
+Dat image heeft **geen CI-attestatie en is niet in een schone omgeving gebouwd**. De inhoud
+komt aantoonbaar uit commit `7b79972`: gebouwd uit `git archive 7b79972`, en meegepusht als
+`sha-7b79972` naast de versietag. Geverifieerd ín het image vóór het pushen — versie
+`0.2.0a11`, 16 `/instellingen/`-aanroepen, nul `/config/`-aanroepen, `PadGeweigerd` aanwezig,
+`DEFAULT_PLANNING_SHEETS_ID` weg. Loopt de wachtrij later alsnog leeg, dan herbouwt CI
+dezelfde tag uit dezelfde commit.
+
 ### Fixed — 2026-08-17 — het configuratiescherm was onbereikbaar: de ingress weigert `/config/`
 
 Na de uitrol van `0.2.0a10` bleef het portaal hangen met "Je sessie is verlopen", terwijl de

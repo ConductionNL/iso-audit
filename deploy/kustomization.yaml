@@ -40,6 +40,13 @@ configMapGenerator:
 #
 # De ordening klopt vanzelf: het image wordt op de PR gebouwd en gepusht, dus de
 # tag bestaat vóór de merge en Argo vindt hem direct.
+#
+# LET OP — dat geldt alléén bij een PR-flow. De Argo-Application staat op `automated`
+# met `selfHeal: true` en synct op de commit, niet op `rollout-portal.sh`. Bump je deze
+# tag in een directe push naar `main`, dan zet Argo de deployment op een image dat nog
+# gebouwd moet worden en valt het portaal om met `ImagePullBackOff`. Gebeurd op
+# 2026-08-17, 45 minuten uit de lucht; zie de CHANGELOG. Dus: via een PR, of het image
+# eerst publiceren en pas daarna deze regel wijzigen.
 images:
   - name: ghcr.io/conductionnl/iso-audit
     newTag: "0.2.0a11"
