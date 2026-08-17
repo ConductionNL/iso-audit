@@ -38,8 +38,10 @@
       welke grondslag de prijzen hebben, en dat `max_tokens` thinking meerekent
 - [x] 7.2 CHANGELOG-regel met de motivatie: twee van de drie modellen leverden stil nul
       bevindingen
-- [ ] 8.1 In het cluster verifiëren: dezelfde audit op Haiku 4.5 én op Sonnet 5, en vaststellen
-      dat beide bevindingen opleveren en dat de kosten in het run-record staan
+- [x] 8.1 Geverifieerd op 0.2.0a16 in het cluster: alle drie de modellen leveren één
+      bevinding (OFI) met nul fouten — Haiku $0,00133, Sonnet 5 $0,00605, Opus 5 $0,01145
+      per classificatie. Deze verificatie legde de afkap-bug bloot die de suite niet zag;
+      op 0.2.0a15 gaven Sonnet 5 en Opus 5 nog nul bevindingen zonder foutmelding
 - [ ] 8.2 **Meting voorleggen aan Mark:** triage van beide runs vergeleken met de
       referentie-output van juni — is het betere oordeel de prijs waard? Deze change kiest
       geen model; dit is het moment waarop dat wel gebeurt
