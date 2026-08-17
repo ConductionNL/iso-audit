@@ -32,6 +32,7 @@ import os
 import shutil
 import subprocess  # nosec B404 — gws CLI is een gecontroleerde shell-laag
 import sys
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -366,6 +367,7 @@ def run_audit(
     audit_id: str | None = None,
     sources: list[str] | None = None,
     alleen_ingest: bool = False,
+    op_kosten: Callable[[Any], None] | None = None,
 ) -> None:
     """Volledige auditpipeline uitvoeren.
 
@@ -586,6 +588,7 @@ def run_audit(
         norm=norm,
         scherpte=scherpte,
         rehash=rehash,
+        op_kosten=op_kosten,
     )
 
     logger.info("Stap 6/7: Menselijke review...")

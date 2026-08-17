@@ -371,8 +371,9 @@ class AuditSession:
             if m:
                 self._run.done, self._run.total = int(m.group(1)), int(m.group(2))
 
+        kosten = None
         try:
-            run_live_pipeline(
+            kosten = run_live_pipeline(
                 norm=norm,
                 sources=sources,
                 chapter=chapter,
@@ -405,7 +406,13 @@ class AuditSession:
             # het starten alleen `(0, 0)`.
             if run_id:
                 toegevoegd, overgeslagen = self.laatste_merge
-                afsluiten(self.dir, run_id, toegevoegd=toegevoegd, overgeslagen=overgeslagen)
+                afsluiten(
+                    self.dir,
+                    run_id,
+                    toegevoegd=toegevoegd,
+                    overgeslagen=overgeslagen,
+                    kosten=kosten,
+                )
         except Exception as exc:  # surface elke pipeline-fout in de UI
             # NIET `str(exc)`: dit vangt élke pipeline-fout, dus ook die van Google, Jira
             # en Anthropic. Zo'n tekst kan een URL met credential of een tokenfragment

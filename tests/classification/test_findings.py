@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -618,3 +619,31 @@ def test_classificeer_alle_miro_zonder_clausule_skip(db_pad: str) -> None:
     rows = conn.execute("SELECT * FROM bevindingen").fetchall()
     conn.close()
     assert rows == []
+
+
+def test_usage_json_wordt_vastgelegd(tmp_path: Path) -> None:
+    """Regressiebewaking, geen reparatie: dit werkt al.
+
+    Gemeten op 2026-08-17: 215 van 215 rijen in de referentie-checkout hebben een gevulde
+    `usage_json`. Zonder deze test kan die vastlegging wegvallen zonder dat iemand het merkt —
+    en dan is "wat kost een audit" weer onbeantwoordbaar, wat de vraag van de opdrachtgever is.
+    """
+    db = tmp_path / "audit.db"
+    conn = store.verbinding(str(db))
+    store.initialiseer(conn)
+    client = MagicMock()
+    client.messages.create.return_value = _fake_resp(_JSON_BEVINDING)
+    findings._classificeer_doc(
+        {"id": "d1", "naam": "Doc", "tekst": "x", "herkomst": "Drive"},
+        ["10.2"],
+        {"10.2": {"titel": "NC"}},
+        client,
+        findings.Kostenteller(),
+        conn=conn,
+        audit_id="audit-test",
+    )
+    rijen = conn.execute("select usage_json from classifications").fetchall()
+    assert rijen, "classificatie is niet vastgelegd"
+    usage = json.loads(rijen[0][0])
+    assert usage["input_tokens"] == 10
+    assert usage["output_tokens"] == 20

@@ -28,11 +28,43 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 RUNS = "runs.jsonl"
+
+
+@dataclass(frozen=True)
+class Kosten:
+    """Wat een run kostte, met alles wat nodig is om het later na te vertellen.
+
+    Vier velden bij elkaar, want los van elkaar zeggen ze te weinig. Een bedrag zonder model
+    is niet te herleiden; zonder peildatum niet te controleren (prijzen wijzigen buiten deze
+    repo om); en zonder grondslag niet te interpreteren, want lijstprijs is niet hetzelfde als
+    wat er gefactureerd wordt — Sonnet 5 had op 2026-08-17 een introtarief dat een derde onder
+    de lijstprijs lag.
+    """
+
+    usd: float
+    model: str
+    peildatum: str
+    grondslag: str
+    calls: int = 0
+    fouten: int = 0
+
+    def als_record(self) -> dict[str, Any]:
+        return {
+            "usd": round(self.usd, 4),
+            "model": self.model,
+            "peildatum": self.peildatum,
+            "grondslag": self.grondslag,
+            "calls": self.calls,
+            "fouten": self.fouten,
+        }
+
+
 FINDINGS = "findings.json"
 
 _WS = re.compile(r"\s+")
@@ -140,6 +172,7 @@ def afsluiten(
     toegevoegd: int = 0,
     overgeslagen: int = 0,
     fout: str | None = None,
+    kosten: Kosten | None = None,
 ) -> dict[str, Any]:
     """Schrijf het afsluitrecord van een run — append-only, niets wordt overschreven.
 
@@ -164,6 +197,12 @@ def afsluiten(
     }
     if fout:
         record["fout"] = fout[:500]
+    if kosten is not None:
+        # Bedrag, model, peildatum én grondslag bij elkaar in één record. Losgekoppeld is een
+        # bedrag niet navertelbaar: prijzen wijzigen buiten deze repo om, en lijstprijs is niet
+        # hetzelfde als wat er gefactureerd wordt. Tot 2026-08-17 stond het bedrag alleen in
+        # het log terwijl de rest van de runhistorie wél in de trail zat.
+        record["kosten"] = kosten.als_record()
     _append(dir_, record)
     return record
 

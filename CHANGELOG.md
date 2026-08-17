@@ -6,6 +6,28 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-17 — kosten in het run-record, met peildatum en grondslag
+
+`Kostenteller.kosten_usd()` rekende de kosten al uit en logde ze, maar het bedrag belandde niet
+in `runs.jsonl` — terwijl de rest van de runhistorie daar wél staat. Een auditor die later vroeg
+wat een run kostte, moest door logs zoeken.
+
+Het afsluitrecord krijgt nu een `kosten`-blok met bedrag, model, `PRIJZEN_PEILDATUM`,
+`PRIJZEN_GRONDSLAG`, aantal calls en aantal fouten. Die vier context-velden zitten er niet voor
+de volledigheid: een bedrag zonder model is niet te herleiden, zonder peildatum niet te
+controleren (prijzen wijzigen buiten deze repo om), en zonder grondslag niet te interpreteren.
+
+De kosten reizen via een optionele `op_kosten`-callback van de classifier omhoog door
+`pipeline.run_audit` en `run_live_pipeline` naar de worker. Een callback en geen tweede
+returnwaarde, omdat dat laatste elke bestaande aanroeper zou breken voor één veld. Een
+ingest-only run levert `None` en dus geen kostenveld — nul rapporteren zou suggereren dat er
+geclassificeerd is.
+
+Nieuw: `docs/reference/modelkeuze.md` — wat de modelkeuze betekent, de gemeten kosten per model,
+waarom thinking expliciet uit staat, waarom de cache niets doet, en dat de keuze alleen de
+classificatie bereikt en niet de memo-tekst die de UI-kaart wél belooft.
+
+
 ### Fixed — 2026-08-17 — twee van de drie kiesbare modellen leverden stil nul bevindingen
 
 De UI biedt Haiku 4.5, Sonnet 5 en Opus 5. Alleen Haiku werkte. De classificatie-aanroep gaf

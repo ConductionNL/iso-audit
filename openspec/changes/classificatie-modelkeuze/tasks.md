@@ -15,10 +15,12 @@
 - [x] 4.1 ~~Uitzoeken waarom `usage_json` leeg blijft~~ — **vervallen, premisse was fout.**
       Correct gemeten op 17-08 met Python (de eerdere check gebruikte `sqlite3`, dat op deze
       machine niet bestaat): 215 van 215 rijen gevuld in de referentie-checkout. Geen defect
-- [ ] 4.2 Run-record krijgt totale kosten met `PRIJZEN_PEILDATUM` én de prijsgrondslag
+- [x] 4.2 Run-record krijgt totale kosten met `PRIJZEN_PEILDATUM` én de prijsgrondslag
 - [x] 5.1 `PRIJZEN` krijgt een expliciete grondslag (lijstprijs of werkelijk tarief); geen
       datumlogica in de tabel
-- [ ] 5.2 Sonnet-5-regel volgt die grondslag — vraag aan de opdrachtgever welke van de twee
+- [x] 5.2 Grondslag staat op `lijstprijs` en de tabel volgt dat; **openstaande vraag aan de
+      opdrachtgever**: moet het auditrapport lijstprijs of werkelijke kosten noemen? Wisselen
+      is een waardewijziging, geen code. Oorspronkelijk: vraag aan de opdrachtgever welke van de twee
       het auditrapport moet noemen
 - [x] 5.3 Cache: `cache_control` staat op prompts van 122–726 tokens terwijl het minimum 4096
       (Haiku), 1024 (Sonnet 5) en 512 (Opus 5) is — gemeten cache_read = 0 over 215 calls.
@@ -29,10 +31,10 @@
 - [x] 6.2 Test: respons zonder tekstblok verhoogt de foutenteller en logt de reden
 - [x] 6.3 Test: leesbaar antwoord zonder bevindingen blijft een geldig leeg oordeel zonder
       foutmelding
-- [ ] 6.4 Test: `usage_json` is gevuld na een classificatie — als regressiebewaking, niet als
+- [x] 6.4 Test: `usage_json` is gevuld na een classificatie — als regressiebewaking, niet als
       reparatie; het werkt al
 - [x] 6.5 Test: het output-budget laat ruimte voor thinking zodra thinking aanstaat
-- [ ] 7.1 `docs/reference/configuratie.md` (of de modelkeuze-doc): wat de modelkeuze betekent,
+- [x] 7.1 `docs/reference/configuratie.md` (of de modelkeuze-doc): wat de modelkeuze betekent,
       welke grondslag de prijzen hebben, en dat `max_tokens` thinking meerekent
 - [x] 7.2 CHANGELOG-regel met de motivatie: twee van de drie modellen leverden stil nul
       bevindingen

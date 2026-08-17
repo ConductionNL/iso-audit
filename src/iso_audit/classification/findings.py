@@ -40,6 +40,7 @@ import os
 import sqlite3
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -686,11 +687,16 @@ def classificeer_alle_bevindingen(
     rehash: bool = False,
     model: str | None = None,
     audit_id: str | None = None,
+    op_kosten: Callable[[Kostenteller], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Classificeer Drive-docs en Miro-notities; UPSERT in `bevindingen`-tabel.
 
     `audit_id` groepeert de classifications-rows van deze run. Default: een
     UTC-tijdstempel.
+
+    `op_kosten` wordt aangeroepen met de kostenteller zodra de classificatie klaar is, zodat
+    de aanroeper de kosten in het run-record kan zetten. Een callback en geen tweede
+    returnwaarde: dat zou elke bestaande aanroeper breken voor één veld.
 
     Returnt alle bevindingen voor de norm uit de DB (incl. eerdere runs)
     voor downstream-rapportage.
@@ -717,6 +723,8 @@ def classificeer_alle_bevindingen(
     _classify_drive(ctx, gekoppelde_docs)
     _classify_miro(ctx, miro_notities)
     logger.info("Kosten-rapport: %s", teller.rapport())
+    if op_kosten is not None:
+        op_kosten(teller)
 
     rows = conn.execute(
         "SELECT * FROM bevindingen WHERE norm=? ORDER BY clausule_id", (norm,)

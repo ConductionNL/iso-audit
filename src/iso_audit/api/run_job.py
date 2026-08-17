@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from typing import Any
 
+from iso_audit.api.runs import Kosten
 from iso_audit.memo.draft import draft_findings
 from iso_audit.memo.models import BronRef, Finding
 from iso_audit.memo.norm_lookup import NormDatabase, laad_norm_db
@@ -130,10 +132,14 @@ def run_live_pipeline(
     chapter: str | None,
     on_log: Callable[[str], None],
     alleen_ingest: bool = False,
-) -> None:
+) -> Kosten | None:
     """Draai de echte audit-pipeline met opgevangen voortgang (geen review-prompt).
 
     `alleen_ingest` stopt na het inlezen en vastleggen; die modus raakt de Claude-API niet.
+
+    Returnt de kosten van de classificatie, zodat de worker die in het run-record kan zetten.
+    `None` bij een ingest-only run: die raakt de API niet, dus er zijn geen kosten — en nul
+    rapporteren zou suggereren dat er geclassificeerd is.
     """
     from iso_audit import pipeline
     from iso_audit.modes.autonoom import AutonoomMode
@@ -151,9 +157,26 @@ def run_live_pipeline(
     # kan de logger op WARNING staan. Niveau tijdelijk verlagen + herstellen.
     vorig_niveau = pijplijn_logger.level
     pijplijn_logger.setLevel(logging.INFO)
+    conn = verbinding()
+    initialiseer(conn)
+
+    kosten_uit: list[Kosten] = []
+
+    def _bewaar_kosten(teller: Any) -> None:
+        from iso_audit.classification.findings import PRIJZEN_GRONDSLAG, PRIJZEN_PEILDATUM
+
+        kosten_uit.append(
+            Kosten(
+                usd=teller.kosten_usd(),
+                model=teller.model,
+                peildatum=PRIJZEN_PEILDATUM,
+                grondslag=PRIJZEN_GRONDSLAG,
+                calls=teller.calls,
+                fouten=teller.fouten,
+            )
+        )
+
     try:
-        conn = verbinding()
-        initialiseer(conn)
         pipeline.run_audit(
             norm,
             no_review=True,
@@ -161,10 +184,12 @@ def run_live_pipeline(
             mode=AutonoomMode(conn=conn),
             sources=sources,
             alleen_ingest=alleen_ingest,
+            op_kosten=_bewaar_kosten,
         )
     finally:
         pijplijn_logger.removeHandler(handler)
         pijplijn_logger.setLevel(vorig_niveau)
+    return kosten_uit[-1] if kosten_uit else None
 
 
 def draft_from_db(*, norm: str, norms_dir: str, language: str, top_n: int) -> list[Finding]:
