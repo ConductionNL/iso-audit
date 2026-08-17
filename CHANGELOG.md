@@ -6,6 +6,33 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-17 — afgekapte antwoorden lazen als "geen bevindingen"
+
+De clusterverificatie van change `classificatie-modelkeuze` bracht de andere helft van
+dezelfde bug aan het licht. Nadat het thinking-probleem was opgelost, leverden Sonnet 5 en
+Opus 5 nog steeds nul bevindingen — nu zonder foutmelding. Gemeten in productie:
+
+| model | stop_reason | uitvoertokens | JSON compleet |
+|---|---|---|---|
+| Haiku 4.5 | `end_turn` | 193 | ja |
+| Sonnet 5 | `max_tokens` | 214 | nee, afgekapt |
+| Opus 5 | `max_tokens` | 214 | nee, afgekapt |
+
+Het budget `150 * n + 64` was op Haiku's beknoptheid gekalibreerd. Bij afkapping mist de
+sluithaak, vindt `_parse_json_list` geen array, en geeft die stil een lege lijst terug — niet
+te onderscheiden van "het model vond niets".
+
+Twee wijzigingen. Een `stop_reason: max_tokens` geldt nu als storing en niet als leeg oordeel;
+dat is dezelfde regel als voor een onleesbaar antwoord, en hij dekt ook een lang document dat
+straks bij een ruimer budget alsnog afkapt. En het budget is op de gemeten werkelijkheid gezet:
+uitvoertokens per item zijn 193 (Haiku), 276 (Sonnet 5) en 410 (Opus 5), dus 450 per item plus
+128 voor de JSON-omlijsting. Ruimer zetten kost niets — je betaalt voor gegenereerde tokens,
+niet voor het plafond, en bij `max_tokens=4000` stopten beide modellen uit zichzelf.
+
+Dit is precies waarvoor taak 8.1 bestond: de suite was groen, de eenheidstests klopten, en het
+werkte pas aantoonbaar ná meting tegen de echte API.
+
+
 ### Added — 2026-08-17 — kosten in het run-record, met peildatum en grondslag
 
 `Kostenteller.kosten_usd()` rekende de kosten al uit en logde ze, maar het bedrag belandde niet

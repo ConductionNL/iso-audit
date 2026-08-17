@@ -293,17 +293,35 @@ def test_leesbaar_antwoord_zonder_bevindingen_blijft_geldig() -> None:
     assert teller.fouten == 0, "leeg oordeel is geen fout"
 
 
-def test_output_budget_is_per_item_en_uitgelegd() -> None:
-    """Het budget moet meeschalen met het aantal items.
+def test_afgekapt_antwoord_is_een_storing_geen_leeg_oordeel() -> None:
+    """`stop_reason: max_tokens` betekent dat het antwoord halverwege ophoudt.
 
-    Belangrijker dan het getal: zodra thinking aangaat begrenst `max_tokens` thinking én
-    antwoord samen. Bij één clausule is dit 214 tokens, en gemeten op 2026-08-17 ging dat
-    budget volledig op aan thinking — `stop_reason` was `max_tokens` en er kwam geen
-    tekstblok. Deze test faalt als iemand het budget losmaakt van het aantal items.
+    Dan mist de sluithaak, vindt `_parse_json_list` geen array en geeft die stil een lege
+    lijst terug — niet te onderscheiden van "het model vond niets". Gemeten in productie op
+    2026-08-17: Sonnet 5 en Opus 5 werden op 214 tokens afgekapt en leverden zo nul
+    bevindingen zonder één foutmelding.
     """
-    assert findings._max_tokens_voor(1) == 214
-    assert findings._max_tokens_voor(5) == 814
-    assert findings._max_tokens_voor(5) > findings._max_tokens_voor(1)
+    client = MagicMock()
+    resp = _fake_resp('[{"clausule": "8.24", "classificatie": "OFI", "beschrij')
+    resp.stop_reason = "max_tokens"
+    client.messages.create.return_value = resp
+    teller = findings.Kostenteller()
+    out = findings._classificeer_doc(
+        {"naam": "Doc", "tekst": "x"}, ["8.24"], {"8.24": {"titel": "Crypto"}}, client, teller
+    )
+    assert out == []
+    assert teller.fouten == 1, "afgekapt mag niet als leeg oordeel gelden"
+
+
+def test_output_budget_dekt_het_duurste_model() -> None:
+    """Gemeten uitvoertokens per item: Haiku 193, Sonnet 5 276, Opus 5 410.
+
+    Het budget stond op 150/item en was daarmee op Haiku gekalibreerd, waardoor de andere
+    twee modellen stelselmatig werden afgekapt. Deze test faalt als iemand het terugzet
+    onder wat Opus 5 aantoonbaar nodig heeft.
+    """
+    assert findings._max_tokens_voor(1) >= 410, "te krap voor Opus 5 (gemeten 410/item)"
+    assert findings._max_tokens_voor(3) >= 3 * 365, "te krap voor Opus 5 bij drie clausules"
 
 
 def test_classificeer_doc_api_error() -> None:

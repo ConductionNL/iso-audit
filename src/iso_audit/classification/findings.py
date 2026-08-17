@@ -280,16 +280,27 @@ def _bouw_miro_user_prompt(notities: list[dict[str, Any]], clausules: dict[str, 
 
 
 def _max_tokens_voor(aantal_items: int) -> int:
-    """Output-budget: 150 tokens per item plus 64 voor de JSON-omlijsting.
+    """Output-budget per classificatie-aanroep.
 
-    De 150 is de begroting voor één bevinding: een beschrijving van maximaal 80 woorden plus
-    de onderbouwing. Geen magisch getal — zie `_SYSTEM_*`, waar die 80 woorden staan.
+    Gemeten op 2026-08-17 tegen de echte API, uitvoertokens per item bij een compleet
+    antwoord (`stop_reason: end_turn`):
 
-    **Zodra thinking aangaat moet dit budget mee omhoog.** Op Sonnet 5 en Opus 5 begrenst
-    `max_tokens` thinking én responstekst samen; bij vijf clausules is dit 814 tokens, en
-    thinking eet dat op waarna de JSON halverwege afkapt — zonder foutmelding.
+    | model | 1 clausule | 3 clausules |
+    |---|---|---|
+    | Haiku 4.5 | 193 | — |
+    | Sonnet 5 | 276 | 218 |
+    | Opus 5 | 410 | 365 |
+
+    Het budget stond op `150 * n + 64` en was daarmee op Haiku gekalibreerd. Sonnet 5 en
+    Opus 5 werden afgekapt (`stop_reason: max_tokens`), waarna `_parse_json_list` geen
+    sluithaak vond en stil een lege lijst teruggaf — zelfde uitkomst als een leeg oordeel.
+
+    450 dekt Opus 5 met marge; 128 is voor de JSON-omlijsting. Ruimer zetten kost niets: je
+    betaalt voor gegenereerde tokens, niet voor het plafond, en bij `max_tokens=4000` stopten
+    beide modellen uit zichzelf rond 276 en 410. Zodra thinking aangaat moet dit budget
+    opnieuw omhoog, want dan begrenst `max_tokens` thinking én antwoord samen.
     """
-    return 150 * aantal_items + 64
+    return 450 * aantal_items + 128
 
 
 def _parse_json_list(tekst: str) -> list[dict[str, Any]]:
@@ -371,6 +382,12 @@ def _classificeer_doc(
     except OnleesbaarAntwoordError as e:
         raw = ""
         onleesbaar = str(e)
+    # Afgekapt is niet leeg. Bij `max_tokens` mist de sluithaak, vindt `_parse_json_list`
+    # geen array en geeft die stil een lege lijst terug — niet te onderscheiden van "het
+    # model vond niets". Gemeten op 2026-08-17: precies zo verdwenen de bevindingen van
+    # Sonnet 5 en Opus 5.
+    if onleesbaar is None and getattr(resp, "stop_reason", None) == "max_tokens":
+        onleesbaar = "antwoord afgekapt op max_tokens; het budget is te krap voor dit model"
     if conn is not None and audit_id:
         from iso_audit.store import log_classification
 
@@ -434,6 +451,8 @@ def _classificeer_miro_batch(
     except OnleesbaarAntwoordError as e:
         raw = ""
         onleesbaar = str(e)
+    if onleesbaar is None and getattr(resp, "stop_reason", None) == "max_tokens":
+        onleesbaar = "antwoord afgekapt op max_tokens; het budget is te krap voor dit model"
     if conn is not None and audit_id:
         from iso_audit.store import log_classification
 
