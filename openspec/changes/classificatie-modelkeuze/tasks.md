@@ -1,34 +1,40 @@
 # Tasks: classificatie-modelkeuze
 
-- [ ] 1.1 `classification/findings.py`: `thinking={"type": "disabled"}` expliciet meegeven in
+- [x] 1.1 `classification/findings.py`: `thinking={"type": "disabled"}` expliciet meegeven in
       beide classificatiepaden (doc en Miro), met de reden erbij — het gedrag mag niet
       veranderen doordat een ander model een andere default heeft
-- [ ] 1.2 `classification/llm.py`: dezelfde expliciete configuratie op de aanroepen daar
+- [x] 1.2 `classification/llm.py`: dezelfde expliciete configuratie op de aanroepen daar
       (regel 89 en 132), zodat er geen tweede pad overblijft met de oude aanname
-- [ ] 2.1 Helper die het eerste blok met `type == "text"` opzoekt in plaats van
+- [x] 2.1 Helper die het eerste blok met `type == "text"` opzoekt in plaats van
       `resp.content[0]` te nemen; gebruikt door alle classificatie-aanroepen
-- [ ] 2.2 Geen tekstblok gevonden ⇒ `teller.fouten` omhoog plus een logregel met de reden;
+- [x] 2.2 Geen tekstblok gevonden ⇒ `teller.fouten` omhoog plus een logregel met de reden;
       `_parse_json_list` blijft ongewijzigd voor een leesbaar antwoord zonder array
-- [ ] 3.1 Comment bij `max_tokens = 150 * len(clausule_ids) + 64`: waar de 150 vandaan komt
+- [x] 3.1 Comment bij `max_tokens = 150 * len(clausule_ids) + 64`: waar de 150 vandaan komt
       (80 woorden beschrijving plus onderbouwing) en dat het budget mee moet omhoog zodra
       thinking aangaat, omdat `max_tokens` thinking én antwoord samen begrenst
-- [ ] 4.1 Uitzoeken waarom `classifications.usage_json` leeg blijft terwijl
-      `_usage_dict(resp.usage)` wordt meegegeven aan `log_classification`; repareren
+- [x] 4.1 ~~Uitzoeken waarom `usage_json` leeg blijft~~ — **vervallen, premisse was fout.**
+      Correct gemeten op 17-08 met Python (de eerdere check gebruikte `sqlite3`, dat op deze
+      machine niet bestaat): 215 van 215 rijen gevuld in de referentie-checkout. Geen defect
 - [ ] 4.2 Run-record krijgt totale kosten met `PRIJZEN_PEILDATUM` én de prijsgrondslag
-- [ ] 5.1 `PRIJZEN` krijgt een expliciete grondslag (lijstprijs of werkelijk tarief); geen
+- [x] 5.1 `PRIJZEN` krijgt een expliciete grondslag (lijstprijs of werkelijk tarief); geen
       datumlogica in de tabel
 - [ ] 5.2 Sonnet-5-regel volgt die grondslag — vraag aan de opdrachtgever welke van de twee
       het auditrapport moet noemen
-- [ ] 6.1 Test: elk model in `KIESBARE_MODELLEN` levert een geparseerde bevinding op met een
+- [x] 5.3 Cache: `cache_control` staat op prompts van 122–726 tokens terwijl het minimum 4096
+      (Haiku), 1024 (Sonnet 5) en 512 (Opus 5) is — gemeten cache_read = 0 over 215 calls.
+      Zichtbaar maken dat er niet gecachet wordt, en de "~10x goedkoper"-belofte uit de
+      module-docstring van `findings.py` halen of waarmaken
+- [x] 6.1 Test: elk model in `KIESBARE_MODELLEN` levert een geparseerde bevinding op met een
       gestubde respons waarvan het eerste blok géén tekstblok is
-- [ ] 6.2 Test: respons zonder tekstblok verhoogt de foutenteller en logt de reden
-- [ ] 6.3 Test: leesbaar antwoord zonder bevindingen blijft een geldig leeg oordeel zonder
+- [x] 6.2 Test: respons zonder tekstblok verhoogt de foutenteller en logt de reden
+- [x] 6.3 Test: leesbaar antwoord zonder bevindingen blijft een geldig leeg oordeel zonder
       foutmelding
-- [ ] 6.4 Test: `usage_json` is gevuld na een classificatie
-- [ ] 6.5 Test: het output-budget laat ruimte voor thinking zodra thinking aanstaat
+- [ ] 6.4 Test: `usage_json` is gevuld na een classificatie — als regressiebewaking, niet als
+      reparatie; het werkt al
+- [x] 6.5 Test: het output-budget laat ruimte voor thinking zodra thinking aanstaat
 - [ ] 7.1 `docs/reference/configuratie.md` (of de modelkeuze-doc): wat de modelkeuze betekent,
       welke grondslag de prijzen hebben, en dat `max_tokens` thinking meerekent
-- [ ] 7.2 CHANGELOG-regel met de motivatie: twee van de drie modellen leverden stil nul
+- [x] 7.2 CHANGELOG-regel met de motivatie: twee van de drie modellen leverden stil nul
       bevindingen
 - [ ] 8.1 In het cluster verifiëren: dezelfde audit op Haiku 4.5 én op Sonnet 5, en vaststellen
       dat beide bevindingen opleveren en dat de kosten in het run-record staan

@@ -135,7 +135,11 @@ def test_valideer_onbekend_thema_naar_overig() -> None:
 
 def _fake_anthropic_response(text: str) -> Any:
     """Bouw een minimaal anthropic-response-object met `.content[0].text`."""
+    # `type` expliciet zetten: de API geeft blokken met een type terug, en zonder dat
+    # veld kan deze stub het echte gedrag van Sonnet 5 en Opus 5 — een thinking-blok in
+    # plaats van een tekstblok — niet nabootsen. Zie `classification/respons.py`.
     block = MagicMock()
+    block.type = "text"
     block.text = text
     resp = MagicMock()
     resp.content = [block]

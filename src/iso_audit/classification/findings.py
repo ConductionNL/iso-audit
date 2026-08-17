@@ -9,8 +9,13 @@ wrapper is geschrapt; callers importeren rechtstreeks uit
 
 Verbeteringen t.o.v. v1:
 
-1. **System prompt met `cache_control` (ephemeral)** — statische delen worden
-   na eerste call uit cache gelezen (~10x goedkoper).
+1. **System prompt met `cache_control` (ephemeral)** — bedoeld om statische delen
+   uit cache te lezen. LET OP: dit slaat bij de huidige promptgroottes **niet aan**.
+   De systeem-prompts zijn 122-726 tokens en het minimum cacheerbare prefix is 4096
+   tokens op Haiku 4.5, 1024 op Sonnet 5 en 512 op Opus 5; onder dat minimum cachet
+   de API stil niet. Gemeten over 215 classificaties in de referentie-checkout
+   (2026-08-17): cache_read en cache_write allebei nul. De eerdere claim "~10x
+   goedkoper" stond hier jarenlang en was niet waar.
 2. **Per-call token usage + kostenlogging** via `Kostenteller`.
 3. **`schat_kosten`** — kostenschatting vooraf zonder API-calls.
 4. **Rehash / selective re-classify** — UPSERT i.p.v. INSERT-OR-IGNORE,
@@ -42,6 +47,8 @@ from typing import Any
 import anthropic
 from dotenv import load_dotenv
 
+from iso_audit.classification.respons import GEEN_THINKING, OnleesbaarAntwoordError, tekst_uit
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -60,6 +67,22 @@ CHARS_PER_TOKEN = 4  # ruwe schatting voor dry-run-cost
 PRIJZEN_PEILDATUM = "2026-08-14"
 """Datum waarop deze tarieven zijn gecontroleerd. Prijzen wijzigen buiten deze repo
 om; rapporteer deze datum mee bij elk kostenbedrag."""
+
+PRIJZEN_GRONDSLAG = "lijstprijs"
+"""Wélke prijs hier staat: `lijstprijs` of `werkelijk` (inclusief tijdelijke acties).
+
+Een bedrag met een peildatum maar zonder grondslag is niet navertelbaar. Concreet geval op
+2026-08-17: Sonnet 5 heeft tot en met 31 augustus 2026 een introductietarief van $2,00/$10,00
+per miljoen tokens, terwijl de tabel hieronder $3,00/$15,00 aanhoudt. Elk gerapporteerd bedrag
+voor Sonnet 5 valt daarmee een derde hoger uit dan wat er gefactureerd wordt.
+
+Bewust geen datumlogica in de tabel die zelf tussen tarieven kiest: dat is een tweede
+administratie die achterloopt op de leverancier, precies wat `PRIJZEN_PEILDATUM` moet
+voorkomen. Eén handmatig bijgehouden tabel met een peildatum en een benoemde grondslag is
+saai en controleerbaar.
+
+Staat hier `lijstprijs` en wil de opdrachtgever werkelijke kosten zien, dan is dat een
+waardewijziging in de tabel plus deze constante — geen codewijziging."""
 
 PRIJZEN: dict[str, dict[str, float]] = {
     # Alias én gedateerde ID: beide zijn geldige model-strings, en er staan
@@ -255,6 +278,19 @@ def _bouw_miro_user_prompt(notities: list[dict[str, Any]], clausules: dict[str, 
 # ---------------------------------------------------------------------------
 
 
+def _max_tokens_voor(aantal_items: int) -> int:
+    """Output-budget: 150 tokens per item plus 64 voor de JSON-omlijsting.
+
+    De 150 is de begroting voor één bevinding: een beschrijving van maximaal 80 woorden plus
+    de onderbouwing. Geen magisch getal — zie `_SYSTEM_*`, waar die 80 woorden staan.
+
+    **Zodra thinking aangaat moet dit budget mee omhoog.** Op Sonnet 5 en Opus 5 begrenst
+    `max_tokens` thinking én responstekst samen; bij vijf clausules is dit 814 tokens, en
+    thinking eet dat op waarna de JSON halverwege afkapt — zonder foutmelding.
+    """
+    return 150 * aantal_items + 64
+
+
 def _parse_json_list(tekst: str) -> list[dict[str, Any]]:
     """Extract de eerste JSON-array uit een respons-tekst."""
     start = tekst.find("[")
@@ -315,7 +351,8 @@ def _classificeer_doc(
     try:
         resp = client.messages.create(
             model=teller.model,
-            max_tokens=150 * len(clausule_ids) + 64,
+            max_tokens=_max_tokens_voor(len(clausule_ids)),
+            thinking=GEEN_THINKING,
             system=_maak_system_param(system),  # type: ignore[arg-type]
             messages=[{"role": "user", "content": user}],
         )
@@ -325,11 +362,14 @@ def _classificeer_doc(
         return []
     elapsed = time.time() - t0
     teller.voeg_toe(resp.usage, elapsed)
-    raw = ""
+    # Eerst de ruwe respons vastleggen, dan pas oordelen: een onleesbaar antwoord is precies
+    # het geval waarin je de raw output in de trail wil hebben om te zien wát er terugkwam.
+    onleesbaar: str | None = None
     try:
-        raw = resp.content[0].text  # type: ignore[union-attr]
-    except (AttributeError, IndexError):
+        raw = tekst_uit(resp)
+    except OnleesbaarAntwoordError as e:
         raw = ""
+        onleesbaar = str(e)
     if conn is not None and audit_id:
         from iso_audit.store import log_classification
 
@@ -344,6 +384,11 @@ def _classificeer_doc(
             usage=_usage_dict(resp.usage),
             elapsed_s=elapsed,
         )
+    if onleesbaar is not None:
+        # Tokens verbruikt, geen antwoord kunnen lezen: storing, geen leeg oordeel.
+        teller.fouten += 1
+        logger.warning("Onleesbaar antwoord (doc %s): %s", doc.get("naam", "")[:40], onleesbaar)
+        return []
     try:
         return _parse_json_list(raw)
     except (json.JSONDecodeError, IndexError) as e:
@@ -371,7 +416,8 @@ def _classificeer_miro_batch(
     try:
         resp = client.messages.create(
             model=teller.model,
-            max_tokens=150 * len(notities) + 64,
+            max_tokens=_max_tokens_voor(len(notities)),
+            thinking=GEEN_THINKING,
             system=_maak_system_param(system),  # type: ignore[arg-type]
             messages=[{"role": "user", "content": user}],
         )
@@ -381,11 +427,12 @@ def _classificeer_miro_batch(
         return []
     elapsed = time.time() - t0
     teller.voeg_toe(resp.usage, elapsed)
-    raw = ""
+    onleesbaar: str | None = None
     try:
-        raw = resp.content[0].text  # type: ignore[union-attr]
-    except (AttributeError, IndexError):
+        raw = tekst_uit(resp)
+    except OnleesbaarAntwoordError as e:
         raw = ""
+        onleesbaar = str(e)
     if conn is not None and audit_id:
         from iso_audit.store import log_classification
 
@@ -401,6 +448,10 @@ def _classificeer_miro_batch(
             usage=_usage_dict(resp.usage),
             elapsed_s=elapsed,
         )
+    if onleesbaar is not None:
+        teller.fouten += 1
+        logger.warning("Onleesbaar antwoord (Miro batch): %s", onleesbaar)
+        return []
     try:
         return _parse_json_list(raw)
     except (json.JSONDecodeError, IndexError) as e:

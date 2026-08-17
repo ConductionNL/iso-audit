@@ -25,6 +25,8 @@ from typing import Any
 import anthropic
 from dotenv import load_dotenv
 
+from iso_audit.classification.respons import GEEN_THINKING, tekst_uit
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -87,10 +89,11 @@ def _classificeer_batch(
         resp = client.messages.create(
             model=MODEL,
             max_tokens=2048,
+            thinking=GEEN_THINKING,
             system=_bouw_system_prompt(),
             messages=[{"role": "user", "content": invoer}],
         )
-        tekst: str = resp.content[0].text  # type: ignore[union-attr]
+        tekst: str = tekst_uit(resp)
         start = tekst.find("{")
         eind = tekst.rfind("}") + 1
         if start == -1 or eind <= start:

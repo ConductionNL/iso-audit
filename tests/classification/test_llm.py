@@ -11,7 +11,11 @@ from iso_audit.classification import llm
 
 
 def _fake_response(text: str) -> Any:
+    # `type` expliciet zetten: de API geeft blokken met een type terug, en zonder dat
+    # veld kan deze stub het echte gedrag van Sonnet 5 en Opus 5 — een thinking-blok in
+    # plaats van een tekstblok — niet nabootsen. Zie `classification/respons.py`.
     block = MagicMock()
+    block.type = "text"
     block.text = text
     resp = MagicMock()
     resp.content = [block]

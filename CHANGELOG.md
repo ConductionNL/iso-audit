@@ -6,6 +6,62 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-17 — twee van de drie kiesbare modellen leverden stil nul bevindingen
+
+De UI biedt Haiku 4.5, Sonnet 5 en Opus 5. Alleen Haiku werkte. De classificatie-aanroep gaf
+geen `thinking`-parameter mee, en dat weglaten is niet "uit": op Sonnet 5 en Opus 5 staat
+adaptive thinking dan aan. Gemeten tegen de echte API met een classificatie-achtige vraag:
+
+| aanroep | blokken | stop_reason |
+|---|---|---|
+| `claude-sonnet-5` zonder `thinking` | `['thinking']` | `max_tokens` |
+| `claude-sonnet-5` met `thinking: disabled` | `['text']` | `max_tokens` |
+| `claude-opus-5` zonder `thinking` | `['thinking']` | `max_tokens` |
+| `claude-haiku-4-5` met `thinking: disabled` | `['text']` | — |
+
+Zonder de parameter kwam er dus **alleen** een thinking-blok terug en géén tekstblok.
+`resp.content[0].text` gooide een `AttributeError`, die werd afgevangen tot een lege string, en
+`_parse_json_list("")` returnde stil een lege lijst — zonder de foutenteller te verhogen en
+zonder logregel. De run meldde zich `klaar` met nul bevindingen.
+
+Wat dit vervelend maakte: het gedrag is **invoer-afhankelijk**. Op een triviale vraag gaf
+Sonnet 5 wél direct tekst — adaptive thinking betekent dat het model zelf beslist. Het werkte
+dus in een snelle test en faalde op het echte werk.
+
+Drie wijzigingen: `thinking` staat expliciet uit (geverifieerd dat alle drie de modellen dat
+accepteren, Haiku inbegrepen); het tekstblok wordt op `type` gezocht in plaats van op positie,
+via één helper in de nieuwe module `classification/respons.py` die alle vier de
+classificatie-aanroepen gebruiken; en een respons zonder tekstblok is nu een storing die
+meetelt en gelogd wordt, terwijl een leesbaar antwoord zonder bevindingen een geldig leeg
+oordeel blijft.
+
+De testfixtures zetten geen `type` op hun responsblokken en konden dit daarom niet nabootsen.
+Dat is gerepareerd — de fixture die de bug had moeten vangen, vangt hem nu.
+
+Zie `openspec/changes/classificatie-modelkeuze/`.
+
+### Changed — 2026-08-17 — prijsgrondslag benoemd, en de cache-belofte teruggenomen
+
+`PRIJZEN_GRONDSLAG` zegt nu expliciet of de tarieven lijstprijs of werkelijk tarief zijn. Dat
+is nodig omdat Sonnet 5 tot en met 31 augustus 2026 een introductietarief van $2,00/$10,00
+heeft terwijl de tabel $3,00/$15,00 aanhoudt: elk gerapporteerd bedrag voor dat model valt een
+derde hoger uit dan wat er gefactureerd wordt. Bewust geen datumlogica in de tabel — dat zou
+een tweede administratie zijn die achterloopt op de leverancier.
+
+De module-docstring van `findings.py` beloofde dat de systeem-prompt "na eerste call uit cache
+gelezen (~10x goedkoper)" wordt. Dat gebeurt niet: de prompts zijn 122–726 tokens en het
+minimum cacheerbare prefix is 4096 tokens op Haiku 4.5, 1024 op Sonnet 5 en 512 op Opus 5.
+Onder dat minimum cachet de API stil niet. Gemeten over 215 classificaties in de
+referentie-checkout: `cache_read` en `cache_write` allebei nul. De claim is vervangen door wat
+er werkelijk gebeurt.
+
+**Correctie op een eerdere versie van het voorstel:** daar stond dat `usage_json` leeg blijft.
+Dat was fout — die check gebruikte `sqlite3`, wat op deze machine niet bestaat, en de lege
+uitvoer las ik als nul rijen. Correct gemeten: 215 van 215 rijen gevuld. Wat de data wél
+oplevert is het antwoord op de kostenvraag: gemiddeld 702 input- en 594 output-tokens per
+classificatie, en voor die hele set $0,79 op Haiku, $2,37 op Sonnet 5 en $3,95 op Opus 5.
+Prijs is bij dit volume dus geen argument in de modelkeuze.
+
 ### Added — 2026-08-17 — Drive-locaties als lijst, met eerlijke status per locatie
 
 Twee problemen die samen één change vormen — zie `openspec/changes/drive-locaties-ui/`.

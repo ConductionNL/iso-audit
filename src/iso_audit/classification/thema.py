@@ -27,6 +27,8 @@ from typing import Any
 import anthropic
 from dotenv import load_dotenv
 
+from iso_audit.classification.respons import tekst_uit
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -216,7 +218,7 @@ def _verwerk_batch(client: anthropic.Anthropic, batch: list[dict[str, Any]]) -> 
         ],
         messages=[{"role": "user", "content": invoer}],
     )
-    tekst: str = resp.content[0].text  # type: ignore[union-attr]
+    tekst: str = tekst_uit(resp)
     start = tekst.find("{")
     eind = tekst.rfind("}") + 1
     if start == -1 or eind <= start:

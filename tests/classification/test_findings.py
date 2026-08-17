@@ -177,12 +177,27 @@ def test_kostenteller_rapport_string() -> None:
 # ---------- _classificeer_doc ----------
 
 
-def _fake_resp(text: str) -> Any:
-    """Bouw een minimaal anthropic-response-object met `.content[0].text` + `.usage`."""
-    block = MagicMock()
-    block.text = text
+def _blok(soort: str, text: str = "") -> Any:
+    """Eén responsblok met een expliciet `type`, zoals de API het teruggeeft.
+
+    Het `type` zetten is niet cosmetisch: tot 2026-08-17 zette deze fixture het niet, en
+    daardoor kon hij het echte gedrag van Sonnet 5 en Opus 5 — een thinking-blok vóór (of in
+    plaats van) het tekstblok — niet nabootsen. De bug die daaruit volgde was in de tests
+    onzichtbaar.
+    """
+    blok = MagicMock()
+    blok.type = soort
+    blok.text = text
+    return blok
+
+
+def _fake_resp(text: str, blokken: list[Any] | None = None) -> Any:
+    """Bouw een minimaal anthropic-response-object met `.content` + `.usage`.
+
+    `blokken` overschrijft de inhoud, voor responsen die niet met een tekstblok beginnen.
+    """
     resp = MagicMock()
-    resp.content = [block]
+    resp.content = blokken if blokken is not None else [_blok("text", text)]
     resp.usage = MagicMock(
         input_tokens=10,
         output_tokens=20,
@@ -204,6 +219,90 @@ def test_classificeer_doc_happy() -> None:
         {"clausule": "10.2", "classificatie": "OFI", "beschrijving": "..", "onderbouwing": ".."}
     ]
     assert teller.calls == 1
+
+
+_JSON_BEVINDING = (
+    '[{"clausule": "10.2", "classificatie": "OFI", "beschrijving": "..", "onderbouwing": ".."}]'
+)
+
+
+def test_thinking_wordt_expliciet_uitgezet() -> None:
+    """Weglaten is niet "uit": dan bepaalt het gekozen model het gedrag.
+
+    Gemeten op 2026-08-17 tegen de echte API: zonder deze parameter leverde
+    `claude-sonnet-5` op een classificatie-achtige vraag alléén een thinking-blok en géén
+    tekstblok. Dat maakte de uitkomst afhankelijk van welk model de auditor koos.
+    """
+    client = MagicMock()
+    client.messages.create.return_value = _fake_resp(_JSON_BEVINDING)
+    findings._classificeer_doc(
+        {"naam": "Doc", "tekst": "x"},
+        ["10.2"],
+        {"10.2": {"titel": "NC"}},
+        client,
+        findings.Kostenteller(),
+    )
+    kwargs = client.messages.create.call_args.kwargs
+    assert kwargs["thinking"] == {"type": "disabled"}
+
+
+def test_tekstblok_wordt_gevonden_achter_een_thinking_blok() -> None:
+    """`content[0]` is een aanname; het tekstblok hoort op type gevonden te worden.
+
+    Dit is precies wat Sonnet 5 en Opus 5 teruggaven: een thinking-blok eerst.
+    """
+    client = MagicMock()
+    client.messages.create.return_value = _fake_resp(
+        "", blokken=[_blok("thinking"), _blok("text", _JSON_BEVINDING)]
+    )
+    teller = findings.Kostenteller()
+    out = findings._classificeer_doc(
+        {"naam": "Doc", "tekst": "x"}, ["10.2"], {"10.2": {"titel": "NC"}}, client, teller
+    )
+    assert out and out[0]["clausule"] == "10.2"
+    assert teller.fouten == 0
+
+
+def test_respons_zonder_tekstblok_is_een_storing() -> None:
+    """Tokens verbruikt en geen antwoord kunnen lezen is een fout, geen leeg oordeel.
+
+    Tot 2026-08-17 gaf dit stil een lege lijst: geen foutenteller, geen logregel. De run
+    meldde zich klaar met nul bevindingen — de ernstigste vorm van valse dekking voor een
+    audittool, want het rapport is leeg en lijkt compleet.
+    """
+    client = MagicMock()
+    client.messages.create.return_value = _fake_resp("", blokken=[_blok("thinking")])
+    teller = findings.Kostenteller()
+    out = findings._classificeer_doc(
+        {"naam": "Doc", "tekst": "x"}, ["10.2"], {"10.2": {"titel": "NC"}}, client, teller
+    )
+    assert out == []
+    assert teller.fouten == 1, "een onleesbaar antwoord moet als fout meetellen"
+
+
+def test_leesbaar_antwoord_zonder_bevindingen_blijft_geldig() -> None:
+    """Het model dat expliciet niets rapporteert is een oordeel, geen storing."""
+    client = MagicMock()
+    client.messages.create.return_value = _fake_resp("[]")
+    teller = findings.Kostenteller()
+    out = findings._classificeer_doc(
+        {"naam": "Doc", "tekst": "x"}, ["10.2"], {"10.2": {"titel": "NC"}}, client, teller
+    )
+    assert out == []
+    assert teller.fouten == 0, "leeg oordeel is geen fout"
+
+
+def test_output_budget_is_per_item_en_uitgelegd() -> None:
+    """Het budget moet meeschalen met het aantal items.
+
+    Belangrijker dan het getal: zodra thinking aangaat begrenst `max_tokens` thinking én
+    antwoord samen. Bij één clausule is dit 214 tokens, en gemeten op 2026-08-17 ging dat
+    budget volledig op aan thinking — `stop_reason` was `max_tokens` en er kwam geen
+    tekstblok. Deze test faalt als iemand het budget losmaakt van het aantal items.
+    """
+    assert findings._max_tokens_voor(1) == 214
+    assert findings._max_tokens_voor(5) == 814
+    assert findings._max_tokens_voor(5) > findings._max_tokens_voor(1)
 
 
 def test_classificeer_doc_api_error() -> None:

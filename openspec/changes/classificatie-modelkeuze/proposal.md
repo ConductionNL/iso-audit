@@ -36,16 +36,45 @@ Dit is niet hypothetisch: het staat als breaking change in de migratiegids voor 
 modellen ("every route that never set `thinking`: it now thinks, and `max_tokens` caps
 thinking + response text together").
 
-### 3. De kostenvraag is onbeantwoordbaar
+### 3. De kosten zijn wél gemeten, maar staan niet in het run-record — en de cache doet niets
 
-De tabel `classifications` heeft een `usage_json`-kolom (`store.py:158`) en
-`_usage_dict(resp.usage)` wordt netjes meegegeven aan `log_classification`. Toch staat er in
-geen enkele run data in: gemeten op 17-08 tegen zowel `output/audit.db` als de
-referentie-checkout `~/projects/iso-audit/output/audit.db` — nul rijen met een gevulde
-`usage_json`.
+**Correctie op een eerdere versie van dit voorstel.** Daar stond dat `usage_json` leeg blijft.
+Dat was fout: die "meting" gebruikte `sqlite3` op een machine waar dat commando niet bestaat,
+en de lege uitvoer las ik als nul rijen. Correct gemeten met Python op 2026-08-17:
+**215 van 215 rijen** in de referentie-checkout hebben een gevulde `usage_json`, en 2 van 2
+lokaal. Er is daar dus geen defect.
 
-Gevolg: "wat kost een audit" is niet te beantwoorden, en daarmee is elke modelkeuze een
-gevoelskwestie. De vraag komt van de opdrachtgever, niet van ons.
+Wat die data wél laat zien, zijn twee andere dingen.
+
+**De cache doet niets.** Over alle 215 classificaties is `cache_read_input_tokens` nul en
+`cache_creation_input_tokens` nul. `_maak_system_param` zet wel `cache_control: ephemeral` op
+de systeem-prompt, maar die prompts zijn 122–726 tokens en het minimum cacheerbare prefix is
+**4096 tokens op Haiku 4.5**, 1024 op Sonnet 5 en 512 op Opus 5. Onder dat minimum cachet de
+API stil niet — geen fout, geen waarschuwing. De module-docstring van `findings.py` belooft
+"statische delen worden na eerste call uit cache gelezen (~10x goedkoper)"; dat gebeurt niet.
+Opvallend gevolg: caching zou alleen op Opus 5 aanslaan, het duurste model.
+
+**Het run-record heeft geen kostenveld.** `registreer`/`afsluiten` in `api/runs.py` kennen
+`toegevoegd`, `overgeslagen` en `fout`. De kosten worden per run wél berekend
+(`Kostenteller.kosten_usd`) en gelogd, maar belanden niet in de trail — dus een auditor die
+later vraagt wat een run kostte, moet in de logs gaan zoeken.
+
+### 3b. Wat de meting oplevert voor de modelkeuze
+
+Uit de 215 echte classificaties in de referentie-checkout: gemiddeld **702 input- en 594
+output-tokens** per classificatie. Voor die hele set:
+
+| model | kosten | bij 10× dit volume |
+|---|---|---|
+| Haiku 4.5 | $0,79 | $7,89 |
+| Sonnet 5 | $2,37 | $23,68 |
+| Opus 5 | $3,95 | $39,47 |
+
+Dat is het antwoord op de vraag die deze change moest mogelijk maken, en het is duidelijker
+dan verwacht: **prijs is bij dit volume geen argument.** Het verschil tussen het goedkoopste
+en het duurste model is een paar dollar per audit, voor een oordeel dat naar een
+certificerende instantie gaat. Dat verandert de aard van de modelkeuze — het is een
+kwaliteitsvraag, niet een kostenvraag.
 
 ### 4. De prijzentabel staat op lijstprijs terwijl er een introtarief geldt
 
