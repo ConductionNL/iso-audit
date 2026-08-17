@@ -30,5 +30,5 @@
 - [x] 6.1 `docs/reference/source-drive.md` bijwerken: meerdere locaties, wat het getal
       betekent, en dat losse bestanden niet worden ondersteund
 - [x] 6.2 CHANGELOG-regel met de motivatie: onvindbare mogelijkheid plus valse groen
-- [ ] 7.1 In het cluster verifiëren met twee locaties: de Shared Drive plus "Interne audits",
+- [x] 7.1 In het cluster verifiëren met twee locaties: de Shared Drive plus "Interne audits",
       en één bewust fout ID om de waarschuwing te zien
