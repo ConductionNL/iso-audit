@@ -642,6 +642,17 @@ async function terugNaarOmgeving(bron, veld){
 // implementatiedetail en de auditor typt nooit een scheidingsteken.
 const _lijstWaarden = {};
 
+// Naam en soort per locatie-ID, uit de laatste healthcheck. Een ID van 44 tekens zegt een
+// mens niets — "0AAP…" is de ISO-drive, en dat moet je kunnen zien zonder het uit je hoofd
+// te kennen. De namen komen uit dezelfde bron als de statusregels, dus ze kunnen niet
+// uiteenlopen met wat de healthcheck meldt.
+const _locatieNamen = {};
+
+function onthoudLocatieNamen(locaties){
+  if(!Array.isArray(locaties)) return;
+  for(const l of locaties){ if(l && l.id) _locatieNamen[l.id] = {naam: l.naam||"", soort: l.soort||""}; }
+}
+
 function lijstSleutel(bron, veld){ return `${bron}::${veld}`; }
 
 function lijstVeld(bron, v, tip, herkomst){
@@ -662,11 +673,20 @@ function lijstVeld(bron, v, tip, herkomst){
 function lijstRijen(bron, veld){
   const waarden = _lijstWaarden[lijstSleutel(bron, veld)] || [];
   if(!waarden.length) return `<div class="mini">Nog niets gekoppeld.</div>`;
-  return waarden.map((w, i) => `<div class="lijstrij">
-      <span id="ln-${esc(lijstSleutel(bron, veld))}-${i}" class="mono">${esc(w)}</span>
+  return waarden.map((w, i) => {
+    // De naam voorop, het ID eronder klein. Het ID moet zichtbaar blijven — je verwijdert
+    // een rij op basis van wat er staat, en twee mappen kunnen dezelfde naam hebben.
+    const bekend = _locatieNamen[w];
+    const kop = bekend && bekend.naam
+      ? `${esc(bekend.naam)}${bekend.soort ? ` <span class="mini">(${esc(SOORT_LABEL[bekend.soort]||bekend.soort)})</span>` : ""}`
+      : `<span class="mono">${esc(w)}</span>`;
+    const onder = bekend && bekend.naam ? `<div class="mini mono">${esc(w)}</div>` : "";
+    return `<div class="lijstrij">
+      <span id="ln-${esc(lijstSleutel(bron, veld))}-${i}">${kop}${onder}</span>
       <button type="button" onclick="lijstVerwijderen('${esc(bron)}','${esc(veld)}',${i})"
         >Verwijderen</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 // Hetzelfde herleiden als de server doet, zodat "staat er al" hier klopt: wie een URL
@@ -751,6 +771,7 @@ const SOORT_LABEL = {"shared-drive":"Shared Drive", "map":"map", "geen-map":"gee
 // Per locatie een eigen regel. Eén samengevatte status verbergt precies het geval waar het
 // om gaat: één van de twee locaties levert niets op, en dat zie je niet aan een totaal.
 function locatieRegels(locaties){
+  onthoudLocatieNamen(locaties);
   if(!Array.isArray(locaties) || !locaties.length) return "";
   return `<div class="locaties">` + locaties.map(l => {
     const naam = l.naam ? esc(l.naam) : `<span class="mono">${esc(l.id)}</span>`;

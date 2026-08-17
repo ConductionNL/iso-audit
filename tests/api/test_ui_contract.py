@@ -194,6 +194,28 @@ def test_lijstveld_rendert_rijen_en_vraagt_geen_kommas() -> None:
     assert 'join(",")' in bewaar
 
 
+def test_de_rijen_tonen_de_naam_niet_alleen_het_id() -> None:
+    """Een ID van 44 tekens zegt een mens niets.
+
+    De spec eist "de naam zoals Drive die kent" per locatie. De statusregels deden dat al;
+    de bewerkbare rijen toonden nog het kale ID, en dan moet je uit je hoofd weten dat
+    `0AAP…` de ISO-drive is. Het ID blijft er wel bij staan: je verwijdert een rij op basis
+    van wat er staat, en twee mappen kunnen dezelfde naam hebben.
+    """
+    bron = _bron()
+    assert "const _locatieNamen" in bron
+    assert "function onthoudLocatieNamen(" in bron
+    # De namen komen uit dezelfde healthcheck als de statusregels, zodat ze niet uiteen
+    # kunnen lopen met wat daar gemeld wordt.
+    regels = bron.split("function locatieRegels(")[1].split("\nasync function testBron")[0]
+    assert "onthoudLocatieNamen(locaties)" in regels
+
+    rijen = bron.split("function lijstRijen(")[1].split("\n// Hetzelfde herleiden")[0]
+    assert "_locatieNamen[w]" in rijen, "de rij kijkt de naam niet op"
+    assert "bekend.naam" in rijen
+    assert "mini mono" in rijen, "het ID moet zichtbaar blijven onder de naam"
+
+
 def test_dezelfde_locatie_kan_niet_twee_keer() -> None:
     """Een geplakte URL van een locatie die al als kaal ID staat, is dezelfde locatie."""
     bron = _bron()
