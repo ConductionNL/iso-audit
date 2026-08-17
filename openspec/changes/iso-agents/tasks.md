@@ -1,4 +1,6 @@
-# Tasks: iso-vraagassistent
+# Tasks: iso-agents
+
+## Bronbevrager (agent 1)
 
 - [ ] 1.1 `assistent/ophalen.py`: clausule-detectie in de vraag (`8.24`, "clausule 5.27") en
       ophalen via `clause_matches`; alleen zonder clausule terugvallen op `documents_fts` —
@@ -41,3 +43,39 @@
       document en bevinding elkaar tegenspreken
 - [ ] 8.2 **Voorleggen aan Mark:** is "staat er niet in" in de praktijk bruikbaar of te streng?
       Dat is de enige ontwerpkeuze die pas in gebruik te beoordelen is
+
+## Normuitlegger (agent 2)
+
+- [ ] 9.1 Antwoordt uit `data/normteksten.lookup()`: `normtekst`, `interpretatie` en
+      `bewijslast`, geparafraseerd. Beweert niets over Conduction — dat is de Bronbevrager
+- [ ] 9.2 Test: een vraag naar wat een clausule eist noemt geen Conduction-document
+
+## Gap-analist (agent 3)
+
+- [ ] 10.1 Zet `bewijslast` per clausule naast wat er via `clause_matches` gekoppeld is
+- [ ] 10.2 Oordeel komt uit de bestaande classificatie (`bevindingen`), niet uit deze agent —
+      anders is er een tweede classificatiepad met een ander antwoord
+- [ ] 10.3 Test: de Gap-analist schrijft geen rij in `bevindingen` en velt geen classificatie
+- [ ] 10.4 Test: ontbrekende bewijslast wordt getoond als constatering, niet als NC
+
+## Opsteller (agent 4)
+
+- [ ] 11.1 Genereert beleidsstuk, risicoregister of VvT uit modelkennis, met de
+      documentstructuur die de skill als inspiratie gaf (doel, scope, rollen, review-cyclus)
+- [ ] 11.2 **Merkteken dat meereist met het document** — in de bestandsinhoud, niet alleen in
+      de UI, want het document verlaat het portaal richting Drive
+- [ ] 11.3 De classificatie negeert gemarkeerde documenten als bewijs
+- [ ] 11.4 Een mens kan vastleggen dat de organisatie het document heeft overgenomen; vanaf dan
+      telt het als gewoon bewijs, en die overname staat in de trail
+- [ ] 11.5 Test: gegenereerd document in een gekoppelde Drive-locatie levert geen bevinding
+- [ ] 11.6 Test: na vastgelegde overname telt hetzelfde document wél mee
+- [ ] 11.7 In de UI benoemen dat de Opsteller uit modelkennis put en geen bewijs oplevert
+
+## Overkoepelend
+
+- [ ] 12.1 Agentkeuze in de UI: de auditor ziet welke agent antwoordde en waarom die past
+- [ ] 12.2 Trail legt de agent vast naast vraag, antwoord en bronnen
+- [ ] 12.3 Test: elke agent houdt zich aan zijn bronregel — de Normuitlegger raakt het corpus
+      niet, de Bronbevrager put niet uit modelkennis
+- [ ] 12.4 **Voorleggen aan Mark:** is de scheiding in de praktijk te volgen, of gaat een
+      auditor de verkeerde agent vragen? Dat is pas in gebruik te beoordelen
