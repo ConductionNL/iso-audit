@@ -78,6 +78,10 @@
     padding:.3rem 0; border-bottom:1px solid var(--border); }
   .lijstrij:last-child { border-bottom:none; }
   .lijstrij .mini { flex:1 1 auto; }
+  /* Alleen de bewerkbare rijen: de naam neemt de ruimte zodat Verwijderen in elke rij op
+     dezelfde plek staat. Zonder dit schuift de knop mee met de lengte van de naam. Niet op
+     `.lijstrij` zelf, want in een statusregel is het eerste kind het bolletje. */
+  .bewerkrij > span:first-child { flex:1 1 auto; }
   .locaties { margin-top:.3rem; }
   .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8rem; }
   .veld input { border:1px solid var(--border); border-radius:4px; padding:.3rem; color:#1a1a1a; }
@@ -577,7 +581,13 @@ async function loadConfigView(){
   _bronnen = bronnen.filter(b => !b.eigen_kaart);
   // Herkomst per env-naam, zodat elk invulveld kan tonen waar zijn waarde vandaan komt.
   _herkomst = Object.fromEntries((herk.velden||[]).map(v => [v.env, v]));
-  const kaarten = bronnen.map(b => {
+  // `_bronnen` en niet `bronnen`: een bron met `eigen_kaart` heeft zijn eigen scherm en
+  // hoort hier niet nóg een keer te staan. Deed dat wel, en op 2026-08-17 werd dat zichtbaar
+  // als een tegenspraak: de Anthropic-kaart meldde "● actief" terwijl de generieke kaart
+  // eronder "⚠ niet gekoppeld" zei. Die laatste vraagt een `_check_source` voor iets dat
+  // geen Source-adapter is, dus die faalt altijd. Exact wat de vlag moest voorkomen —
+  // zie de docstring bij `eigen_kaart`: "twee kanten die kunnen afwijken".
+  const kaarten = _bronnen.map(b => {
     const h = health[b.naam] || {};
     const badge = h.connected
       ? `<span class="badge-on">● gekoppeld</span>`
@@ -681,7 +691,7 @@ function lijstRijen(bron, veld){
       ? `${esc(bekend.naam)}${bekend.soort ? ` <span class="mini">(${esc(SOORT_LABEL[bekend.soort]||bekend.soort)})</span>` : ""}`
       : `<span class="mono">${esc(w)}</span>`;
     const onder = bekend && bekend.naam ? `<div class="mini mono">${esc(w)}</div>` : "";
-    return `<div class="lijstrij">
+    return `<div class="lijstrij bewerkrij">
       <span id="ln-${esc(lijstSleutel(bron, veld))}-${i}">${kop}${onder}</span>
       <button type="button" onclick="lijstVerwijderen('${esc(bron)}','${esc(veld)}',${i})"
         >Verwijderen</button>

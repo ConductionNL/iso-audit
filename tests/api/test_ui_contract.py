@@ -194,6 +194,22 @@ def test_lijstveld_rendert_rijen_en_vraagt_geen_kommas() -> None:
     assert 'join(",")' in bewaar
 
 
+def test_een_bron_met_eigen_kaart_staat_niet_ook_in_de_generieke_lijst() -> None:
+    """`eigen_kaart` bestaat precies om dit te voorkomen — en werd niet gebruikt.
+
+    De kaarten werden uit de ongefilterde lijst gerenderd, dus Anthropic kreeg zowel zijn
+    eigen scherm als een generieke kaart. Die generieke vraagt een `_check_source` voor iets
+    dat geen Source-adapter is en faalt dus altijd. Gemeten op 2026-08-17, zichtbaar als een
+    tegenspraak op één scherm: "● actief" bovenaan, "⚠ niet gekoppeld" eronder.
+
+    De docstring bij `eigen_kaart` zei het al: "twee kanten die kunnen afwijken".
+    """
+    bron = _bron()
+    assert "_bronnen = bronnen.filter(b => !b.eigen_kaart)" in bron
+    assert "const kaarten = _bronnen.map(" in bron, "kaarten uit de ongefilterde lijst"
+    assert "const kaarten = bronnen.map(" not in bron
+
+
 def test_de_rijen_tonen_de_naam_niet_alleen_het_id() -> None:
     """Een ID van 44 tekens zegt een mens niets.
 
