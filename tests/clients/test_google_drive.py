@@ -51,6 +51,9 @@ class _Files:
     def get_media(self, **kwargs: Any) -> _Call:
         return self._volgende("get_media", kwargs)
 
+    def get(self, **kwargs: Any) -> _Call:
+        return self._volgende("get", kwargs)
+
 
 class _Service:
     def __init__(self, opnames: list[dict[str, Any]], antwoorden: list[Any]) -> None:
@@ -169,3 +172,67 @@ def test_retries_worden_meegegeven(dienst: Any) -> None:
     gd.drive_bereikbaar("map1")
 
     assert opnames[0]["execute_kwargs"]["num_retries"] == gd._MAX_RETRIES
+
+
+# ---------- locatie-info en inhoudstelling (statusregel in het configuratiescherm) ----------
+
+
+def test_locatie_info_geeft_naam_en_mime(dienst: Any) -> None:
+    opnames, antwoorden = dienst
+    antwoorden.append({"id": "map1", "name": "Interne audits", "mimeType": gd._MAP_MIME})
+
+    uit = gd.drive_locatie_info("map1")
+
+    assert uit == {"id": "map1", "naam": "Interne audits", "mime": gd._MAP_MIME}
+    assert opnames[0]["methode"] == "get"
+    assert opnames[0]["supportsAllDrives"] is True
+
+
+def test_locatie_info_faalt_zacht(dienst: Any) -> None:
+    """De naam is comfort, geen voorwaarde — een fout mag de rij niet onbruikbaar maken."""
+    _, antwoorden = dienst
+    antwoorden.append(RuntimeError("404 not found"))
+
+    assert gd.drive_locatie_info("weg") is None
+
+
+def test_telling_scheidt_bestanden_van_submappen(dienst: Any) -> None:
+    """Nul bestanden met submappen is iets anders dan leeg: recursief leest die wél."""
+    _, antwoorden = dienst
+    antwoorden.append(
+        {
+            "files": [
+                {"id": "a", "mimeType": "text/plain"},
+                {"id": "b", "mimeType": gd._MAP_MIME},
+                {"id": "c", "mimeType": "application/pdf"},
+            ]
+        }
+    )
+
+    aantal, submappen = gd.drive_inhoud_telling("map1")
+
+    assert (aantal, submappen) == (2, True)
+
+
+def test_telling_lege_map(dienst: Any) -> None:
+    _, antwoorden = dienst
+    antwoorden.append({"files": []})
+
+    assert gd.drive_inhoud_telling("map1") == (0, False)
+
+
+def test_telling_pagineert_niet_door(dienst: Any) -> None:
+    """Eén pagina volstaat; doorpagineren maakt van een statusregel weer een enumeratie."""
+    opnames, antwoorden = dienst
+    antwoorden.extend(
+        [
+            {"files": [{"id": "a", "mimeType": "text/plain"}], "nextPageToken": "p2"},
+            {"files": [{"id": "b", "mimeType": "text/plain"}]},
+        ]
+    )
+
+    aantal, _ = gd.drive_inhoud_telling("map1")
+
+    assert aantal == 1
+    assert len(opnames) == 1
+    assert "pageToken" not in opnames[0]

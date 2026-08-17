@@ -171,6 +171,53 @@ def test_een_403_zonder_sessieprobleem_heet_niet_sessie_verlopen() -> None:
     assert "ingelogd" in veilig
 
 
+def test_lijstveld_rendert_rijen_en_vraagt_geen_kommas() -> None:
+    """Meerdere Drive-locaties koppelen mag geen komma-getyp worden.
+
+    `DriveSource` las al uit meerdere locaties — `_split_ids` splitst op komma's — maar het
+    veld heette "Map-ID van de auditmap", enkelvoud, en niemand raadt dat daar een komma in
+    mag. Het opslagformaat was naar de UI gelekt: één typefout maakte stil twee onbruikbare
+    ID's van één goede.
+    """
+    bron = _bron()
+    assert "function lijstVeld(" in bron
+    assert "function lijstToevoegen(" in bron
+    assert "function lijstVerwijderen(" in bron
+
+    # De auditor krijgt een toevoegveld en rijen, geen scheidingsteken-instructie.
+    veld = bron.split("function lijstVeld(")[1].split("\nfunction lijstRijen")[0]
+    assert "plak een Drive-URL of ID" in veld
+    assert "komma" not in veld.lower(), "de UI mag niet om een scheidingsteken vragen"
+
+    # De komma bestaat alleen op de grens naar de server.
+    bewaar = bron.split("async function bewaarBron(")[1].split("\nasync function")[0]
+    assert 'join(",")' in bewaar
+
+
+def test_dezelfde_locatie_kan_niet_twee_keer() -> None:
+    """Een geplakte URL van een locatie die al als kaal ID staat, is dezelfde locatie."""
+    bron = _bron()
+    toevoegen = bron.split("function lijstToevoegen(")[1].split("\nfunction lijstVerwijderen")[0]
+    assert "idUitUrl(" in toevoegen, "zonder normalisatie herkent de dubbelcheck de URL niet"
+    assert "staat er al" in toevoegen
+
+
+def test_status_per_locatie_zichtbaar_zonder_te_testen() -> None:
+    """Een groene bron met één lege locatie moet dat op de kaart zelf laten zien.
+
+    Anders is de samenvatting precies de dekkingsclaim die niet klopt: de auditor ziet
+    groen en concludeert dat de scope gedekt is.
+    """
+    bron = _bron()
+    assert "function locatieRegels(" in bron
+    regels = bron.split("function locatieRegels(")[1].split("\nasync function testBron")[0]
+    # Het getal is niet-recursief; dat moet erbij staan, anders leest het als een totaal.
+    assert "direct in deze locatie" in regels
+    assert "l.reden" in regels, "een waarschuwing zonder reden helpt niemand"
+    # En de kaart rendert ze, niet alleen de testknop.
+    assert bron.count("locatieRegels(") >= 3
+
+
 def test_de_ui_wordt_niet_gecachet(tmp_path: Path) -> None:
     """Eén HTML-bestand zonder buildstap heeft geen versie in de URL. Zonder `no-store`
     zit een auditor na een uitrol op een oud scherm zonder het te merken — dat kostte hier

@@ -395,3 +395,55 @@ def test_geen_configwijziging_tijdens_een_run(
     r = client.post("/instellingen/bronnen/miro", json={"velden": {"MIRO_API_TOKEN": "x"}})
     assert r.status_code == 409
     assert aid in r.json()["detail"]
+
+
+# --- lijstvelden (meerdere Drive-locaties) --------------------------------
+
+
+def test_lijstveld_normaliseert_en_ontdubbelt(tmp_path: Path) -> None:
+    """Een geplakte URL en het kale ID zijn dezelfde locatie; die mag er één keer in.
+
+    De normalisatie staat op de server en niet in de browser, zodat hij ook geldt voor een
+    waarde die een beheerder via de omgeving meegeeft.
+    """
+    c = BronConfig(tmp_path)
+    c.zet(
+        "drive",
+        {
+            "AUDIT_SOURCE_FOLDER_ID": (
+                "https://drive.google.com/drive/folders/0AAP-shared?hl=nl,0AAP-shared,1YJoG-map"
+            )
+        },
+        door="auditor@example.org",
+    )
+    assert os.environ["AUDIT_SOURCE_FOLDER_ID"] == "0AAP-shared,1YJoG-map"
+
+
+def test_lijstveld_geeft_de_rijen_terug(tmp_path: Path) -> None:
+    """De UI rendert rijen; die hoort niet zelf op komma's te splitsen."""
+    c = BronConfig(tmp_path)
+    c.zet(
+        "drive",
+        {"AUDIT_SOURCE_FOLDER_ID": "0AAP-shared,1YJoG-map"},
+        door="auditor@example.org",
+    )
+    veld = next(v for v in c.status("drive")["velden"] if v["naam"] == "AUDIT_SOURCE_FOLDER_ID")
+    assert veld["lijst"] is True
+    assert veld["waarden"] == ["0AAP-shared", "1YJoG-map"]
+
+
+def test_gewoon_veld_krijgt_geen_rijen(tmp_path: Path) -> None:
+    """Alleen Drive is een lijstveld; de vorm van de andere velden verandert niet."""
+    veld = next(
+        v for v in BronConfig(tmp_path).status("jira")["velden"] if v["naam"] == "JIRA_BASE_URL"
+    )
+    assert veld["lijst"] is False
+    assert veld["waarden"] == []
+
+
+def test_lijstveld_wissen_werkt_nog(tmp_path: Path) -> None:
+    """Een lege lijst betekent loskoppelen, net als bij een gewoon veld."""
+    c = BronConfig(tmp_path)
+    c.zet("drive", {"AUDIT_SOURCE_FOLDER_ID": "0AAP-shared"}, door="auditor@example.org")
+    c.zet("drive", {"AUDIT_SOURCE_FOLDER_ID": ""}, door="auditor@example.org")
+    assert "AUDIT_SOURCE_FOLDER_ID" not in os.environ

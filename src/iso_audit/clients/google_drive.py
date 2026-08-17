@@ -122,6 +122,72 @@ def drive_bereikbaar(folder_id: str, drive_id: str | None = None) -> None:
     _dienst().files().list(**params).execute(num_retries=_MAX_RETRIES)
 
 
+_TELLING_PAGE_SIZE = 100
+"""Eén pagina volstaat voor de statusregel: het gaat om "staat hier iets in", niet om een
+exact totaal. Een recursieve telling over een Shared Drive kost minuten (gemeten: 2,5
+minuut voor 409 documenten) en het configuratiescherm opent bij elke pageload."""
+
+
+def drive_inhoud_telling(folder_id: str, drive_id: str | None = None) -> tuple[int, bool]:
+    """Tel niet-recursief wat er direct in een locatie staat.
+
+    Returnt ``(aantal_bestanden, heeft_submappen)`` over **één** pagina. Beide zijn nodig
+    om "leeg" van "alleen submappen" te onderscheiden: een map met uitsluitend submappen
+    levert nul bestanden op, en die mag niet als lege locatie worden weggezet terwijl een
+    recursieve run er wél documenten uit haalt.
+
+    Het aantal is begrensd door de pagegrootte en dus een ondergrens, niet een totaal — de
+    UI benoemt dat. Bewust geen `nextPageToken`-lus: die maakt van een statusregel weer een
+    enumeratie.
+
+    :raises: propageert de onderliggende API-fout.
+    """
+    params = _lijst_params(folder_id, drive_id)
+    params["fields"] = "files(id, mimeType)"
+    params["pageSize"] = _TELLING_PAGE_SIZE
+    result = _dienst().files().list(**params).execute(num_retries=_MAX_RETRIES)
+    bestanden = result.get("files", [])
+    aantal = sum(1 for b in bestanden if b.get("mimeType") != _MAP_MIME)
+    submappen = any(b.get("mimeType") == _MAP_MIME for b in bestanden)
+    return aantal, submappen
+
+
+def drive_locatie_info(locatie_id: str) -> dict[str, str] | None:
+    """Naam en soort van één Drive-locatie, of ``None`` als dat niet lukt.
+
+    Geeft ``{"id", "naam", "mime"}``. Bewust **niet** raisen: de naam is comfort in het
+    configuratiescherm, geen voorwaarde om te kunnen lezen. Een locatie waarvan we de naam
+    niet krijgen maar die wel bestanden oplevert is gewoon bruikbaar, en dan hoort de UI
+    het ID te tonen in plaats van de rij als kapot te melden.
+
+    De `mimeType` is het enige dat "lege map" van "dit is een bestand" onderscheidt: op
+    `'<bestand-id>' in parents` antwoordt de API met een lege lijst en status 200, precies
+    zoals bij een echt lege map.
+    """
+    try:
+        info = (
+            _dienst()
+            .files()
+            .get(fileId=locatie_id, fields="id, name, mimeType", supportsAllDrives=True)
+            .execute(num_retries=_MAX_RETRIES)
+        )
+    except Exception:
+        logger.warning(
+            '{"event": "drive_locatie_onbekend", "reden": "naam niet op te halen"}',
+        )
+        return None
+    return {
+        "id": str(info.get("id", locatie_id)),
+        "naam": str(info.get("name", "")),
+        "mime": str(info.get("mimeType", "")),
+    }
+
+
+def is_map_mime(mime: str) -> bool:
+    """Is dit MIME-type een Drive-map? Eén plek, zodat de constante niet gaat rondzwerven."""
+    return mime == _MAP_MIME
+
+
 def drive_exporteer_google_doc(file_id: str) -> str:
     """Exporteer een Google Doc als plain text.
 

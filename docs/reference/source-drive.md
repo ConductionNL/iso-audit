@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-07-13
+last_reviewed: 2026-08-17
 ---
 
 # Source: Drive
@@ -17,7 +17,28 @@ Google Workspace service-account met domain-wide delegation.
 |---|---|---|
 | `GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE` | ja | Pad naar de service-account JSON-key. Deployment-breed; niet in de UI. |
 | `GWS_IMPERSONATE_EMAIL` | **nee** | Namens welke *gebruiker* het account leest. Leeg laten tenzij een bron zonder impersonation onbereikbaar is. |
-| `AUDIT_SOURCE_FOLDER_ID` | ja | Map-ID, of Shared Drive root-ID (begint met `0A`). Een geplakte Drive-URL wordt naar het ID herleid. |
+| `AUDIT_SOURCE_FOLDER_ID` | ja | Eén of meer map-ID's en/of Shared Drive root-ID's (die beginnen met `0A`), komma-gescheiden. Een geplakte Drive-URL wordt naar het ID herleid. |
+
+### Meerdere locaties
+
+Meerdere Drives of mappen naast elkaar koppelen kan: in het portaal staan ze als losse
+rijen met een toevoeg- en verwijderactie, en de auditor typt nooit een scheidingsteken. De
+komma is het opslagformaat van de env-var, niet iets dat je invult.
+
+Bestanden die in twee gekoppelde locaties voorkomen worden op file-id ontdubbeld, dus
+overlappende scopes leveren geen dubbele documenten op.
+
+**Losse bestanden worden niet ondersteund.** De Drive-query is `'<id>' in parents`; een
+bestand-ID matcht daar niets. Tot 2026-08-17 leverde dat een groen bolletje op met nul
+gelezen documenten — de probe keek alleen of de API-aanroep slaagde, niet of er iets
+terugkwam. Nu meldt zo'n locatie zichzelf als waarschuwing, met de oorzaak erbij wanneer
+die is vast te stellen.
+
+**Het getal per locatie is niet-recursief.** Het zegt hoeveel bestanden er *direct* in die
+locatie staan, niet wat een run in totaal ophaalt. Een recursieve telling kost minuten
+(gemeten: 2,5 minuut voor 409 documenten) en het configuratiescherm opent bij elke
+pageload. Een map met alleen submappen toont daarom `0` en is toch bruikbaar; de
+statusregel meldt dan dat er submappen zijn.
 
 > De namen `GOOGLE_SERVICE_ACCOUNT_FILE` en `GOOGLE_IMPERSONATE_USER` stonden hier eerder;
 > die worden nergens in `src/` gelezen. `auth.py` leest de twee namen hierboven.

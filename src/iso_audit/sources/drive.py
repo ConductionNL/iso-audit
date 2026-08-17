@@ -21,10 +21,12 @@ from typing import Any
 import docx
 
 from iso_audit.clients.google_drive import (
-    drive_bereikbaar,
     drive_download_bestand,
     drive_exporteer_google_doc,
+    drive_inhoud_telling,
     drive_lijst_bestanden,
+    drive_locatie_info,
+    is_map_mime,
 )
 from iso_audit.config.google_ids import uit_url
 from iso_audit.config.verbinding import normaliseer
@@ -211,25 +213,79 @@ class DriveSource:
         del sessie_id
         return iter([])
 
+    def _locatie_status(self, fid: str) -> dict[str, object]:
+        """Status van één locatie: wat het is, of het bereikbaar is, en wat erin staat.
+
+        Bewust per locatie en niet samengevat. Tot 2026-08-17 slaagde de probe zodra de
+        API-aanroep lukte, ongeacht de uitkomst. De query is `'<id>' in parents`, dus een
+        bestand-ID matcht niets — geen fout, een lege lijst — en de UI meldde **gekoppeld**
+        terwijl elke run nul documenten uit die locatie las. Dezelfde valse groen als de
+        hardcoded planning-sheet die op 16-08 is weggehaald.
+        """
+        rij: dict[str, object] = {"id": fid, "naam": "", "soort": "onbekend"}
+        info = drive_locatie_info(fid)
+        if info:
+            rij["naam"] = info["naam"]
+        # Een Shared Drive-root herkennen we aan het ID-prefix; `files.get` geeft daar geen
+        # map-mime voor terug.
+        if self._drive_id_voor[fid]:
+            rij["soort"] = "shared-drive"
+        elif info:
+            rij["soort"] = "map" if is_map_mime(info["mime"]) else "geen-map"
+
+        try:
+            aantal, submappen = drive_inhoud_telling(fid, drive_id=self._drive_id_voor[fid])
+        except Exception as e:
+            soort, tekst = normaliseer(e, bron=self.naam)
+            return {**rij, "status": "fail", "soort_fout": soort, "reden": tekst}
+
+        rij["aantal"] = aantal
+        rij["submappen"] = submappen
+        if aantal or submappen:
+            return {**rij, "status": "ok"}
+
+        # Leeg. Alleen een oorzaak noemen als die is vastgesteld — een verzonnen oorzaak
+        # stuurt de auditor net zo hard het verkeerde bos in als geen melding.
+        reden = (
+            "Dit lijkt geen map maar een bestand; Drive kan er geen documenten uit lezen."
+            if rij["soort"] == "geen-map"
+            else "Bereikbaar, maar er zijn geen bestanden of submappen gevonden."
+        )
+        return {**rij, "status": "leeg", "reden": reden}
+
     def probe(self) -> dict[str, object]:
         """Lichte connectiviteits-probe voor de UI grey-out (geen volledige listing).
 
-        Eén bounded `files list` per folder (pageSize=1, niet-recursief) — bewijst
-        auth + bereikbaarheid in een fractie van de tijd van ``healthcheck()``.
+        Per locatie één `files.get` voor de naam en één bounded, niet-recursieve
+        `files.list` voor de inhoud. Geen recursie: die kost minuten en hoort niet in een
+        scherm dat bij elke pageload opent.
+
+        De bron geldt als gekoppeld zodra **één** locatie iets oplevert. Anders zou één
+        verkeerd geplakt ID een werkende configuratie als kapot laten ogen, en dat nodigt
+        uit tot wegklikken.
         """
-        for fid in self._folder_ids:
-            try:
-                drive_bereikbaar(fid, drive_id=self._drive_id_voor[fid])
-            except Exception as e:
-                soort, tekst = normaliseer(e, bron=self.naam)
-                return {
-                    "status": "fail",
-                    "naam": self.naam,
-                    "tenant": fid,
-                    "soort": soort,
-                    "reden": tekst,
-                }
-        return {"status": "ok", "naam": self.naam, "folders": list(self._folder_ids)}
+        locaties = [self._locatie_status(fid) for fid in self._folder_ids]
+        bruikbaar = [loc for loc in locaties if loc["status"] == "ok"]
+        if bruikbaar:
+            return {
+                "status": "ok",
+                "naam": self.naam,
+                "folders": list(self._folder_ids),
+                "locaties": locaties,
+            }
+
+        # Niets bruikbaar. Een echte verbindingsfout weegt zwaarder dan "leeg": die zegt
+        # iets over de credential, en dat is wat de auditor eerst moet weten.
+        eerste_fout = next((loc for loc in locaties if loc["status"] == "fail"), None)
+        bron = eerste_fout or (locaties[0] if locaties else None)
+        return {
+            "status": "fail",
+            "naam": self.naam,
+            "tenant": str(bron["id"]) if bron else "",
+            "soort": str(bron.get("soort_fout", "niet_geconfigureerd")) if bron else "",
+            "reden": str(bron["reden"]) if bron else "Geen Drive-locatie geconfigureerd.",
+            "locaties": locaties,
+        }
 
     def healthcheck(self) -> dict[str, object]:
         """Verifieer dat alle geconfigureerde Drive-locaties bereikbaar zijn."""

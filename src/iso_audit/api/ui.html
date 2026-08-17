@@ -74,6 +74,12 @@
   .bronkop { display:flex; gap:.6rem; align-items:center; }
   .bronkop button { margin-left:auto; }
   .veld { display:block; margin:.4rem 0; font-size:.85rem; color:var(--muted); }
+  .lijstrij { display:flex; flex-wrap:wrap; align-items:baseline; gap:.4rem;
+    padding:.3rem 0; border-bottom:1px solid var(--border); }
+  .lijstrij:last-child { border-bottom:none; }
+  .lijstrij .mini { flex:1 1 auto; }
+  .locaties { margin-top:.3rem; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.8rem; }
   .veld input { border:1px solid var(--border); border-radius:4px; padding:.3rem; color:#1a1a1a; }
   .bronbadge { font-size:.7rem; padding:.05rem .35rem; border-radius:3px;
                background:#eef1f5; color:#4a5568; }
@@ -577,13 +583,17 @@ async function loadConfigView(){
       ? `<span class="badge-on">● gekoppeld</span>`
       : `<span class="badge-off">⚠ niet gekoppeld</span>`;
     const reden = h.connected ? "" : `<div class="mini">${esc(h.reden||"")}</div>`;
+    // Ook op de kaart zelf de locaties tonen, niet alleen na "Testen". Een bron die groen
+    // is terwijl één van zijn locaties niets oplevert, moet dat direct laten zien —
+    // anders is de samenvatting precies de dekkingsclaim die niet klopt.
+    const locaties = locatieRegels(h.locaties);
     return `<div class="bronkaart" id="kaart-${esc(b.naam)}">
       <div class="bronkop">
         <strong>${esc(b.label)}</strong> ${badge}
         <button class="alt" onclick="toonBronForm('${esc(b.naam)}')">Configureer</button>
       </div>
       <div class="mini">${esc(b.uitleg||"")}</div>
-      ${reden}
+      ${reden}${locaties}
       <div id="bf-${esc(b.naam)}" hidden></div>
     </div>`;
   }).join("");
@@ -627,12 +637,76 @@ async function terugNaarOmgeving(bron, veld){
   await loadConfigView();
 }
 
+// De waarden van een lijstveld leven in de browser als array, niet als tekstregel met
+// komma's. Pas bij het opslaan wordt er één string van gemaakt — het opslagformaat is een
+// implementatiedetail en de auditor typt nooit een scheidingsteken.
+const _lijstWaarden = {};
+
+function lijstSleutel(bron, veld){ return `${bron}::${veld}`; }
+
+function lijstVeld(bron, v, tip, herkomst){
+  const sleutel = lijstSleutel(bron, v.naam);
+  if(_lijstWaarden[sleutel] === undefined) _lijstWaarden[sleutel] = (v.waarden || []).slice();
+  return `<div class="veld"${tip}>${esc(v.label)}${herkomst}
+    <div id="lv-${esc(sleutel)}">${lijstRijen(bron, v.naam)}</div>
+    <div style="margin-top:.4rem">
+      <input id="la-${esc(sleutel)}" style="width:70%" type="text"
+        placeholder="plak een Drive-URL of ID"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();lijstToevoegen('${esc(bron)}','${esc(v.naam)}')}">
+      <button type="button" onclick="lijstToevoegen('${esc(bron)}','${esc(v.naam)}')">Toevoegen</button>
+      <span id="lf-${esc(sleutel)}" class="mini"></span>
+    </div>
+    ${v.hint ? `<div class="mini">${esc(v.hint)}</div>` : ""}</div>`;
+}
+
+function lijstRijen(bron, veld){
+  const waarden = _lijstWaarden[lijstSleutel(bron, veld)] || [];
+  if(!waarden.length) return `<div class="mini">Nog niets gekoppeld.</div>`;
+  return waarden.map((w, i) => `<div class="lijstrij">
+      <span id="ln-${esc(lijstSleutel(bron, veld))}-${i}" class="mono">${esc(w)}</span>
+      <button type="button" onclick="lijstVerwijderen('${esc(bron)}','${esc(veld)}',${i})"
+        >Verwijderen</button>
+    </div>`).join("");
+}
+
+// Hetzelfde herleiden als de server doet, zodat "staat er al" hier klopt: wie een URL
+// plakt van een locatie die al als kaal ID in de lijst staat, mag geen dubbele rij krijgen.
+function idUitUrl(waarde){
+  const m = String(waarde).match(/\/(?:folders|d)\/([A-Za-z0-9_-]+)/);
+  return (m ? m[1] : String(waarde)).trim();
+}
+
+function lijstToevoegen(bron, veld){
+  const sleutel = lijstSleutel(bron, veld);
+  const invoer = document.getElementById("la-"+sleutel);
+  const melding = document.getElementById("lf-"+sleutel);
+  const waarde = idUitUrl(invoer.value);
+  melding.textContent = "";
+  if(!waarde){ return; }
+  if(_lijstWaarden[sleutel].includes(waarde)){
+    melding.textContent = "staat er al";
+    return;
+  }
+  _lijstWaarden[sleutel].push(waarde);
+  invoer.value = "";
+  document.getElementById("lv-"+sleutel).innerHTML = lijstRijen(bron, veld);
+}
+
+function lijstVerwijderen(bron, veld, i){
+  const sleutel = lijstSleutel(bron, veld);
+  _lijstWaarden[sleutel].splice(i, 1);
+  document.getElementById("lv-"+sleutel).innerHTML = lijstRijen(bron, veld);
+}
+
 function toonBronForm(naam){
   const doel = document.getElementById("bf-"+naam);
   const b = _bronnen.find(x=>x.naam===naam);
   if(!doel || !b) return;
   if(!doel.hidden){ doel.hidden = true; return; }
   doel.hidden = false;
+  // Bij het openen altijd terug naar wat de server zegt. Anders blijft een niet-opgeslagen
+  // rij uit een vorige keer staan en denk je dat hij gekoppeld is.
+  for(const v of b.velden){ if(v.lijst) delete _lijstWaarden[lijstSleutel(naam, v.naam)]; }
   doel.innerHTML = b.velden.map(v => {
     const tip = v.hint ? ` data-tip="${esc(v.hint)}"` : "";
     const status = v.geheim && v.ingesteld ? ` <span class="ok">ingesteld</span>` : "";
@@ -655,6 +729,7 @@ function toonBronForm(naam){
       onder = `<div class="mini">Komt nu uit de omgeving. Vul je hier iets in, dan geldt
         dat en wordt het vastgelegd.</div>`;
     }
+    if(v.lijst) return lijstVeld(naam, v, tip, bron) + onder;
     return `<label class="veld"${tip}>${esc(v.label)}${status}${bron}<br>
       <input id="v-${esc(naam)}-${esc(v.naam)}" style="width:100%"
         type="${v.geheim ? "password" : "text"}" placeholder="${esc(ph)}"
@@ -670,18 +745,42 @@ function toonBronForm(naam){
 
 // Meteen zeggen of het werkt. Zonder deze terugkoppeling vul je een token in, krijg je
 // "opgeslagen", en moet je zelf ergens anders gaan kijken of de koppeling het doet.
+const SOORT_LABEL = {"shared-drive":"Shared Drive", "map":"map", "geen-map":"geen map",
+  "onbekend":"onbekend"};
+
+// Per locatie een eigen regel. Eén samengevatte status verbergt precies het geval waar het
+// om gaat: één van de twee locaties levert niets op, en dat zie je niet aan een totaal.
+function locatieRegels(locaties){
+  if(!Array.isArray(locaties) || !locaties.length) return "";
+  return `<div class="locaties">` + locaties.map(l => {
+    const naam = l.naam ? esc(l.naam) : `<span class="mono">${esc(l.id)}</span>`;
+    const soort = SOORT_LABEL[l.soort] || esc(l.soort||"");
+    if(l.status === "ok"){
+      // Het getal is niet-recursief; dat staat erbij, anders leest het als een totaal.
+      const telling = l.aantal ? `${l.aantal} bestand(en) direct in deze locatie` : "";
+      const sub = l.submappen ? (telling ? " · submappen" : "submappen") : "";
+      return `<div class="lijstrij"><span class="ok">●</span> ${naam}
+        <span class="mini">(${soort})</span>
+        <span class="mini">${esc(telling)}${esc(sub)}</span></div>`;
+    }
+    return `<div class="lijstrij"><span class="badge-off">⚠</span> ${naam}
+      <span class="mini">(${soort})</span>
+      <div class="mini">${esc(l.reden||"")}</div></div>`;
+  }).join("") + `</div>`;
+}
+
 async function testBron(naam){
   const uit = document.getElementById("bt-"+naam);
   uit.innerHTML = "bezig met testen…";
   try {
     const h = await j(`/instellingen/health/${encodeURIComponent(naam)}`);
-    uit.innerHTML = h.connected
+    const kop = h.connected
       ? `<span class="ok">● gekoppeld</span>`
         + (h.user ? ` — account: ${esc(h.user)}` : "")
         + (h.tenant ? ` (${esc(h.tenant)})` : "")
         + (h.aantal_tabs !== undefined ? ` — ${h.aantal_tabs} tabs gelezen` : "")
-        + (h.folders ? ` — ${(h.folders||[]).length} map(pen)` : "")
       : `<span class="badge-off">⚠ niet gekoppeld</span> ${esc(h.reden||"")}`;
+    uit.innerHTML = kop + locatieRegels(h.locaties);
   } catch(e){
     uit.innerHTML = `<span class="badge-off">⚠ testen mislukte</span> ${esc(String(e))}`;
   }
@@ -692,6 +791,15 @@ async function bewaarBron(naam){
   const msg = document.getElementById("bs-"+naam);
   const velden = {};
   for(const v of b.velden){
+    if(v.lijst){
+      // Hier, en alleen hier, wordt de lijst één string. De server normaliseert en
+      // ontdubbelt nog een keer — dat is de plek die ook geldt voor een waarde die een
+      // beheerder via de omgeving meegeeft.
+      const waarden = _lijstWaarden[lijstSleutel(naam, v.naam)];
+      if(waarden === undefined) continue;
+      velden[v.naam] = waarden.join(",");
+      continue;
+    }
     const el = document.getElementById(`v-${naam}-${v.naam}`);
     if(!el) continue;
     // Een leeg geheim veld betekent "laat staan"; een leeg gewoon veld betekent "wis".

@@ -436,5 +436,154 @@ def test_haal_documenten_op_leesfout_naar_review() -> None:
     assert review[0]["reden"].startswith("Leesfout")
 
 
+# ---------- probe: status per locatie ----------
+#
+# Tot 2026-08-17 slaagde `probe()` zodra de API-aanroep lukte. De Drive-query is
+# `'<id>' in parents`, dus een bestand-ID matcht niets — geen fout, een lege lijst — en de
+# UI meldde **gekoppeld** terwijl elke run nul documenten uit die locatie las.
+
+
+def _probe_met(
+    ids: str,
+    *,
+    info: dict[str, dict[str, str] | None],
+    telling: dict[str, tuple[int, bool]],
+) -> dict[str, Any]:
+    """Draai `probe()` met de client gestubd per locatie-ID."""
+    src = drive.DriveSource(folder_id=ids)
+    with (
+        patch.object(drive, "drive_locatie_info", side_effect=lambda fid: info.get(fid)),
+        patch.object(
+            drive,
+            "drive_inhoud_telling",
+            side_effect=lambda fid, drive_id=None: telling[fid],
+        ),
+    ):
+        return src.probe()
+
+
+_MAP = "application/vnd.google-apps.folder"
+_PDF = "application/pdf"
+
+
+def test_probe_bestand_id_is_geen_koppeling() -> None:
+    """Een bestand-ID levert nul documenten op; dat mag geen groen bolletje geven."""
+    uit = _probe_met(
+        "bestand1",
+        info={"bestand1": {"id": "bestand1", "naam": "Beleid.pdf", "mime": _PDF}},
+        telling={"bestand1": (0, False)},
+    )
+    assert uit["status"] == "fail"
+    rij = uit["locaties"][0]
+    assert rij["soort"] == "geen-map"
+    assert rij["status"] == "leeg"
+    assert "geen map" in str(rij["reden"])
+
+
+def test_probe_lege_map_beweert_geen_oorzaak() -> None:
+    """Bij een echt lege map is de oorzaak niet vast te stellen — dan niets beweren."""
+    uit = _probe_met(
+        "map1",
+        info={"map1": {"id": "map1", "naam": "Interne audits", "mime": _MAP}},
+        telling={"map1": (0, False)},
+    )
+    rij = uit["locaties"][0]
+    assert rij["soort"] == "map"
+    assert rij["status"] == "leeg"
+    assert "geen map" not in str(rij["reden"])
+    assert "geen bestanden of submappen" in str(rij["reden"])
+
+
+def test_probe_map_met_alleen_submappen_is_niet_leeg() -> None:
+    """Nul bestanden maar wél submappen: een recursieve run leest daar wél uit."""
+    uit = _probe_met(
+        "map1",
+        info={"map1": {"id": "map1", "naam": "Beleid", "mime": _MAP}},
+        telling={"map1": (0, True)},
+    )
+    assert uit["status"] == "ok"
+    assert uit["locaties"][0]["status"] == "ok"
+
+
+def test_probe_een_goede_en_een_lege_locatie_blijft_gekoppeld() -> None:
+    """Eén verkeerd geplakt ID mag een werkende configuratie niet rood maken."""
+    uit = _probe_met(
+        "0AAP-shared,bestand1",
+        info={
+            "0AAP-shared": {"id": "0AAP-shared", "naam": "Conduction", "mime": ""},
+            "bestand1": {"id": "bestand1", "naam": "Beleid.pdf", "mime": _PDF},
+        },
+        telling={"0AAP-shared": (409, True), "bestand1": (0, False)},
+    )
+    assert uit["status"] == "ok"
+    per_status = {str(r["id"]): r["status"] for r in uit["locaties"]}
+    assert per_status == {"0AAP-shared": "ok", "bestand1": "leeg"}
+
+
+def test_probe_shared_drive_wordt_als_zodanig_herkend() -> None:
+    """`files.get` geeft voor een Shared Drive-root geen map-mime; het ID-prefix wel."""
+    uit = _probe_met(
+        "0AAP-shared",
+        info={"0AAP-shared": {"id": "0AAP-shared", "naam": "Conduction", "mime": ""}},
+        telling={"0AAP-shared": (12, False)},
+    )
+    rij = uit["locaties"][0]
+    assert rij["soort"] == "shared-drive"
+    assert rij["naam"] == "Conduction"
+
+
+def test_probe_zonder_naam_blijft_bruikbaar() -> None:
+    """De naam is comfort, geen voorwaarde: zonder naam blijft de locatie gekoppeld."""
+    uit = _probe_met(
+        "map1",
+        info={"map1": None},
+        telling={"map1": (3, False)},
+    )
+    assert uit["status"] == "ok"
+    rij = uit["locaties"][0]
+    assert rij["naam"] == ""
+    assert rij["soort"] == "onbekend"
+    assert rij["status"] == "ok"
+
+
+def test_probe_verbindingsfout_weegt_zwaarder_dan_leeg() -> None:
+    """Een geweigerde credential zegt iets anders dan een lege map; die moet vooropstaan."""
+    src = drive.DriveSource(folder_id="map1,map2")
+
+    def _telling(fid: str, drive_id: str | None = None) -> tuple[int, bool]:
+        if fid == "map2":
+            raise RuntimeError("403 forbidden")
+        return (0, False)
+
+    with (
+        patch.object(drive, "drive_locatie_info", return_value=None),
+        patch.object(drive, "drive_inhoud_telling", side_effect=_telling),
+    ):
+        uit = src.probe()
+
+    assert uit["status"] == "fail"
+    assert uit["tenant"] == "map2"
+    assert uit["soort"] == "auth"
+
+
+def test_probe_telt_niet_recursief() -> None:
+    """De statusregel mag geen enumeratie worden — één telling per locatie, niet meer."""
+    src = drive.DriveSource(folder_id="map1,map2")
+    aanroepen: list[str] = []
+
+    def _telling(fid: str, drive_id: str | None = None) -> tuple[int, bool]:
+        aanroepen.append(fid)
+        return (5, True)
+
+    with (
+        patch.object(drive, "drive_locatie_info", return_value=None),
+        patch.object(drive, "drive_inhoud_telling", side_effect=_telling),
+        patch.object(drive, "drive_lijst_bestanden", side_effect=AssertionError("recursief!")),
+    ):
+        src.probe()
+
+    assert aanroepen == ["map1", "map2"]
+
+
 # Type-cast voor mypy zodat tests/typing klopt.
 _ = Any

@@ -6,6 +6,43 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-17 — Drive-locaties als lijst, met eerlijke status per locatie
+
+Twee problemen die samen één change vormen — zie `openspec/changes/drive-locaties-ui/`.
+
+**De mogelijkheid bestond en was onvindbaar.** `DriveSource` las al uit meerdere locaties:
+`_split_ids` splitst op komma's en `list_documents` dedupliceert op file-id. Maar het veld
+heette "Map-ID van de auditmap", enkelvoud, met de hint "Het laatste deel van de Drive-URL
+van de map". Niemand raadt dat daar een komma in mag, dus wie twee Drives wilde koppelen
+concludeerde dat het niet kon. Het opslagformaat was bovendien naar de UI gelekt: je moest
+zelf scheidingstekens plaatsen, en één typefout maakte stil twee onbruikbare ID's van één
+goede.
+
+Het Drive-formulier is nu een lijst met een toevoeg- en verwijderactie per rij. De komma
+bestaat alleen nog op de grens naar de server; de auditor typt er nooit een. Normaliseren
+(geplakte URL → ID) en ontdubbelen gebeurt server-side, zodat het ook geldt voor een waarde
+die een beheerder via de omgeving meegeeft.
+
+**Een niet-map meldde zich groen.** `probe()` deed één `files.list` en keek alleen of de
+aanroep slaagde. De query is `'<id>' in parents`, dus een bestand-ID matcht niets — geen
+fout, een lege lijst. De UI meldde **gekoppeld** terwijl elke run nul documenten uit die
+locatie las. Dezelfde valse groen als de hardcoded planning-sheet die gisteren is
+weggehaald, langs een andere weg.
+
+Elke locatie heeft nu een eigen statusregel met de naam uit Drive, het soort, en wat erin
+staat. Een locatie zonder bestanden én zonder submappen is een waarschuwing, niet groen —
+met de oorzaak erbij (`mimeType` zegt of het een map is) en zónder oorzaak wanneer die niet
+is vast te stellen. Liever geen oorzaak dan een verzonnen oorzaak. De bron als geheel blijft
+gekoppeld zodra één locatie iets oplevert, anders maakt één verkeerd geplakt ID een werkende
+configuratie rood.
+
+De aantallen zijn niet-recursief en dat staat er ook bij: een recursieve telling kost
+minuten en dit scherm opent bij elke pageload. Daarom is de drempel voor de waarschuwing
+"geen bestanden én geen submappen".
+
+Losse bestanden blijven buiten scope, op verzoek. De waarschuwing maakt wél zichtbaar
+wanneer iemand het toch probeert.
+
 ### Storing — 2026-08-17 — portaal 45 minuten plat na een versiebump zonder image
 
 `0.2.0a11` is naar `main` gepusht terwijl de image-build voor die commit nog in de wachtrij

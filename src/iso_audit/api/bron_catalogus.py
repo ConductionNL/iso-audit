@@ -48,6 +48,18 @@ class Veld:
     hint: str = ""
     """Korte uitleg, als tooltip. Niet de plek voor implementatiedetails."""
 
+    lijst: bool = False
+    """Meerdere waarden, in de UI als rijen met een toevoeg- en verwijderactie.
+
+    De opslag blijft één komma-gescheiden string — dat is wat de adapters al lezen
+    (`sources/drive.py:_split_ids`). De komma is daarmee een implementatiedetail dat de UI
+    opbouwt en uit elkaar haalt; de auditor typt er nooit een.
+
+    Bewust géén generiek herhaalbaar-veld-mechaniek: alleen Drive heeft dit nodig, en drie
+    bronnen die het niet gebruiken mogen niet meebetalen aan die abstractie. Wil Jira het
+    later ook, dán generaliseren.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class BronDefinitie:
@@ -75,8 +87,12 @@ STANDAARD: list[BronDefinitie] = [
         velden=[
             Veld(
                 naam="AUDIT_SOURCE_FOLDER_ID",
-                label="Map-ID van de auditmap",
-                hint="Het laatste deel van de Drive-URL van de map.",
+                label="Gekoppelde Drive-locaties",
+                hint=(
+                    "Een Shared Drive of een map. Plak de URL uit de adresbalk, of het ID. "
+                    "Je kunt er meerdere koppelen; dubbele bestanden worden overgeslagen."
+                ),
+                lijst=True,
             ),
             Veld(
                 naam="GWS_IMPERSONATE_EMAIL",

@@ -40,6 +40,7 @@ from typing import Any
 
 from iso_audit.api import bron_catalogus as cat
 from iso_audit.config import secret_store
+from iso_audit.config.google_ids import uit_url
 
 _log = logging.getLogger("iso_audit.audit")
 
@@ -69,6 +70,30 @@ de overschrijving niet gebruikt wordt). Wie en wanneer staat al in
 def _hash(waarde: str) -> str:
     """Vingerafdruk van een waarde. Nooit de waarde zelf, ook niet afgekort."""
     return hashlib.sha256(waarde.encode("utf-8")).hexdigest()
+
+
+def lijst_uit(waarde: str) -> list[str]:
+    """Split een opgeslagen lijstveld in losse, genormaliseerde waarden.
+
+    Elke waarde gaat door `uit_url`, zodat een geplakte Drive-URL hetzelfde ID oplevert
+    als een kaal ID en de ontdubbeling daarop kan vergelijken.
+    """
+    gezien: list[str] = []
+    for deel in waarde.split(","):
+        genormaliseerd = uit_url(deel.strip())
+        if genormaliseerd and genormaliseerd not in gezien:
+            gezien.append(genormaliseerd)
+    return gezien
+
+
+def lijst_naar(waarden: list[str]) -> str:
+    """Bouw de opgeslagen vorm: komma-gescheiden, genormaliseerd, ontdubbeld.
+
+    De komma blijft het opslagformaat — dat is wat de adapters al lezen
+    (`sources/drive.py:_split_ids`) — maar hij is hier een implementatiedetail. De UI
+    toont rijen en de auditor typt nooit een scheidingsteken.
+    """
+    return ",".join(lijst_uit(",".join(waarden)))
 
 
 class BronConfig:
@@ -198,6 +223,10 @@ class BronConfig:
                     "hint": v.hint,
                     "ingesteld": bool(waarde),
                     "waarde": "" if v.geheim else waarde,
+                    "lijst": v.lijst,
+                    # De UI rendert rijen; die hoort niet zelf op komma's te splitsen.
+                    # Voor een gewoon veld blijft dit leeg, zodat de vorm niet verandert.
+                    "waarden": lijst_uit(waarde) if v.lijst and not v.geheim else [],
                     # Staat er een beheerderswaarde achter dit veld? Dan is invullen
                     # alleen mogelijk als expliciete overschrijving.
                     "uit_omgeving": bool(uit_omgeving),
@@ -252,6 +281,11 @@ class BronConfig:
         vervangen: set[str] = set()
         for naam, waarde in velden.items():
             nieuw = waarde.strip()
+            if toegestaan[naam].lijst:
+                # Normaliseren en ontdubbelen op één plek, niet in de browser: dan geldt
+                # het ook voor een waarde die een beheerder via de omgeving meegeeft, en
+                # levert een geplakte URL hetzelfde ID op als een kaal ID.
+                nieuw = lijst_naar([nieuw])
             if nieuw == huidig.get(naam, ""):
                 continue
             uit_omgeving = (self.basis.get(naam) or "").strip()
