@@ -85,7 +85,7 @@ class BronConfig:
         Zonder deze momentopname is de vraag "staat hier een beheerderswaarde achter?"
         zelfreferentieel: `zet()` en `naar_omgeving()` schrijven in dezelfde omgeving die
         het antwoord moet leveren, en dan lijkt élke opgeslagen waarde uit de omgeving te
-        komen. Dat is dezelfde fout die eerder de herkomst in `/config/herkomst` onwaar
+        komen. Dat is dezelfde fout die eerder de herkomst in `/instellingen/herkomst` onwaar
         maakte."""
 
     # --- lezen ---------------------------------------------------------------

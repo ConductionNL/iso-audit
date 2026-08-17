@@ -220,7 +220,7 @@ def load_config(
     **van vóór de eerste `naar_omgeving()`** doorgeven: die methode schrijft opgeloste
     waarden terug in `os.environ`, dus zonder momentopname leest een tweede
     `load_config()` een UI-waarde terug als `bron="env"`. Dan meldt
-    `/config/herkomst` "door een beheerder gezet" over iets dat een auditor zelf
+    `/instellingen/herkomst` "door een beheerder gezet" over iets dat een auditor zelf
     intypte — precies de vraag die dat endpoint moet beantwoorden — en zou een
     blokkade op env-velden een UI-veld na één save onbewerkbaar maken.
     """

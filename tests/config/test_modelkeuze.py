@@ -85,8 +85,8 @@ def test_herkomst_endpoint(tmp_path, monkeypatch) -> None:  # type: ignore[no-un
     app = create_app(registry, profile=str(EXAMPLES / "conduction.profile.yaml"), norms_dir=NORMS)
     client = TestClient(app, headers={"X-Forwarded-Email": AUDITOR})
 
-    client.post("/config/bronnen/jira", json={"velden": {"JIRA_API_TOKEN": "topsecret"}})
-    body = client.get("/config/herkomst")
+    client.post("/instellingen/bronnen/jira", json={"velden": {"JIRA_API_TOKEN": "topsecret"}})
+    body = client.get("/instellingen/herkomst")
     assert body.status_code == 200
     velden = {r["veld"]: r for r in body.json()["velden"]}
 

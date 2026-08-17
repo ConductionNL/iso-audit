@@ -10,7 +10,7 @@ auditpraktijk draaien: een nieuwe audit vroeg een beheeractie en eerdere audits 
 onvindbaar. Nu is een audit een eerste-klas object en noemt elk verzoek zijn audit.
 
 Audit-onafhankelijk blijven: `/healthz` (buiten de auth-gate, voor de kubelet-probe)
-en `/config/*` — of de bronnen gekoppeld zijn is geen eigenschap van één audit.
+en `/instellingen/*` — of de bronnen gekoppeld zijn is geen eigenschap van één audit.
 """
 
 from __future__ import annotations
@@ -211,7 +211,7 @@ def create_app(
 
     # --- audit-onafhankelijke configuratie ----------------------------------
 
-    @app.get("/config/options")
+    @app.get("/instellingen/options")
     def config_options() -> dict[str, list[str]]:
         """Beschikbare normen (norm-DB) en geregistreerde bronnen."""
         from iso_audit.ingest import beschikbare_bronnen
@@ -221,7 +221,7 @@ def create_app(
             "sources": beschikbare_bronnen(),
         }
 
-    @app.get("/config/bronnen")
+    @app.get("/instellingen/bronnen")
     def config_bronnen() -> list[dict[str, object]]:
         """Per bron: welke velden nodig zijn en of ze ingesteld zijn.
 
@@ -229,7 +229,7 @@ def create_app(
         """
         return bronnen.alles()
 
-    @app.post("/config/bronnen/{bron}")
+    @app.post("/instellingen/bronnen/{bron}")
     def config_bron_zetten(bron: str, body: BronVelden, request: Request) -> dict[str, object]:
         """Koppel een bron of pas zijn scope aan — zonder cluster, zonder beheerder.
 
@@ -270,7 +270,7 @@ def create_app(
         hk.log_herkomst(_laad_settings())
         return bronnen.status(bron)
 
-    @app.get("/config/herkomst")
+    @app.get("/instellingen/herkomst")
     def config_herkomst() -> dict[str, object]:
         """Per veld: welke bron won, en of het is ingesteld.
 
@@ -281,7 +281,7 @@ def create_app(
         huidig = _laad_settings()
         return {"config_version": huidig.config_version, "velden": hk.overzicht(huidig)}
 
-    @app.get("/config/anthropic")
+    @app.get("/instellingen/anthropic")
     def anthropic_status() -> dict[str, object]:
         """Welke modus, welk model, en of er een actieve sessie is.
 
@@ -306,7 +306,7 @@ def create_app(
             **sessie,
         }
 
-    @app.post("/config/anthropic/login")
+    @app.post("/instellingen/anthropic/login")
     def anthropic_login_start(request: Request) -> dict[str, str]:
         """Start de browserstap. Het portaal heeft geen browser en hoort er geen te hebben."""
         try:
@@ -316,7 +316,7 @@ def create_app(
         log_event("anthropic_login_gestart", identiteit_van(request))
         return {"sessie": sessie, "url": url}
 
-    @app.post("/config/anthropic/login/code")
+    @app.post("/instellingen/anthropic/login/code")
     def anthropic_login_code(body: LoginCode, request: Request) -> dict[str, object]:
         """Lever de code aan. De code wordt niet gelogd en niet bewaard."""
         try:
@@ -326,7 +326,7 @@ def create_app(
         log_event("anthropic_login_voltooid", identiteit_van(request))
         return aa.status()
 
-    @app.post("/config/anthropic/logout")
+    @app.post("/instellingen/anthropic/logout")
     def anthropic_logout(request: Request) -> dict[str, object]:
         try:
             aa.uitloggen()
@@ -335,12 +335,12 @@ def create_app(
         log_event("anthropic_uitgelogd", identiteit_van(request))
         return aa.status()
 
-    @app.get("/config/wijzigingen")
+    @app.get("/instellingen/wijzigingen")
     def config_wijzigingen() -> list[dict[str, object]]:
         """Append-only spoor van configuratiewijzigingen: wie, wanneer, welke velden."""
         return bronnen.wijzigingen()
 
-    @app.get("/config/health")
+    @app.get("/instellingen/health")
     def config_health() -> dict[str, dict[str, object]]:
         """Per-bron koppelstatus — één bron van waarheid, ook voor het configscherm.
 
@@ -400,11 +400,11 @@ def create_app(
         uit = landschap.lees_in(r.bronnen)
         return uit
 
-    @app.get("/config/health/{bron}")
+    @app.get("/instellingen/health/{bron}")
     def config_health_bron(bron: str) -> dict[str, object]:
         """Koppelstatus van één bron — de "Testen"-knop naast het formulier.
 
-        Apart van `/config/health` omdat dat álle bronnen langsgaat: wie een Jira-token
+        Apart van `/instellingen/health` omdat dat álle bronnen langsgaat: wie een Jira-token
         invult wil niet wachten op een Drive-listing, en wil ook niet zelf ergens anders
         gaan kijken of het gelukt is.
         """

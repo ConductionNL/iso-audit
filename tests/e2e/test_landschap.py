@@ -80,7 +80,7 @@ def portaal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     monkeypatch.setenv("REQUIRE_AUTH", "false")
     db = tmp_path / "audit.db"
     monkeypatch.setenv("AUDIT_DB_PATH", str(db))
-    # Ook de Google-variabelen: anders doet `/config/health` een echte Drive-call met de
+    # Ook de Google-variabelen: anders doet `/instellingen/health` een echte Drive-call met de
     # credentials van de ontwikkelaar. Traag, netwerkafhankelijk, en het raakt
     # productiedata — een testsuite hoort dat geen van drieën te doen.
     for naam in (

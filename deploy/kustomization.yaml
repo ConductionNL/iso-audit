@@ -42,4 +42,4 @@ configMapGenerator:
 # tag bestaat vóór de merge en Argo vindt hem direct.
 images:
   - name: ghcr.io/conductionnl/iso-audit
-    newTag: "0.2.0a10"
+    newTag: "0.2.0a11"

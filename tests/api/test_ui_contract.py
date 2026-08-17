@@ -20,12 +20,12 @@ ONGESCOPED = {
     # Het documentenlandschap hoort bij de organisatie en niet bij één audit: één
     # voorraad die alle audits gebruiken. Daarom bewust zonder audit-prefix.
     "/landschap",
-    "/config/health",
-    "/config/options",
-    "/config/bronnen",
-    "/config/wijzigingen",
-    "/config/herkomst",
-    "/config/anthropic",
+    "/instellingen/health",
+    "/instellingen/options",
+    "/instellingen/bronnen",
+    "/instellingen/wijzigingen",
+    "/instellingen/herkomst",
+    "/instellingen/anthropic",
     "/me",
 }
 
@@ -83,7 +83,7 @@ def test_configscherm_kan_een_bron_koppelen() -> None:
     bron = _bron()
     assert 'id="view-config"' in bron
     assert "toonBronForm" in bron and "bewaarBron" in bron
-    assert "/config/bronnen/" in bron
+    assert "/instellingen/bronnen/" in bron
 
 
 def test_openen_van_een_audit_laadt_ook_de_bronselectie() -> None:
@@ -116,7 +116,7 @@ def test_er_is_een_testknop_met_zichtbaar_resultaat() -> None:
     steeds niet of de koppeling werkt."""
     bron = _bron()
     assert "async function testBron(" in bron
-    assert "/config/health/" in bron, "test één bron, niet alle bronnen"
+    assert "/instellingen/health/" in bron, "test één bron, niet alle bronnen"
     assert ">Testen</button>" in bron
     bewaar = bron.split("async function bewaarBron(")[1].split("\nasync function")[0]
     assert "testBron(naam)" in bewaar, "na opslaan meteen testen"
@@ -138,10 +138,37 @@ def test_een_mislukt_verzoek_laat_het_scherm_niet_op_laden_staan() -> None:
 
     # En de route vangt hem af met een leesbare melding in plaats van stilte.
     assert "async function veiligeRoute()" in bron
-    veilig = bron.split("async function veiligeRoute()")[1].split("\n}")[0]
+    veilig = bron.split("async function veiligeRoute()")[1].split("\nfunction uitloggen")[0]
     assert "Je sessie is verlopen" in veilig
     assert "Herlaad de pagina" in veilig
     assert 'addEventListener("hashchange", veiligeRoute)' in bron
+
+
+def test_een_403_zonder_sessieprobleem_heet_niet_sessie_verlopen() -> None:
+    """Een 403 hoeft niets met de sessie te maken te hebben.
+
+    Gemeten op 2026-08-17: een globale nginx-regel op de ingress weigerde élk pad onder
+    `/config/`, waarna dit scherm "Je sessie is verlopen" meldde terwijl de koptekst
+    "ingelogd als …" toonde. Herladen hielp niet — er was niets mis met de sessie — en de
+    melding stuurde naar het verkeerde probleem.
+
+    Daarom toetst `j()` de sessie in plaats van hem te veronderstellen: bij een 401/403
+    wordt `/me` opnieuw bevraagd. Blijft die 200, dan leeft de sessie en is het pad
+    geweigerd.
+    """
+    bron = _bron()
+    helper = bron.split("const j = async")[1].split("const esc")[0]
+    assert 'await fetch("/me")' in helper, "de sessie wordt niet gemeten maar aangenomen"
+    assert "if(!sessie.ok) throw new SessieVerlopen" in helper
+    assert "throw new PadGeweigerd" in helper
+    assert "class PadGeweigerd" in bron
+
+    veilig = bron.split("async function veiligeRoute()")[1].split("\nfunction uitloggen")[0]
+    assert "e instanceof PadGeweigerd" in veilig
+    # De melding moet expliciet zeggen dat herladen niet helpt, anders blijft de auditor
+    # het toch proberen — precies wat er op 17-08 gebeurde.
+    assert "Herladen helpt hier niet" in veilig
+    assert "ingelogd" in veilig
 
 
 def test_de_ui_wordt_niet_gecachet(tmp_path: Path) -> None:
@@ -229,7 +256,7 @@ def test_normlabel_verbergt_de_slug() -> None:
 def test_configscherm_toont_de_herkomst_per_veld() -> None:
     """Zonder herkomst-badge typt een auditor iets in dat stil geen effect heeft."""
     bron = _bron()
-    assert 'j("/config/herkomst")' in bron
+    assert 'j("/instellingen/herkomst")' in bron
     assert "bronBadge" in bron
     assert "BRON_LABEL" in bron
 

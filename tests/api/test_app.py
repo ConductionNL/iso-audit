@@ -262,7 +262,7 @@ def test_findings_severity_filter(tmp_path: Path) -> None:
 
 
 def test_config_options(tmp_path: Path) -> None:
-    d = _client(tmp_path).get("/config/options").json()
+    d = _client(tmp_path).get("/instellingen/options").json()
     assert "iso-9001-2015" in d["norms"] and "iso-27001-2022" in d["norms"]
     assert "drive" in d["sources"]  # registry
 
@@ -279,7 +279,7 @@ def test_config_health_endpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
         return {"connected": naam == "drive", "status": "ok", "naam": naam}
 
     monkeypatch.setattr(sess, "_check_source", _fake)
-    h = _client(tmp_path).get("/config/health").json()
+    h = _client(tmp_path).get("/instellingen/health").json()
     assert {"drive", "jira", "miro", "planning"} <= set(h)
     assert h["drive"]["connected"] is True
     assert h["jira"]["connected"] is False

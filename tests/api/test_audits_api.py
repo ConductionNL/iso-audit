@@ -237,9 +237,9 @@ def test_healthz_en_config_zijn_niet_audit_gescoped(
     )
     client, _ = _portaal(tmp_path)
     assert client.get("/healthz").json() == {"status": "ok"}
-    gezondheid = client.get("/config/health").json()
+    gezondheid = client.get("/instellingen/health").json()
     assert set(gezondheid) >= {"drive", "jira", "planning"}
-    assert "sources" in client.get("/config/options").json()
+    assert "sources" in client.get("/instellingen/options").json()
 
 
 def test_detail_meldt_andere_actieve_auditor(tmp_path: Path) -> None:

@@ -6,7 +6,7 @@ herhalen, zet `PortaalClient` de prefix erop — behalve voor de routes die bewu
 audit-onafhankelijk zijn.
 
 Die uitzonderingenlijst staat hier expliciet en niet als slimme regel: `/healthz`
-hoort buiten de auth-gate én buiten elke audit, en `/config/*` beschrijft de
+hoort buiten de auth-gate én buiten elke audit, en `/instellingen/*` beschrijft de
 omgeving. Een test die per ongeluk `/audits/x/healthz` aanroept zou een groen
 resultaat kunnen geven op een route die in productie niet bestaat.
 """
@@ -27,7 +27,7 @@ EXAMPLES = Path("examples/auditmemo")
 NORMS = "examples/norms"
 AUDITOR = "auditor@conduction.nl"
 
-ONGESCOPED = ("/healthz", "/config", "/audits", "/me", "/openapi.json", "/docs")
+ONGESCOPED = ("/healthz", "/instellingen", "/audits", "/me", "/openapi.json", "/docs")
 """Paden die niet onder een audit vallen; al het andere krijgt de audit-prefix.
 
 `"/"` staat hier **niet** in: elk pad begint ermee, dus `startswith` zou dan altijd

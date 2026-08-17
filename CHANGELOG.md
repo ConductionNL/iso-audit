@@ -6,6 +6,43 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-17 — het configuratiescherm was onbereikbaar: de ingress weigert `/config/`
+
+Na de uitrol van `0.2.0a10` bleef het portaal hangen met "Je sessie is verlopen", terwijl de
+koptekst "ingelogd als …" toonde en herladen niet hielp.
+
+De oorzaak zat niet in de applicatie. De gedeelde nginx-ingresscontroller draagt een globale
+Nextcloud-hardeningregel:
+
+    location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)/ { deny all; }
+
+Die geldt voor **elke host op het cluster**. Elk verzoek onder `/config/` kreeg nginx' eigen
+403 en bereikte de pod nooit — onzichtbaar in zowel het applicatielog als het
+oauth2-proxy-log. Het onderscheid dat het uitwees: `/me` gaf de Sign-In-pagina van
+oauth2-proxy, `/config/options` gaf `<title>403 Forbidden</title>` van nginx.
+
+**Onze routes heten nu `/instellingen/*`.** Dat is de enige oplossing die binnen onze eigen
+namespace valt; de ConfigMap aanpassen zou infrastructuur raken die met andere tenants wordt
+gedeeld. De hash-route `#/config` in de UI blijft — een fragment gaat nooit naar de server.
+
+Gemeten reikwijdte van dezelfde regelset, op een host die er verder niets mee te maken heeft
+(`platform.commonground.nu`): `/config/x`, `/issues`, `/occ-test` en `/indienen` geven daar
+allemaal 403. De tweede deny-regel heeft namelijk geen afsluitende `/`, dus
+`autotest|occ|issue|indie|db_|console` matcht elk pad dat er *mee begint*. Doorgegeven aan de
+clusterbeheerder; niet door ons gewijzigd.
+
+### Fixed — 2026-08-17 — "sessie verlopen" werd gemeld bij een 403 die niets met de sessie te maken had
+
+`j()` behandelde elke 401/403 als sessieverloop. Bij de blokkade hierboven leverde dat een
+scherm op dat tegelijk "ingelogd als markwesterweel@conduction.nl" en "Je sessie is verlopen"
+toonde, met een herlaad-link die per definitie niet kon werken. De oude code liet het scherm
+stil op "laden…" staan; deze verklaarde het actief verkeerd, wat erger is.
+
+`j()` meet nu in plaats van te veronderstellen: bij een 401/403 wordt `/me` opnieuw bevraagd.
+Komt daar 200 uit, dan leeft de sessie en gooit hij `PadGeweigerd` in plaats van
+`SessieVerlopen` — met een melding die zegt dat je gewoon ingelogd bent, dat herladen niet
+helpt, en dat een beheerder ernaar moet kijken.
+
 ### Fixed — 2026-08-16 — een verlopen sessie liet het scherm eeuwig op "laden…" staan
 
 `j()` in `ui.html` deed `(await fetch(url)).json()` zonder naar de statuscode te kijken. Bij

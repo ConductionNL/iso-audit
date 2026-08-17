@@ -223,10 +223,21 @@ const TRIAGE = ["open","valide","niet_valide","follow_up"];
 // een niet-afgevangen `route()`, en blijft het scherm eeuwig op "laden…" staan zonder
 // uitleg. Dat gebeurde na een cookie-rotatie, die alle bestaande sessies ongeldig maakt.
 class SessieVerlopen extends Error {}
+class PadGeweigerd extends Error {}
 
 const j = async (url,opts) => {
   const r = await fetch(url,opts);
-  if(r.status === 401 || r.status === 403) throw new SessieVerlopen(String(r.status));
+  if(r.status === 401 || r.status === 403){
+    // Meten in plaats van gokken. Een 403 hoeft niets met de sessie te maken te hebben:
+    // op 2026-08-17 bleek de ingress élk pad onder `/config/` te weigeren via een globale
+    // nginx-regel, waarna dit scherm "Je sessie is verlopen" meldde terwijl de koptekst
+    // "ingelogd als …" toonde. Herladen hielp dus niet, en de melding stuurde naar het
+    // verkeerde probleem. `/me` is de goedkoopste vraag die de sessie echt toetst: komt
+    // daar 200 uit, dan leeft de sessie en wordt alleen dít pad geweigerd.
+    const sessie = await fetch("/me");
+    if(!sessie.ok) throw new SessieVerlopen(String(r.status));
+    throw new PadGeweigerd(`${r.status} op ${url}`);
+  }
   if(!r.ok) throw new Error(`${r.status} op ${url}`);
   return r.json();
 };
@@ -260,13 +271,23 @@ async function veiligeRoute(){
     await route();
   } catch(e) {
     const wrap = document.querySelector("section:not([hidden]) .step") || document.body;
-    wrap.innerHTML = (e instanceof SessieVerlopen)
-      ? `<div class="warn"><strong>Je sessie is verlopen.</strong> Dat gebeurt onder meer
-         nadat het cookie-secret is geroteerd.
+    if(e instanceof SessieVerlopen){
+      wrap.innerHTML = `<div class="warn"><strong>Je sessie is verlopen.</strong> Dat gebeurt
+         onder meer nadat het cookie-secret is geroteerd.
          <a href="" onclick="location.reload();return false">Herlaad de pagina</a> om
-         opnieuw in te loggen.</div>`
-      : `<div class="warn"><strong>Laden mislukt.</strong> ${esc(String(e))}<br>
+         opnieuw in te loggen.</div>`;
+    } else if(e instanceof PadGeweigerd){
+      // Expliciet zeggen dat herladen niet helpt. Dit is geen sessieprobleem en geen fout
+      // van de auditor: iets tussen browser en applicatie weigert het pad.
+      wrap.innerHTML = `<div class="warn"><strong>Dit onderdeel wordt geblokkeerd.</strong>
+         Je bent gewoon ingelogd — het verzoek (${esc(String(e.message))}) is geweigerd
+         vóórdat het de applicatie bereikte, waarschijnlijk door een regel op de ingress of
+         een proxy. Herladen helpt hier niet; dit moet door een beheerder worden
+         opgelost.</div>`;
+    } else {
+      wrap.innerHTML = `<div class="warn"><strong>Laden mislukt.</strong> ${esc(String(e))}<br>
          <a href="" onclick="location.reload();return false">Opnieuw proberen</a></div>`;
+    }
   }
 }
 function uitloggen(){
@@ -314,7 +335,7 @@ function normLabel(n){
 async function loadNormKeuze(){
   const el = document.getElementById("na-norm");
   if(el.dataset.loaded) return;
-  const normen = (await j("/config/options")).norms || [];
+  const normen = (await j("/instellingen/options")).norms || [];
   // Eén keuze: per norm een optie, plus "Beide" wanneer er precies twee zijn. Een
   // enum in plaats van vinkjes — je kiest een auditscope, geen verzameling.
   const opties = normen.map(n => `<option value="${esc(n)}">${esc(normLabel(n))}</option>`);
@@ -419,7 +440,7 @@ function modelLabel(m){
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 async function loadAnthropic(){
-  document.getElementById("anthropic-wrap").innerHTML = anthropicKaart(await j("/config/anthropic"));
+  document.getElementById("anthropic-wrap").innerHTML = anthropicKaart(await j("/instellingen/anthropic"));
 }
 async function zetAnthropicModus(){
   const modus = document.getElementById("an-modus").value;
@@ -438,7 +459,7 @@ async function bewaarAnthropicKey(){
 }
 async function anthropicLogin(){
   msgAn("bezig…");
-  const r = await fetch("/config/anthropic/login", {method:"POST"});
+  const r = await fetch("/instellingen/anthropic/login", {method:"POST"});
   if(!r.ok){ msgAn("⚠ " + ((await r.json().catch(()=>({}))).detail || r.status)); return; }
   const d = await r.json(); _loginSessie = d.sessie; msgAn("");
   document.getElementById("an-login").innerHTML =
@@ -449,14 +470,14 @@ async function anthropicLogin(){
 }
 async function anthropicCode(){
   const code = document.getElementById("an-code").value;
-  const r = await fetch("/config/anthropic/login/code", {method:"POST",
+  const r = await fetch("/instellingen/anthropic/login/code", {method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({sessie:_loginSessie, code})});
   if(!r.ok){ msgAn("⚠ " + ((await r.json().catch(()=>({}))).detail || r.status)); return; }
   document.getElementById("an-login").innerHTML = ""; await loadAnthropic(); msgAn("✓ ingelogd");
 }
 async function anthropicLogout(){
-  const r = await fetch("/config/anthropic/logout", {method:"POST"});
+  const r = await fetch("/instellingen/anthropic/logout", {method:"POST"});
   if(!r.ok){ msgAn("⚠ uitloggen mislukt"); return; }
   await loadAnthropic(); msgAn("✓ uitgelogd");
 }
@@ -464,7 +485,7 @@ function msgAn(tekst){
   const el = document.getElementById("an-msg"); if(el) el.textContent = tekst;
 }
 async function postBron(naam, velden){
-  const r = await fetch(`/config/bronnen/${encodeURIComponent(naam)}`,
+  const r = await fetch(`/instellingen/bronnen/${encodeURIComponent(naam)}`,
     {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({velden})});
   if(!r.ok) msgAn("⚠ " + ((await r.json().catch(()=>({}))).detail || r.status));
   return r.ok;
@@ -475,7 +496,7 @@ async function postBron(naam, velden){
 // beantwoorden vóórdat er geauditeerd wordt: klopt dit, is dit wat we hebben gezien?
 
 async function loadLandschap(){
-  const [staat, opties] = await Promise.all([j("/landschap"), j("/config/options")]);
+  const [staat, opties] = await Promise.all([j("/landschap"), j("/instellingen/options")]);
   const wrap = document.getElementById("ls-staat");
   const perBron = Object.entries(staat.per_bron || {});
   wrap.innerHTML = staat.documenten
@@ -485,7 +506,7 @@ async function loadLandschap(){
     : `<p class="note">Nog niets ingelezen. Kies hieronder de bronnen en lees het landschap in.</p>`;
 
   // Bronnen om in te lezen: dezelfde lijst als bij een run.
-  const health = await j("/config/health");
+  const health = await j("/instellingen/health");
   document.getElementById("ls-bronnen").innerHTML =
     (opties.sources||[]).map(s => {
       const off = !(health[s]||{}).connected;
@@ -546,7 +567,7 @@ async function loadConfigView(){
   _overschrijf = new Set();
   await loadAnthropic();
   const [health, bronnen, herk] = await Promise.all([
-    j("/config/health"), j("/config/bronnen"), j("/config/herkomst")]);
+    j("/instellingen/health"), j("/instellingen/bronnen"), j("/instellingen/herkomst")]);
   _bronnen = bronnen.filter(b => !b.eigen_kaart);
   // Herkomst per env-naam, zodat elk invulveld kan tonen waar zijn waarde vandaan komt.
   _herkomst = Object.fromEntries((herk.velden||[]).map(v => [v.env, v]));
@@ -599,7 +620,7 @@ function bronBadge(env){
 }
 
 async function terugNaarOmgeving(bron, veld){
-  await fetch(`/config/bronnen/${encodeURIComponent(bron)}`,
+  await fetch(`/instellingen/bronnen/${encodeURIComponent(bron)}`,
     {method:"POST", headers:{"Content-Type":"application/json"},
      body:JSON.stringify({velden:{[veld]: ""}})});
   _overschrijf.delete(bron+"|"+veld);
@@ -653,7 +674,7 @@ async function testBron(naam){
   const uit = document.getElementById("bt-"+naam);
   uit.innerHTML = "bezig met testen…";
   try {
-    const h = await j(`/config/health/${encodeURIComponent(naam)}`);
+    const h = await j(`/instellingen/health/${encodeURIComponent(naam)}`);
     uit.innerHTML = h.connected
       ? `<span class="ok">● gekoppeld</span>`
         + (h.user ? ` — account: ${esc(h.user)}` : "")
@@ -678,7 +699,7 @@ async function bewaarBron(naam){
     velden[v.naam] = el.value;
   }
   msg.textContent = "bezig…";
-  const r = await fetch(`/config/bronnen/${encodeURIComponent(naam)}`,
+  const r = await fetch(`/instellingen/bronnen/${encodeURIComponent(naam)}`,
     {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({velden})});
   if(!r.ok){
     const d = await r.json().catch(()=>({detail:"onbekende fout"}));
@@ -760,7 +781,7 @@ async function loadRuns(){
 }
 
 async function loadConfig(){
-  const [o, health] = await Promise.all([j("/config/options"), j("/config/health")]);
+  const [o, health] = await Promise.all([j("/instellingen/options"), j("/instellingen/health")]);
   const el = document.getElementById("config-form"); el.hidden = false;
   el.innerHTML =
     `<strong>Bronnen:</strong><br>` +

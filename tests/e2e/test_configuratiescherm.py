@@ -3,7 +3,7 @@
 ## Waarom dit bestaat
 
 De rest van de suite test de API en de HTML-broncode. Dat is niet genoeg gebleken: op
-2026-08-15 was de server aantoonbaar correct — de juiste velden in `/config/bronnen`, de
+2026-08-15 was de server aantoonbaar correct — de juiste velden in `/instellingen/bronnen`, de
 juiste JS in `ui.html` — terwijl een auditor in de browser **niets kon invullen**. Een
 contract-test op de brontekst ziet dat niet, want die voert de JS nooit uit.
 

@@ -1,9 +1,19 @@
 ---
 status: current
-last_reviewed: 2026-08-14
+last_reviewed: 2026-08-17
 ---
 
 # Configuration precedence
+
+> **Why the API prefix is `/instellingen/` and not `/config/`.** Do not "tidy" this back.
+> The shared nginx ingress controller carries a global Nextcloud hardening snippet with
+> `location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)/ { deny all; }`. It
+> applies to every host on the cluster, so every request under `/config/` was answered with
+> nginx's own 403 and never reached the pod — invisible in both the application and the
+> oauth2-proxy logs. Measured 2026-08-17; the same snippet also blocks any path starting
+> with `autotest`, `occ`, `issue`, `indie`, `db_` or `console` (no trailing slash, so
+> `/issues` and `/indienen` match too). Renaming our own routes is the only fix that does
+> not touch infrastructure shared with other tenants.
 
 All configuration is resolved by one loader, `iso_audit.config.settings.load_config`.
 Nothing reads `os.environ` directly for configuration: that would lose the provenance,
@@ -32,7 +42,7 @@ Every resolved value carries its own source (`ui-override`, `env`, `yaml`, `ui`,
 table — that way it cannot fall away between resolving and using.
 
 - At startup, one audit-log line per field records which source won. Never the value.
-- `GET /config/herkomst` returns the same information, so an auditor can check it without
+- `GET /instellingen/herkomst` returns the same information, so an auditor can check it without
   cluster access.
 - In the portal, each input shows a badge with its source. Fields set from the environment
   or `config.yaml` are read-only, because a value typed over them would have no effect.
@@ -40,7 +50,7 @@ table — that way it cannot fall away between resolving and using.
 ## Overriding an administrator value
 
 A field set from the environment can still be replaced from the portal, but only as an
-**explicit** action (`POST /config/bronnen/{bron}?overschrijf=true`). Its provenance then
+**explicit** action (`POST /instellingen/bronnen/{bron}?overschrijf=true`). Its provenance then
 becomes `ui-override`, and the change trail records `overschrijft_omgeving: true` with who
 and when — never the value. Clearing the field restores the environment value.
 
