@@ -1,6 +1,6 @@
 ---
 status: draft
-last_reviewed: 2026-08-17
+last_reviewed: 2026-08-18
 ---
 
 # Source: Drive
@@ -39,6 +39,51 @@ locatie staan, niet wat een run in totaal ophaalt. Een recursieve telling kost m
 (gemeten: 2,5 minuut voor 409 documenten) en het configuratiescherm opent bij elke
 pageload. Een map met alleen submappen toont daarom `0` en is toch bruikbaar; de
 statusregel meldt dan dat er submappen zijn.
+
+## Wat er gelezen wordt
+
+| Formaat | Hoe |
+|---|---|
+| Google Doc | export naar `text/plain` |
+| Google Sheet | export naar `.xlsx`, daarna alle bladen (een CSV-export geeft alleen het **eerste** blad) |
+| Google Slides | export naar `text/plain` |
+| `.docx` | `python-docx`, alinea's |
+| `.xlsx` | `openpyxl`, celtekst per blad met de bladnaam als kop, formules als laatst berekende waarde |
+| `.pptx` | `python-pptx`, tekst per dia |
+| PDF | `pypdf`, doorlopende tekst per pagina — **geen OCR** |
+| `text/plain`, markdown, HTML, CSV | als tekst gedecodeerd |
+
+**Snelkoppelingen worden gevolgd.** Naam, MIME-type en `modifiedTime` komen van het
+doelbestand en niet van de snelkoppeling: het leeftijdsfilter in de pipeline (2 jaar)
+beslist op `modifiedTime`. Zit het doel ook rechtstreeks in een gekoppelde locatie, dan
+telt het één keer — dedup op file-id.
+
+## Wat er niet gelezen wordt
+
+Afbeeldingen (jpeg, png, gif, tiff, svg), video, en Google Forms. Deze komen in de lijst
+voor **handmatige review**, met de reden erbij, en worden meegeteld in de dekking.
+
+Een bestand dat wél gelezen kon worden maar nul tekens oplevert — de gescande PDF — komt
+niet als document met lege inhoud in het landschap. Dat zou de pipeline "geen bewijs" laten
+concluderen over een document dat niemand heeft gelezen. Het gaat naar handmatige review
+met de reden "mogelijk een scan".
+
+## Dekking van een run
+
+Elke ingest meldt op INFO-niveau hoeveel bestanden er zijn gezien, hoeveel er zijn gelezen,
+en per reden hoeveel niet. Diezelfde telling staat in het `dekking`-blok van het
+afsluitrecord in `runs.jsonl`:
+
+    "dekking": {"gezien": 512, "gelezen": 480, "niet_gelezen": 32,
+                "overgeslagen": {"image/png: afbeelding…": 21, …}}
+
+Aantallen per reden, geen bestandsnamen — die staan in het handmatige-reviewspoor.
+
+Waarom in het run-record en niet alleen in het log: het log verdwijnt bij een podherstart,
+en "welk deel van de bron heeft het tool gezien" is precies wat een certificerende instantie
+vraagt. Tot 2026-08-18 bleef 42% van 512 bestanden ongelezen, waarvan 92 zonder enige
+melding — het aantal ingelezen documenten was daarmee een dekkingsclaim die niemand kon
+nagaan.
 
 > De namen `GOOGLE_SERVICE_ACCOUNT_FILE` en `GOOGLE_IMPERSONATE_USER` stonden hier eerder;
 > die worden nergens in `src/` gelezen. `auth.py` leest de twee namen hierboven.

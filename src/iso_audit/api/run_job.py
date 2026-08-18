@@ -10,12 +10,26 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
-from iso_audit.api.runs import Kosten
+from iso_audit.api.runs import Dekking, Kosten
 from iso_audit.memo.draft import draft_findings
 from iso_audit.memo.models import BronRef, Finding
 from iso_audit.memo.norm_lookup import NormDatabase, laad_norm_db
+
+
+@dataclass(frozen=True)
+class RunUitkomst:
+    """Wat een live-run oplevert voor het run-record: kosten en dekking.
+
+    Twee velden en geen tuple, want een tuple van twee optionals bij de aanroep is niet te
+    lezen zonder de definitie erbij te halen — en dit gaat naar de audit-trail.
+    """
+
+    kosten: Kosten | None = None
+    dekking: Dekking | None = None
+
 
 _NORM_SLUG = {"9001": "iso-9001-2015", "27001": "iso-27001-2022"}
 _SEV = {"NC": "NC", "OFI": "OFI", "positief": "POSITIVE"}
@@ -132,14 +146,15 @@ def run_live_pipeline(
     chapter: str | None,
     on_log: Callable[[str], None],
     alleen_ingest: bool = False,
-) -> Kosten | None:
+) -> RunUitkomst:
     """Draai de echte audit-pipeline met opgevangen voortgang (geen review-prompt).
 
     `alleen_ingest` stopt na het inlezen en vastleggen; die modus raakt de Claude-API niet.
 
-    Returnt de kosten van de classificatie, zodat de worker die in het run-record kan zetten.
-    `None` bij een ingest-only run: die raakt de API niet, dus er zijn geen kosten — en nul
-    rapporteren zou suggereren dat er geclassificeerd is.
+    Returnt de kosten van de classificatie én de dekking van de ingest, zodat de worker die
+    in het run-record kan zetten. `kosten` blijft `None` bij een ingest-only run: die raakt de
+    API niet, dus er zijn geen kosten — en nul rapporteren zou suggereren dat er
+    geclassificeerd is. `dekking` blijft `None` als er geen Drive in de bronnen zat.
     """
     from iso_audit import pipeline
     from iso_audit.modes.autonoom import AutonoomMode
@@ -161,6 +176,16 @@ def run_live_pipeline(
     initialiseer(conn)
 
     kosten_uit: list[Kosten] = []
+    dekking_uit: list[Dekking] = []
+
+    def _bewaar_dekking(teller: Any) -> None:
+        dekking_uit.append(
+            Dekking(
+                gezien=teller.gezien,
+                gelezen=teller.gelezen,
+                overgeslagen=dict(teller.overgeslagen),
+            )
+        )
 
     def _bewaar_kosten(teller: Any) -> None:
         from iso_audit.classification.findings import PRIJZEN_GRONDSLAG, PRIJZEN_PEILDATUM
@@ -185,11 +210,15 @@ def run_live_pipeline(
             sources=sources,
             alleen_ingest=alleen_ingest,
             op_kosten=_bewaar_kosten,
+            op_dekking=_bewaar_dekking,
         )
     finally:
         pijplijn_logger.removeHandler(handler)
         pijplijn_logger.setLevel(vorig_niveau)
-    return kosten_uit[-1] if kosten_uit else None
+    return RunUitkomst(
+        kosten=kosten_uit[-1] if kosten_uit else None,
+        dekking=dekking_uit[-1] if dekking_uit else None,
+    )
 
 
 def draft_from_db(*, norm: str, norms_dir: str, language: str, top_n: int) -> list[Finding]:

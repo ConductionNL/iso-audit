@@ -236,3 +236,109 @@ def test_telling_pagineert_niet_door(dienst: Any) -> None:
     assert aantal == 1
     assert len(opnames) == 1
     assert "pageToken" not in opnames[0]
+
+
+# --- snelkoppelingen -------------------------------------------------------
+#
+# 29 snelkoppelingen werden overgeslagen omdat `shortcutDetails` niet in de veldenlijst stond.
+# Ze wijzen naar echte documenten, en ze maken de voor de hand liggende workaround — een map
+# met snelkoppelingen naar de relevante stukken — stil onbruikbaar.
+
+_SNELKOPPELING = "application/vnd.google-apps.shortcut"
+
+
+def test_veldenlijst_vraagt_shortcut_details(dienst: Any) -> None:
+    """Zonder deze velden is er geen spoor naar waar een snelkoppeling heen wijst."""
+    _, antwoorden = dienst
+    antwoorden.append({"files": []})
+
+    gd.drive_lijst_bestanden("map1")
+
+    assert "shortcutDetails(targetId, targetMimeType)" in gd._LIJST_VELDEN
+
+
+def test_snelkoppeling_wordt_gevolgd_naar_het_doel(dienst: Any) -> None:
+    """Naam én `modifiedTime` komen van het doel: het leeftijdsfilter beslist daarop."""
+    opnames, antwoorden = dienst
+    antwoorden.extend(
+        [
+            {
+                "files": [
+                    {
+                        "id": "kort",
+                        "name": "link naar VvT",
+                        "mimeType": _SNELKOPPELING,
+                        "modifiedTime": "2026-08-01T00:00:00Z",
+                        "shortcutDetails": {
+                            "targetId": "echt",
+                            "targetMimeType": "application/pdf",
+                        },
+                    }
+                ]
+            },
+            {
+                "id": "echt",
+                "name": "VvT Conduction ISO 27001.pdf",
+                "mimeType": "application/pdf",
+                "modifiedTime": "2024-03-03T00:00:00Z",
+            },
+        ]
+    )
+
+    uit = gd.drive_lijst_bestanden("map1")
+
+    assert [b["id"] for b in uit] == ["echt"]
+    assert uit[0]["name"] == "VvT Conduction ISO 27001.pdf"
+    assert uit[0]["modifiedTime"] == "2024-03-03T00:00:00Z"
+    assert opnames[1]["methode"] == "get" and opnames[1]["fileId"] == "echt"
+
+
+def test_snelkoppeling_zonder_bereikbaar_doel_valt_niet_stil(dienst: Any) -> None:
+    """Een doel dat niet op te halen is, blijft als snelkoppeling in de lijst; de source-laag
+    meldt hem bij de dekking. Weglaten zou hetzelfde stille gat opnieuw maken."""
+    _, antwoorden = dienst
+    antwoorden.extend(
+        [
+            {
+                "files": [
+                    {
+                        "id": "kort",
+                        "name": "link",
+                        "mimeType": _SNELKOPPELING,
+                        "shortcutDetails": {"targetId": "weg"},
+                    }
+                ]
+            },
+            RuntimeError("404"),
+        ]
+    )
+
+    uit = gd.drive_lijst_bestanden("map1")
+
+    assert [b["id"] for b in uit] == ["kort"]
+    assert uit[0]["mimeType"] == _SNELKOPPELING
+
+
+def test_snelkoppeling_naar_map_wordt_gevolgd_zonder_lus(dienst: Any) -> None:
+    """Een mapboom heeft geen cycli; een snelkoppeling naar een bovenliggende map wel."""
+    _, antwoorden = dienst
+    antwoorden.extend(
+        [
+            {
+                "files": [
+                    {
+                        "id": "kort",
+                        "name": "terug naar boven",
+                        "mimeType": _SNELKOPPELING,
+                        "shortcutDetails": {"targetId": "map1", "targetMimeType": _MAP},
+                    },
+                    {"id": "a", "name": "A", "mimeType": "text/plain"},
+                ]
+            },
+            {"id": "map1", "name": "Wortel", "mimeType": _MAP},
+        ]
+    )
+
+    uit = gd.drive_lijst_bestanden("map1")
+
+    assert [b["id"] for b in uit] == ["a"], "de startmap wordt niet opnieuw doorlopen"

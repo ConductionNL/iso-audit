@@ -51,3 +51,48 @@ def test_afsluiten_zonder_kosten_laat_het_veld_weg(tmp_path: Path) -> None:
     runs.registreer(tmp_path, door="a@b.c", modus="live", norm="27001", bronnen=["drive"])
     runs.afsluiten(tmp_path, "run-0001", toegevoegd=1)
     assert "kosten" not in runs.samengevat(tmp_path)[-1]
+
+
+# --- dekking in het afsluitrecord ------------------------------------------
+
+
+def test_afsluiten_zet_dekking_met_redenen(tmp_path: Path) -> None:
+    """Het aantal documenten zonder de dekking is een dekkingsclaim die niemand kan nagaan.
+
+    Gemeten op 2026-08-17: 512 bestanden in de bron, 299 gelezen. Een auditor die 299
+    documenten zag, zag niet dat er 213 buiten stonden — dat stond alleen in een logregel die
+    een podherstart niet overleeft.
+    """
+    from iso_audit.api.runs import Dekking
+
+    runs.registreer(tmp_path, door="a@b.c", modus="live", norm="27001", bronnen=["drive"])
+    runs.afsluiten(
+        tmp_path,
+        "run-0001",
+        toegevoegd=3,
+        dekking=Dekking(
+            gezien=512,
+            gelezen=299,
+            overgeslagen={"image/png: afbeelding": 121, "onbekend type: video/mp4": 92},
+        ),
+    )
+    d = runs.samengevat(tmp_path)[-1]["dekking"]
+    assert d["gezien"] == 512
+    assert d["gelezen"] == 299
+    assert d["niet_gelezen"] == 213, "het totaal moet uit de redenen volgen, niet los geteld"
+    assert d["overgeslagen"]["image/png: afbeelding"] == 121
+
+
+def test_dekking_bevat_geen_bestandsnamen(tmp_path: Path) -> None:
+    """Aantallen per reden, geen namen: 213 namen per record maakt de trail onleesbaar."""
+    from iso_audit.api.runs import Dekking
+
+    record = Dekking(gezien=2, gelezen=1, overgeslagen={"onbekend type: video/mp4": 1}).als_record()
+    assert set(record) == {"gezien", "gelezen", "niet_gelezen", "overgeslagen"}
+
+
+def test_afsluiten_zonder_dekking_laat_het_veld_weg(tmp_path: Path) -> None:
+    """Een run zonder Drive leest geen bestanden; een dekking van 0/0 zou misleiden."""
+    runs.registreer(tmp_path, door="a@b.c", modus="live", norm="27001", bronnen=["jira"])
+    runs.afsluiten(tmp_path, "run-0001", toegevoegd=1)
+    assert "dekking" not in runs.samengevat(tmp_path)[-1]

@@ -6,6 +6,71 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-18 — dekking van het landschap: 42% van de bron werd niet gelezen
+
+Change `landschap-dekking`. Gemeten op 2026-08-17 tegen de gekoppelde Shared Drive: 512
+bestanden, waarvan 299 gelezen. De andere 213 vielen in twee categorieën, en de tweede was de
+erge:
+
+| categorie | aantal | wat er gebeurde |
+|---|---|---|
+| PDF | 91 | op `NIET_TEKSTUEEL`, gemeld als "handmatige review" |
+| Google Slides | 19 | idem |
+| **onbekend MIME** | **92** | `logger.debug("Skip (onbekend MIME)")` — geen melding |
+
+Die 92 zaten niet in het gemelde aantal van 119 en hadden op INFO-niveau geen enkele regel.
+41 overgeslagen bestanden waren op naam al auditkritisch: de auditrapporten van de
+certificerende instantie, `Afwijking 20250605_247 Registratieformulier NC-B-2025-01`, de VvT,
+de RI&E, de interne-auditverslagen — dus 9.2, 9.3, 10.2 en 6.1.3.
+
+Wat er is gewijzigd:
+
+- **Meer formaten gelezen.** PDF (`pypdf`, nieuw), `.xlsx`, `.pptx`, Google Sheets en Slides
+  via export, en markdown/HTML/CSV die alleen een MIME-regel misten — `text/plain` werd wel
+  gelezen, `text/markdown` niet, en daar zat `Auditrapport_beide_v3.3_2026-05-05.md` bij.
+  Google Sheets worden als `.xlsx` geëxporteerd en niet als CSV: een CSV-export bevat alleen
+  het eerste blad, en dat zou dezelfde stille onvolledigheid opnieuw invoeren.
+- **Snelkoppelingen gevolgd.** `shortcutDetails` stond niet in de veldenlijst van de client;
+  29 snelkoppelingen kwamen binnen als bestand met een onleesbaar MIME-type. Naam, type én
+  `modifiedTime` komen nu van het doelbestand — dat laatste is niet cosmetisch, want het
+  leeftijdsfilter van 2 jaar beslist daarop. Dedup op file-id, dus een doel dat ook
+  rechtstreeks in scope zit telt één keer. De recursie kreeg een `bezocht`-set: een mapboom
+  heeft geen cycli, een snelkoppeling naar een bovenliggende map wel.
+- **Niets verdwijnt meer stil.** Elke overgeslagen categorie wordt op INFO gemeld met de reden
+  en komt in de handmatige-reviewlijst; een onbekend type krijgt zijn eigen categorie zodat een
+  nieuw bestandsformaat niet in hetzelfde gat terugvalt.
+- **Dekking in het run-record.** `Dekking` naast `Kosten`: gezien, gelezen, en per reden het
+  aantal overgeslagen. Aantallen, geen bestandsnamen. Het log verdwijnt bij een podherstart, en
+  "welk deel van de bron heeft het tool gezien" is precies wat een certificerende instantie
+  vraagt — dezelfde reden waarom de kosten er gisteren in zijn gezet.
+- **Een leeg extractieresultaat is een storing.** `LeegDocumentError`: een gescande PDF levert
+  nul tekens op, en als document met lege inhoud opgenomen classificeert de pipeline hem als
+  "geen bewijs" — een oordeel over iets wat niemand heeft gelezen, op een clausule waar het
+  bewijs bestaat. Dezelfde regel als bij het afgekapte antwoord hieronder.
+
+Gemeten na de wijziging tegen dezelfde Shared Drive: **502 bestanden gezien, 456 gelezen (91%),
+46 niet.** Van die 46 zijn 6 bewust uitgesloten referentiedocumenten (de normteksten zelf), 12
+afbeeldingen, 6 Google Forms, 1 video, 1 Drive-tekening — en 18 snelkoppelingen waarvan het doel
+een 404 geeft: verwijderd, of in een My Drive die niet met het service-account is gedeeld. Dat
+laatste is geen bug maar een vondst die het tool eerder niet kon melden.
+
+`pypdf` is als afhankelijkheid toegevoegd en op **6.15.0** vastgezet in `uv.lock`, niet op de
+nieuwste 6.16.1: die is vier dagen oud, en de quarantaine-regel uit de workstation-policy geldt
+ook op PyPI. Geen transitieve afhankelijkheden; lockfile-diff is één pakket van pypi.org.
+
+Verificatie op de auditkritische stukken (50 bestanden op naam gezocht, echt ingelezen): **45
+leveren tekst op** — de auditrapporten van de certificerende instantie (38k–73k tekens), het
+NC-registratieformulier (7.853), de VvT (23.400), de RI&E-actielijst (13.597),
+`instructie management review.pdf` (2.170) en alle kwartaalverslagen van de interne audits. Vier
+zijn scans en worden als zodanig gemeld in plaats van als leeg document opgenomen: beide
+ISO-certificaten en twee RI&E-overzichten. Eén geeft een 403 "this file cannot be downloaded" —
+een downloadbeperking op dat bestand — en belandt als leesfout in de handmatige review.
+
+Geen OCR en geen video: die blijven onleesbaar, maar nu *zichtbaar* onleesbaar in plaats van
+stil afwezig. De vier gescande certificaten zijn daarmee het eerste concrete argument voor OCR;
+dat blijft een aparte afweging.
+
+
 ### Fixed — 2026-08-17 — afgekapte antwoorden lazen als "geen bevindingen"
 
 De clusterverificatie van change `classificatie-modelkeuze` bracht de andere helft van

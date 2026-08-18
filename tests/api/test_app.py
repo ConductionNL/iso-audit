@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -373,7 +374,11 @@ def test_live_run_worker_draft_en_status(tmp_path: Path, monkeypatch) -> None:  
     from iso_audit.api.session import _RunState
     from iso_audit.memo.models import Finding
 
-    monkeypatch.setattr(rj, "run_live_pipeline", lambda **kw: kw["on_log"]("Stap 7/7: klaar"))
+    def _stub_pipeline(**kw: Any) -> rj.RunUitkomst:
+        kw["on_log"]("Stap 7/7: klaar")
+        return rj.RunUitkomst()
+
+    monkeypatch.setattr(rj, "run_live_pipeline", _stub_pipeline)
     fake = [
         Finding(
             id="nc-8.15",

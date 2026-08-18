@@ -65,6 +65,33 @@ class Kosten:
         }
 
 
+@dataclass(frozen=True)
+class Dekking:
+    """Welk deel van de bron een run heeft gezien en gelezen, en per reden wat niet.
+
+    Waarom dit in het run-record hoort en niet alleen in het log: het log verdwijnt bij een
+    podherstart, en "welk deel van de bron heeft het tool gezien" is precies wat een
+    certificerende instantie vraagt. Een auditor die 299 documenten ziet, ziet niet dat er 213
+    buiten stonden — dezelfde redenering waarom de kosten op 2026-08-17 van het log naar het
+    run-record zijn verhuisd.
+
+    Aantallen per reden, geen bestandsnamen: 213 namen per record maakt de trail onleesbaar, en
+    de namen staan al in het handmatige-reviewspoor.
+    """
+
+    gezien: int
+    gelezen: int
+    overgeslagen: dict[str, int]
+
+    def als_record(self) -> dict[str, Any]:
+        return {
+            "gezien": self.gezien,
+            "gelezen": self.gelezen,
+            "niet_gelezen": sum(self.overgeslagen.values()),
+            "overgeslagen": dict(self.overgeslagen),
+        }
+
+
 FINDINGS = "findings.json"
 
 _WS = re.compile(r"\s+")
@@ -173,6 +200,7 @@ def afsluiten(
     overgeslagen: int = 0,
     fout: str | None = None,
     kosten: Kosten | None = None,
+    dekking: Dekking | None = None,
 ) -> dict[str, Any]:
     """Schrijf het afsluitrecord van een run — append-only, niets wordt overschreven.
 
@@ -203,6 +231,10 @@ def afsluiten(
         # hetzelfde als wat er gefactureerd wordt. Tot 2026-08-17 stond het bedrag alleen in
         # het log terwijl de rest van de runhistorie wél in de trail zat.
         record["kosten"] = kosten.als_record()
+    if dekking is not None:
+        # Zelfde reden als bij de kosten: zonder dit staat er in de trail hoeveel documenten
+        # zijn toegevoegd, maar niet welk deel van de bron ongelezen bleef.
+        record["dekking"] = dekking.als_record()
     _append(dir_, record)
     return record
 

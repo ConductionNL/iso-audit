@@ -141,8 +141,9 @@ def test_list_documents_yields_alleen_ondersteunde() -> None:
             "mimeType": "application/vnd.google-apps.document",
             "modifiedTime": "2026-02-02T00:00:00Z",
         },
-        # Skip:
+        # Niet leesbaar (afbeelding, geen OCR):
         {"id": "f3", "name": "afb.png", "mimeType": "image/png", "modifiedTime": ""},
+        # PDF wordt sinds 2026-08-18 wél gelezen — 91 van de 213 ongelezen bestanden.
         {"id": "f4", "name": "rapport.pdf", "mimeType": "application/pdf", "modifiedTime": ""},
         # Uitgesloten op naam:
         {
@@ -156,7 +157,7 @@ def test_list_documents_yields_alleen_ondersteunde() -> None:
     with patch.object(drive, "drive_lijst_bestanden", return_value=bestanden):
         docs = list(src.list_documents())
     ids = {d.id for d in docs}
-    assert ids == {"f1", "f2"}
+    assert ids == {"f1", "f2", "f4"}
 
 
 def test_list_documents_geeft_metadata_door() -> None:
@@ -587,3 +588,264 @@ def test_probe_telt_niet_recursief() -> None:
 
 # Type-cast voor mypy zodat tests/typing klopt.
 _ = Any
+
+
+# ---------- dekking: wat niet gelezen wordt, wordt gemeld ----------
+#
+# Tot 2026-08-18 verdwenen 92 van de 512 bestanden in de gekoppelde Shared Drive via
+# `logger.debug("Skip (onbekend MIME)")`: niet in het gemelde aantal voor handmatige review,
+# en op INFO-niveau geen enkele regel. Deze tests zijn de gate daarop.
+
+
+def _xlsx_bytes(bladen: dict[str, list[list[Any]]]) -> bytes:
+    """Bouw een xlsx in het geheugen. Geen binaire fixture in de repo: wat erin zit moet
+    leesbaar zijn in de test die het gebruikt."""
+    import io
+
+    import openpyxl
+
+    boek = openpyxl.Workbook()
+    boek.remove(boek.active)
+    for naam, rijen in bladen.items():
+        blad = boek.create_sheet(naam)
+        for rij in rijen:
+            blad.append(rij)
+    buffer = io.BytesIO()
+    boek.save(buffer)
+    return buffer.getvalue()
+
+
+def _pptx_bytes(regels: list[str]) -> bytes:
+    import io
+
+    import pptx
+
+    presentatie = pptx.Presentation()
+    dia = presentatie.slides.add_slide(presentatie.slide_layouts[5])
+    dia.shapes.title.text = regels[0]
+    buffer = io.BytesIO()
+    presentatie.save(buffer)
+    return buffer.getvalue()
+
+
+def _pdf_bytes(tekst: str | None) -> bytes:
+    """Minimale, met de hand opgebouwde PDF — met of zonder tekstlaag.
+
+    Met de hand en niet als gecommitte binary: een auditor moet in de test kunnen zien wat
+    erin zit. `tekst=None` levert een pagina zonder tekstlaag op, wat een gescande PDF
+    nabootst: `extract_text()` geeft dan nul tekens.
+    """
+    stroom = b"" if tekst is None else f"BT /F1 12 Tf 72 720 Td ({tekst}) Tj ET".encode("latin-1")
+    objecten = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length %d >>\nstream\n" % len(stroom) + stroom + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    uit = bytearray(b"%PDF-1.4\n")
+    offsets: list[int] = []
+    for nummer, obj in enumerate(objecten, start=1):
+        offsets.append(len(uit))
+        uit += b"%d 0 obj\n" % nummer + obj + b"\nendobj\n"
+    xref = len(uit)
+    uit += b"xref\n0 %d\n" % (len(objecten) + 1)
+    uit += b"0000000000 65535 f \n"
+    for offset in offsets:
+        uit += b"%010d 00000 n \n" % offset
+    uit += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
+        len(objecten) + 1,
+        xref,
+    )
+    return bytes(uit)
+
+
+def _bestand(id_: str, naam: str, mime: str) -> dict[str, Any]:
+    return {"id": id_, "name": naam, "mimeType": mime, "modifiedTime": "2026-05-05T00:00:00Z"}
+
+
+def test_markdown_wordt_gelezen_als_tekst() -> None:
+    """`Auditrapport_beide_v3.3_2026-05-05.md` bleef buiten het landschap omdat markdown een
+    andere tekst-MIME heeft dan `text/plain` — niet omdat het onleesbaar was."""
+    bestanden = [_bestand("f1", "Auditrapport.md", "text/markdown")]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=b"# Auditrapport"),
+    ):
+        docs, review = drive.haal_documenten_op(folder_id="x")
+    assert [d["tekst"] for d in docs] == ["# Auditrapport"]
+    assert review == []
+
+
+def test_html_en_csv_worden_gelezen() -> None:
+    bestanden = [
+        _bestand("f1", "index.html", "text/html"),
+        _bestand("f2", "lijst.csv", "text/csv"),
+    ]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=b"inhoud"),
+    ):
+        docs, _ = drive.haal_documenten_op(folder_id="x")
+    assert len(docs) == 2
+
+
+def test_xlsx_levert_celtekst_per_blad() -> None:
+    """Een CSV-export zou alleen het eerste blad geven; dat is de stille onvolledigheid."""
+    inhoud = _xlsx_bytes({"Acties": [["Risico", "Hoog"]], "Beoordeling": [["Q1", "akkoord"]]})
+    bestanden = [_bestand("f1", "RIE.xlsx", drive.XLSX_MIME)]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=inhoud),
+    ):
+        docs, _ = drive.haal_documenten_op(folder_id="x")
+    tekst = docs[0]["tekst"]
+    assert "Acties" in tekst and "Hoog" in tekst
+    assert "Beoordeling" in tekst and "akkoord" in tekst, "het tweede blad mag niet wegvallen"
+
+
+def test_pptx_levert_diatekst() -> None:
+    inhoud = _pptx_bytes(["Managementreview 2026"])
+    bestanden = [_bestand("f1", "Review.pptx", drive.PPTX_MIME)]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=inhoud),
+    ):
+        docs, _ = drive.haal_documenten_op(folder_id="x")
+    assert "Managementreview 2026" in docs[0]["tekst"]
+
+
+def test_pdf_wordt_gelezen() -> None:
+    """91 PDF's, waaronder de auditrapporten van de certificerende instantie en de VvT."""
+    bestanden = [_bestand("f1", "Auditrapport ISMS.pdf", "application/pdf")]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=_pdf_bytes("Auditrapport ISMS")),
+    ):
+        docs, _ = drive.haal_documenten_op(folder_id="x")
+    assert "Auditrapport ISMS" in docs[0]["tekst"]
+
+
+def test_google_sheet_wordt_als_xlsx_geexporteerd() -> None:
+    """Als CSV komt alleen het eerste blad mee; als xlsx alle bladen."""
+    inhoud = _xlsx_bytes({"Blad1": [["a"]], "Blad2": [["b"]]})
+    bestanden = [_bestand("f1", "Actielijst", drive.GOOGLE_SHEET_MIME)]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_exporteer_bytes", return_value=inhoud) as export,
+    ):
+        docs, _ = drive.haal_documenten_op(folder_id="x")
+    export.assert_called_once_with("f1", drive.XLSX_MIME)
+    assert "Blad2" in docs[0]["tekst"]
+
+
+def test_google_slides_wordt_als_tekst_geexporteerd() -> None:
+    bestanden = [_bestand("f1", "Presentatie", drive.GOOGLE_SLIDES_MIME)]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_exporteer_bytes", return_value=b"dia-tekst") as export,
+    ):
+        docs, _ = drive.haal_documenten_op(folder_id="x")
+    export.assert_called_once_with("f1", "text/plain")
+    assert docs[0]["tekst"] == "dia-tekst"
+
+
+def test_onbekend_type_wordt_gemeld_en_niet_stil_overgeslagen(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Dit is het stille gat: geen melding, en niet in het aantal voor handmatige review."""
+    bestanden = [
+        _bestand("f1", "notitie.txt", "text/plain"),
+        _bestand("f2", "raadsel.bin", "application/x-onbekend"),
+    ]
+    with (
+        caplog.at_level("INFO", logger="iso_audit.sources.drive"),
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=b"inhoud"),
+    ):
+        docs, review = drive.haal_documenten_op(folder_id="x")
+    assert len(docs) == 1
+    assert [r["naam"] for r in review] == ["raadsel.bin"]
+    assert "application/x-onbekend" in review[0]["reden"]
+    meldingen = "\n".join(caplog.messages)
+    assert "application/x-onbekend" in meldingen
+    assert "Niet gelezen (1): onbekend type: application/x-onbekend" in meldingen
+
+
+def test_niet_leesbaar_meldt_de_reden(caplog: pytest.LogCaptureFixture) -> None:
+    """ "Onleesbaar" zonder reden stuurt de auditor net zo hard het verkeerde bos in."""
+    bestanden = [_bestand("f1", "scan.png", "image/png")]
+    with (
+        caplog.at_level("INFO", logger="iso_audit.sources.drive"),
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+    ):
+        _, review = drive.haal_documenten_op(folder_id="x")
+    assert "geen OCR" in review[0]["reden"]
+    assert "image/png" in "\n".join(caplog.messages)
+
+
+def test_leeg_extractieresultaat_is_geen_leeg_document() -> None:
+    """Een gescande PDF levert nul tekens op. Als leeg document opgenomen classificeert de
+    pipeline hem als "geen bewijs" — een oordeel over iets wat niemand heeft gelezen."""
+    bestanden = [_bestand("f1", "Gescand certificaat.pdf", "application/pdf")]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=_pdf_bytes(None)),
+    ):
+        docs, review = drive.haal_documenten_op(folder_id="x")
+    assert docs == [], "geen document met lege inhoud in het landschap"
+    assert "Onleesbaar" in review[0]["reden"]
+    assert "scan" in review[0]["reden"]
+
+
+def test_dekking_telt_gezien_gelezen_en_redenen() -> None:
+    """De dekking gaat naar het run-record; het log overleeft geen podherstart."""
+    bestanden = [
+        _bestand("f1", "notitie.txt", "text/plain"),
+        _bestand("f2", "scan.png", "image/png"),
+        _bestand("f3", "film.mp4", "video/mp4"),
+        _bestand("f4", "raadsel.bin", "application/x-onbekend"),
+        _bestand("f5", "ISO_IEC_27001.docx", drive.DOCX_MIME),
+    ]
+    gezien: list[drive.Dekkingteller] = []
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=b"inhoud"),
+    ):
+        drive.haal_documenten_op(folder_id="x", op_dekking=gezien.append)
+    teller = gezien[0]
+    assert (teller.gezien, teller.gelezen, teller.niet_gelezen) == (5, 1, 4)
+    assert teller.overgeslagen["onbekend type: application/x-onbekend"] == 1
+    assert teller.overgeslagen["referentiedocument, bewust uitgesloten"] == 1
+    assert sum(teller.overgeslagen.values()) == teller.niet_gelezen
+
+
+def test_list_documents_meldt_de_dekking(caplog: pytest.LogCaptureFixture) -> None:
+    """Ook het Source-protocol-pad mag niets stil laten vallen."""
+    bestanden = [
+        _bestand("f1", "notitie.txt", "text/plain"),
+        _bestand("f2", "raadsel.bin", "application/x-onbekend"),
+    ]
+    src = drive.DriveSource(folder_id="x")
+    with (
+        caplog.at_level("INFO", logger="iso_audit.sources.drive"),
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+    ):
+        docs = list(src.list_documents())
+    assert len(docs) == 1
+    meldingen = "\n".join(caplog.messages)
+    assert "2 bestand(en) gezien, 1 gelezen, 1 niet gelezen" in meldingen
+    assert "onbekend type: application/x-onbekend" in meldingen
+
+
+def test_doel_van_snelkoppeling_telt_een_keer() -> None:
+    """De client lost een snelkoppeling op naar het doel-record. Zit dat doel óók rechtstreeks
+    in scope, dan komt het twee keer in de lijst — de dedup op file-id vangt dat."""
+    doel = _bestand("echt", "VvT Conduction ISO 27001.pdf", "application/pdf")
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=[doel, dict(doel)]),
+        patch.object(drive, "drive_download_bestand", return_value=_pdf_bytes("VvT")),
+    ):
+        docs, _ = drive.haal_documenten_op(folder_id="x")
+    assert [d["id"] for d in docs] == ["echt"]

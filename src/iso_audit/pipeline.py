@@ -368,8 +368,13 @@ def run_audit(
     sources: list[str] | None = None,
     alleen_ingest: bool = False,
     op_kosten: Callable[[Any], None] | None = None,
+    op_dekking: Callable[[Any], None] | None = None,
 ) -> None:
     """Volledige auditpipeline uitvoeren.
+
+    :param op_dekking: Krijgt de Drive-dekkingtelling na de ingest (gezien, gelezen, en per
+        reden overgeslagen), zodat de caller die in het run-record kan zetten. Zelfde vorm
+        als `op_kosten`.
 
     :param alleen_ingest: Stop na stap 4 (inlezen + clausule-koppeling + vastleggen).
         Raakt de Claude-API niet en werkt dus zonder API-key. Bedoeld om de keten naar de
@@ -455,7 +460,7 @@ def run_audit(
     handmatige_review: list[dict[str, Any]] = []
     mislukt: dict[str, str] = {}
     if "drive" in actieve_bronnen:
-        documenten, handmatige_review = haal_documenten_op()
+        documenten, handmatige_review = haal_documenten_op(op_dekking=op_dekking)
         if handmatige_review:
             logger.warning(
                 "%d bestand(en) vereisen handmatige review: %s",

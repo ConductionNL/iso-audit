@@ -12,6 +12,11 @@ de volgorde van kosten en risico:
 **Laag 2 — bestaande afhankelijkheden.** `openpyxl` (`.xlsx`, 23), `python-pptx` (`.pptx`, 2)
 en de Drive-export voor Google Sheets (21) en Slides (19). Niets nieuws in `uv.lock`.
 
+> **Bij de uitvoering afgeweken:** Google Sheets worden als `.xlsx` geëxporteerd, niet als CSV.
+> Een CSV-export van een Google Sheet bevat alleen het **eerste** blad — dezelfde stille
+> onvolledigheid die deze change weghaalt. Als xlsx komen alle bladen mee en doet de
+> xlsx-lezer uit laag 2 de rest.
+
 **Laag 3 — één nieuwe afhankelijkheid.** PDF, 91 bestanden en de auditkritische kern. Zie
 hieronder.
 
@@ -26,6 +31,11 @@ Voorstel: `pypdf` — pure Python, geen systeembibliotheken, breed gebruikt. Alt
 `pdfplumber`, dat betere tabelherkenning heeft maar `pdfminer.six` meebrengt en zwaarder is.
 Voor auditdocumenten is doorlopende tekst het belangrijkst, niet tabelstructuur; `pypdf` is
 de saaiere keuze.
+
+> **Bij de uitvoering:** vastgezet op **6.15.0** in `uv.lock` en niet op de nieuwste 6.16.1.
+> Die was vier dagen oud, en de 7-daagse quarantaine uit de workstation-policy geldt ook op
+> PyPI. `pyproject.toml` houdt `>=6.15.0` zonder bovengrens, zodat een latere bump een
+> lockfile-review is en geen permanent plafond.
 
 Deze toevoeging valt onder de supply-chain-discipline uit `~/.claude/CLAUDE.md`: `uv add`,
 `uv.lock` gecommit, en de lockfile-diff reviewen op onverwachte resolved-URL's vóór de
@@ -84,3 +94,12 @@ Meer documenten is meer classificaties. Bij de op 2026-08-17 gemeten tarieven �
 $0,00133 (Haiku) tot $0,01145 (Opus 5) per classificatie — kost een verdubbeling van het
 landschap enkele euro's per audit. Geen bezwaar, wel iets om te noemen in de change die de
 dekking vergroot in plaats van het als verrassing te laten opduiken.
+
+## Testfixtures: opgebouwd in de test, niet gecommit
+
+De xlsx-, pptx- en PDF-fixtures worden in de test zelf gebouwd. Een gecommitte binary is voor
+een reviewer een blackbox; een auditor moet in de test kunnen zien wat er in het bestand staat.
+De PDF is met de hand opgebouwd uit objecten (catalog, pages, page, contentstream, font) — dat
+kost twintig regels en levert bovendien de scan-variant gratis op: dezelfde structuur zonder
+tekstlaag geeft nul tekens uit `extract_text()`, precies het geval dat de `LeegDocumentError`
+moet vangen.

@@ -371,9 +371,9 @@ class AuditSession:
             if m:
                 self._run.done, self._run.total = int(m.group(1)), int(m.group(2))
 
-        kosten = None
+        uitkomst = None
         try:
-            kosten = run_live_pipeline(
+            uitkomst = run_live_pipeline(
                 norm=norm,
                 sources=sources,
                 chapter=chapter,
@@ -411,7 +411,8 @@ class AuditSession:
                     run_id,
                     toegevoegd=toegevoegd,
                     overgeslagen=overgeslagen,
-                    kosten=kosten,
+                    kosten=uitkomst.kosten if uitkomst else None,
+                    dekking=uitkomst.dekking if uitkomst else None,
                 )
         except Exception as exc:  # surface elke pipeline-fout in de UI
             # NIET `str(exc)`: dit vangt élke pipeline-fout, dus ook die van Google, Jira

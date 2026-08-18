@@ -4,6 +4,11 @@ Implementeert het `Source` Protocol. Zoekt in de geconfigureerde Drive-map
 (`AUDIT_SOURCE_FOLDER_ID` of `AUDIT_DRIVE_FOLDER_ID`) naar procedures,
 werkinstructies en beleidsdocumenten.
 
+Leest Google Docs, Sheets en Slides (via export), `.docx`, `.xlsx`, `.pptx`, PDF en de
+tekstformaten (`text/plain`, markdown, HTML, CSV). Snelkoppelingen worden door de client
+opgelost naar hun doelbestand. Wat niet gelezen kan worden — afbeeldingen, video, Google
+Forms — wordt per categorie gemeld en meegeteld in de dekking; niets verdwijnt stil.
+
 Gemigreerd uit `Ops_to_Biz/audit/drive_ingest.py` per milestone B §2.3.2.
 De legacy `haal_documenten_op()`-functie blijft als module-level callable
 zodat bestaande callers (zoals de pipeline-CLI) ongewijzigd kunnen blijven
@@ -15,13 +20,19 @@ from __future__ import annotations
 import io
 import logging
 import os
-from collections.abc import Iterator
+from collections import Counter
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
 from typing import Any
 
 import docx
+import openpyxl
+import pptx
+import pypdf
 
 from iso_audit.clients.google_drive import (
     drive_download_bestand,
+    drive_exporteer_bytes,
     drive_exporteer_google_doc,
     drive_inhoud_telling,
     drive_lijst_bestanden,
@@ -45,21 +56,55 @@ UITGESLOTEN_NAAM_PREFIXEN: tuple[str, ...] = (
     "About the Sample Files",
 )
 
+GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
+GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
+GOOGLE_SLIDES_MIME = "application/vnd.google-apps.presentation"
+SNELKOPPELING_MIME = "application/vnd.google-apps.shortcut"
+DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
 ONDERSTEUNDE_MIME_TYPES: dict[str, str] = {
-    "application/vnd.google-apps.document": "google_doc",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    GOOGLE_DOC_MIME: "google_doc",
+    GOOGLE_SHEET_MIME: "google_sheet",
+    GOOGLE_SLIDES_MIME: "google_slides",
+    DOCX_MIME: "docx",
+    XLSX_MIME: "xlsx",
+    PPTX_MIME: "pptx",
+    "application/pdf": "pdf",
     "text/plain": "txt",
+    "text/markdown": "md",
+    "text/html": "html",
+    "text/csv": "csv",
 }
-NIET_TEKSTUEEL: frozenset[str] = frozenset(
-    {
-        "application/pdf",
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/tiff",
-        "application/vnd.google-apps.presentation",
-    }
-)
+"""Wat gelezen kan worden, en onder welk `Document.type` het binnenkomt.
+
+Tot 2026-08-18 stonden hier drie regels: Google Doc, docx en `text/plain`. Gemeten tegen de
+gekoppelde Shared Drive bleef daarmee 42% van 512 bestanden ongelezen, waaronder de
+auditrapporten van de certificerende instantie (PDF), de spreadsheets met de RI&E-actielijst
+en `Auditrapport_beide_v3.3_2026-05-05.md` — die laatste alleen omdat markdown een andere
+tekst-MIME heeft dan `text/plain`."""
+
+NIET_LEESBAAR: dict[str, str] = {
+    "image/jpeg": "afbeelding; de tekst zit in de pixels en er is geen OCR",
+    "image/png": "afbeelding; de tekst zit in de pixels en er is geen OCR",
+    "image/gif": "afbeelding; de tekst zit in de pixels en er is geen OCR",
+    "image/tiff": "afbeelding; de tekst zit in de pixels en er is geen OCR",
+    "image/svg+xml": "vectorafbeelding; geen doorlopende tekst",
+    "application/vnd.google-apps.drawing": "Drive-tekening; geen doorlopende tekst",
+    "video/mp4": "video; geen tekst te extraheren",
+    "application/vnd.google-apps.form": "Google Form; Drive exporteert hier geen tekst voor",
+    SNELKOPPELING_MIME: (
+        "snelkoppeling niet gevolgd; het doel bestaat niet meer of is niet gedeeld met het "
+        "service-account"
+    ),
+}
+"""Wat bewust niet gelezen wordt, met de reden erbij.
+
+De reden staat in de tabel en niet in de code die hem gebruikt: hij komt in de melding én in
+de handmatige-reviewlijst terecht, en "onleesbaar" zonder reden stuurt de auditor het bos in.
+Een snelkoppeling hoort hier alleen nog als hij niet te volgen was — de client lost hem
+normaal op naar het doelbestand."""
 
 FOLDER_ENV_VARS: tuple[str, ...] = ("AUDIT_SOURCE_FOLDER_ID", "AUDIT_DRIVE_FOLDER_ID")
 
@@ -114,15 +159,125 @@ def _is_uitgesloten(naam: str) -> bool:
     return any(naam.startswith(p) for p in UITGESLOTEN_NAAM_PREFIXEN)
 
 
+class LeegDocumentError(Exception):
+    """De extractie lukte, maar leverde geen tekst op.
+
+    Bewust een eigen fout en geen lege string: een gescande PDF levert nul tekens, en als
+    document met lege inhoud opgenomen classificeert de pipeline hem als "geen bewijs" — een
+    oordeel over iets wat niemand heeft gelezen, op een clausule waar het bewijs bestaat.
+    Dezelfde regel als bij de classificatie sinds 2026-08-17, waar een afgekapt antwoord ook
+    geen leeg oordeel meer is.
+    """
+
+
+def _tekst_uit_docx(inhoud: bytes) -> str:
+    doc = docx.Document(io.BytesIO(inhoud))
+    return "\n".join(p.text for p in doc.paragraphs)
+
+
+def _tekst_uit_xlsx(inhoud: bytes) -> str:
+    """Celtekst per blad, met de bladnaam als kop.
+
+    `data_only=True` geeft de laatst berekende waarde in plaats van de formule: in een
+    RI&E-actielijst is "hoog" het bewijs, niet `=ALS(...)`.
+    """
+    boek = openpyxl.load_workbook(io.BytesIO(inhoud), data_only=True, read_only=True)
+    regels: list[str] = []
+    for blad in boek.worksheets:
+        regels.append(f"## {blad.title}")
+        for rij in blad.iter_rows(values_only=True):
+            cellen = [str(c) for c in rij if c is not None and str(c).strip()]
+            if cellen:
+                regels.append("\t".join(cellen))
+    boek.close()
+    return "\n".join(regels)
+
+
+def _tekst_uit_pptx(inhoud: bytes) -> str:
+    presentatie = pptx.Presentation(io.BytesIO(inhoud))
+    regels: list[str] = []
+    for nummer, dia in enumerate(presentatie.slides, start=1):
+        regels.append(f"## Dia {nummer}")
+        for vorm in dia.shapes:
+            tekst = getattr(vorm, "text", "")
+            if tekst and tekst.strip():
+                regels.append(tekst)
+    return "\n".join(regels)
+
+
+def _tekst_uit_pdf(inhoud: bytes) -> str:
+    """Doorlopende tekst per pagina via `pypdf`. Geen OCR.
+
+    Een gescande PDF levert hier nul tekens op; die wordt door de caller als onleesbaar
+    gemeld en niet als leeg document opgenomen.
+    """
+    lezer = pypdf.PdfReader(io.BytesIO(inhoud))
+    return "\n".join(pagina.extract_text() or "" for pagina in lezer.pages)
+
+
+_BINAIRE_LEZERS: dict[str, Callable[[bytes], str]] = {
+    DOCX_MIME: _tekst_uit_docx,
+    XLSX_MIME: _tekst_uit_xlsx,
+    PPTX_MIME: _tekst_uit_pptx,
+    "application/pdf": _tekst_uit_pdf,
+}
+"""Per binair formaat één lezer. De rest wordt als tekst gedecodeerd."""
+
+
 def _fetch_tekst(file_id: str, mime: str) -> str:
-    """Haal de tekst-inhoud op voor een Drive-bestand op basis van MIME."""
-    if mime == "application/vnd.google-apps.document":
-        return drive_exporteer_google_doc(file_id)
-    inhoud = drive_download_bestand(file_id)
-    if mime == ("application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
-        doc = docx.Document(io.BytesIO(inhoud))
-        return "\n".join(p.text for p in doc.paragraphs)
-    return inhoud.decode("utf-8", errors="replace")
+    """Haal de tekst-inhoud op voor een Drive-bestand op basis van MIME.
+
+    :raises LeegDocumentError: de extractie lukte maar leverde geen tekst op.
+    """
+    if mime == GOOGLE_DOC_MIME:
+        tekst = drive_exporteer_google_doc(file_id)
+    elif mime == GOOGLE_SLIDES_MIME:
+        tekst = drive_exporteer_bytes(file_id, "text/plain").decode("utf-8", errors="replace")
+    elif mime == GOOGLE_SHEET_MIME:
+        # Als `.xlsx` en niet als CSV: een CSV-export van een Google Sheet bevat alleen het
+        # **eerste** blad. Dat is precies de stille onvolledigheid die deze change weghaalt,
+        # en de xlsx-lezer hierboven bestaat al.
+        tekst = _tekst_uit_xlsx(drive_exporteer_bytes(file_id, XLSX_MIME))
+    else:
+        inhoud = drive_download_bestand(file_id)
+        lezer = _BINAIRE_LEZERS.get(mime)
+        tekst = lezer(inhoud) if lezer else inhoud.decode("utf-8", errors="replace")
+    if not tekst.strip():
+        raise LeegDocumentError(
+            "extractie leverde geen tekst op; mogelijk een scan of een leeg bestand"
+        )
+    return tekst
+
+
+@dataclass
+class Dekkingteller:
+    """Wat een ingest heeft gezien, wat ervan is gelezen, en per reden wat niet.
+
+    Aantallen per reden, geen bestandsnamen: 213 namen per run-record maakt de trail
+    onleesbaar, en de namen staan al in de handmatige-reviewlijst.
+    """
+
+    gezien: int = 0
+    gelezen: int = 0
+    overgeslagen: Counter[str] = field(default_factory=Counter)
+
+    def sla_over(self, reden: str) -> None:
+        self.overgeslagen[reden] += 1
+
+    @property
+    def niet_gelezen(self) -> int:
+        return sum(self.overgeslagen.values())
+
+    def meld(self) -> None:
+        """Log per categorie op INFO wat er niet gelezen is.
+
+        Op INFO en niet op DEBUG. Tot 2026-08-18 verdwenen 92 van 512 bestanden via
+        `logger.debug("Skip (onbekend MIME)")`: ze zaten niet in het gemelde aantal voor
+        handmatige review, en op INFO-niveau was er geen regel. Wat je niet leest, moet je
+        zeggen — anders is het aantal documenten een dekkingsclaim die niemand kan nagaan.
+        """
+        for reden, aantal in sorted(self.overgeslagen.items(), key=lambda p: (-p[1], p[0])):
+            logger.info("Niet gelezen (%d): %s", aantal, reden)
 
 
 @register
@@ -162,13 +317,15 @@ class DriveSource:
 
         `filter` wordt momenteel genegeerd; Drive-filtering gebeurt op
         folder-niveau via env-configuratie (`AUDIT_SOURCE_FOLDER_ID`).
-        Niet-tekstuele en onbekende MIME-types worden gelogd en geskipt.
+        Wat niet gelezen kan worden, wordt per categorie op INFO gemeld — geen enkele
+        categorie verdwijnt stil.
         """
         del filter  # toekomstige uitbreiding; nu nog niet ondersteund
         logger.info(
             "DriveSource list_documents: folders=%s",
             self._folder_ids,
         )
+        teller = Dekkingteller()
         gezien: set[str] = set()
         for fid in self._folder_ids:
             for bestand in drive_lijst_bestanden(fid, drive_id=self._drive_id_voor[fid]):
@@ -176,17 +333,22 @@ class DriveSource:
                 if file_id in gezien:
                     continue
                 gezien.add(file_id)
+                teller.gezien += 1
                 naam = bestand["name"]
                 mime = bestand["mimeType"]
                 if _is_uitgesloten(naam):
                     logger.debug("Uitgesloten (referentiedocument): %s", naam)
+                    teller.sla_over("referentiedocument, bewust uitgesloten")
                     continue
-                if mime in NIET_TEKSTUEEL:
-                    logger.info("Skip (niet-tekstueel): %s (%s)", naam, mime)
+                if mime in NIET_LEESBAAR:
+                    logger.info("Niet leesbaar: %s (%s)", naam, mime)
+                    teller.sla_over(f"{mime}: {NIET_LEESBAAR[mime]}")
                     continue
                 if mime not in ONDERSTEUNDE_MIME_TYPES:
-                    logger.debug("Skip (onbekend MIME): %s (%s)", naam, mime)
+                    logger.info("Onbekend type, niet gelezen: %s (%s)", naam, mime)
+                    teller.sla_over(f"onbekend type: {mime}")
                     continue
+                teller.gelezen += 1
                 yield Document(
                     id=file_id,
                     titel=naam,
@@ -195,9 +357,19 @@ class DriveSource:
                     laatst_gewijzigd=bestand.get("modifiedTime", ""),
                     inhoud_uri=file_id,
                 )
+        logger.info(
+            "DriveSource: %d bestand(en) gezien, %d gelezen, %d niet gelezen",
+            teller.gezien,
+            teller.gelezen,
+            teller.niet_gelezen,
+        )
+        teller.meld()
 
     def fetch_content(self, doc: Document) -> str:
-        """Lees de feitelijke tekst van een `Document` op uit Drive."""
+        """Lees de feitelijke tekst van een `Document` op uit Drive.
+
+        :raises LeegDocumentError: het bestand kon gelezen worden maar leverde geen tekst op.
+        """
         if doc.bron != self.naam:
             raise ValueError(
                 f"DriveSource krijgt document uit bron={doc.bron!r}, verwacht {self.naam!r}"
@@ -319,43 +491,67 @@ class DriveSource:
 
 def _verwerk_batch(
     batch: list[dict[str, Any]],
+    teller: Dekkingteller | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Lees één batch; retourneert `(documenten, handmatige_review)`.
+
+    Alles wat niet als document terugkomt, komt in `handmatige_review` **en** in de teller.
+    Tot 2026-08-18 gold dat alleen voor de niet-tekstuele formaten; onbekende MIME-types
+    verdwenen op DEBUG-niveau en zaten in geen van beide.
+    """
+    teller = teller if teller is not None else Dekkingteller()
     documenten: list[dict[str, Any]] = []
     handmatige_review: list[dict[str, Any]] = []
     for bestand in batch:
         naam = bestand["name"]
         file_id = bestand["id"]
         mime = bestand["mimeType"]
+        teller.gezien += 1
         if _is_uitgesloten(naam):
             logger.info("Uitgesloten (referentiedocument): %s", naam)
+            teller.sla_over("referentiedocument, bewust uitgesloten")
             continue
-        if mime in NIET_TEKSTUEEL:
+        if mime in NIET_LEESBAAR:
+            reden = NIET_LEESBAAR[mime]
             handmatige_review.append(
                 {
                     "naam": naam,
                     "id": file_id,
-                    "reden": f"Niet-tekstueel formaat: {mime}",
+                    "reden": f"Niet leesbaar ({mime}): {reden}",
                     "herkomst": "Drive",
                 }
             )
             logger.info("Handmatige review vereist: %s (%s)", naam, mime)
+            teller.sla_over(f"{mime}: {reden}")
             continue
         if mime not in ONDERSTEUNDE_MIME_TYPES:
-            logger.debug("Onbekend mime-type overgeslagen: %s (%s)", naam, mime)
-            continue
-        try:
-            tekst = _fetch_tekst(file_id, mime)
-            documenten.append(
+            handmatige_review.append(
                 {
                     "naam": naam,
                     "id": file_id,
-                    "mime_type": mime,
-                    "tekst": tekst,
+                    "reden": f"Onbekend formaat: {mime}",
                     "herkomst": "Drive",
-                    "modified_at": bestand.get("modifiedTime"),
                 }
             )
-            logger.debug("Ingelezen: %s", naam)
+            logger.info("Onbekend type, handmatige review vereist: %s (%s)", naam, mime)
+            teller.sla_over(f"onbekend type: {mime}")
+            continue
+        try:
+            tekst = _fetch_tekst(file_id, mime)
+        except LeegDocumentError as e:
+            # Geen document met lege inhoud: dat leest als "geen bewijs" op een clausule
+            # waar het bewijs bestaat maar niemand het gelezen heeft.
+            logger.info("Geen tekst uit %s (%s): %s", naam, mime, e)
+            handmatige_review.append(
+                {
+                    "naam": naam,
+                    "id": file_id,
+                    "reden": f"Onleesbaar: {e}",
+                    "herkomst": "Drive",
+                }
+            )
+            teller.sla_over("geen tekst uit het bestand; mogelijk een scan")
+            continue
         except Exception as e:
             logger.warning("Fout bij inlezen %s: %s", naam, e)
             handmatige_review.append(
@@ -366,16 +562,35 @@ def _verwerk_batch(
                     "herkomst": "Drive",
                 }
             )
+            teller.sla_over("leesfout bij het ophalen van de inhoud")
+            continue
+        documenten.append(
+            {
+                "naam": naam,
+                "id": file_id,
+                "mime_type": mime,
+                "tekst": tekst,
+                "herkomst": "Drive",
+                "modified_at": bestand.get("modifiedTime"),
+            }
+        )
+        teller.gelezen += 1
+        logger.debug("Ingelezen: %s", naam)
     return documenten, handmatige_review
 
 
 def haal_documenten_op(
     folder_id: str | list[str] | None = None,
+    op_dekking: Callable[[Dekkingteller], None] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Legacy-API: haal documenten op + lijst van items die handmatige review nodig hebben.
 
     Ondersteunt meerdere folders (komma-sep `AUDIT_SOURCE_FOLDER_ID` of
     `folder_id`-lijst); deduplicatie op file-id.
+
+    `op_dekking` krijgt de telling na afloop, zodat de caller die in het run-record kan
+    zetten. Callback en geen derde returnwaarde: dezelfde vorm als `op_kosten` bij de
+    classificatie, en bestaande callers hoeven niet te wijzigen.
 
     Voor nieuwe code: gebruik `DriveSource.list_documents()` + `fetch_content()`.
     """
@@ -410,6 +625,7 @@ def haal_documenten_op(
 
     alle_documenten: list[dict[str, Any]] = []
     alle_handmatige_review: list[dict[str, Any]] = []
+    teller = Dekkingteller()
     for i in range(0, len(alle_bestanden), BATCH_SIZE):
         batch = alle_bestanden[i : i + BATCH_SIZE]
         logger.info(
@@ -418,13 +634,21 @@ def haal_documenten_op(
             -(-len(alle_bestanden) // BATCH_SIZE),
             len(batch),
         )
-        docs, review = _verwerk_batch(batch)
+        docs, review = _verwerk_batch(batch, teller)
         alle_documenten.extend(docs)
         alle_handmatige_review.extend(review)
 
+    # Gezien én niet-gelezen erbij. Deze regel meldde tot 2026-08-18 "149 ingelezen, 119 voor
+    # handmatige review" terwijl er 512 bestanden waren: 92 zaten in geen van beide getallen.
     logger.info(
-        "Drive-ingest klaar: %d documenten ingelezen, %d voor handmatige review",
-        len(alle_documenten),
+        "Drive-ingest klaar: %d bestand(en) gezien, %d gelezen, %d niet gelezen "
+        "(%d voor handmatige review)",
+        teller.gezien,
+        teller.gelezen,
+        teller.niet_gelezen,
         len(alle_handmatige_review),
     )
+    teller.meld()
+    if op_dekking is not None:
+        op_dekking(teller)
     return alle_documenten, alle_handmatige_review

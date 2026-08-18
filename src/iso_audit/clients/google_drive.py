@@ -52,7 +52,15 @@ retry-lus had. Eén getal, één plek."""
 
 _MAP_MIME = "application/vnd.google-apps.folder"
 
-_LIJST_VELDEN = "nextPageToken, files(id, name, mimeType, modifiedTime)"
+_SNELKOPPELING_MIME = "application/vnd.google-apps.shortcut"
+
+_LIJST_VELDEN = (
+    "nextPageToken, files(id, name, mimeType, modifiedTime, "
+    "shortcutDetails(targetId, targetMimeType))"
+)
+"""`shortcutDetails` hoort erbij sinds 2026-08-18. Zonder die velden kwam een
+snelkoppeling binnen als een bestand met mime `…google-apps.shortcut` en zonder enig
+spoor naar waar hij heen wees; de source-laag liet er 29 stil vallen."""
 
 
 def _lijst_params(folder_id: str, drive_id: str | None) -> dict[str, Any]:
@@ -79,13 +87,60 @@ def drive_lijst_bestanden(folder_id: str, drive_id: str | None = None) -> list[d
 
     Ondersteunt reguliere Drive-mappen en Shared Drives (`0A...`-IDs). Returnt
     `{id, name, mimeType, modifiedTime}` per bestand; submappen worden gevolgd, de
-    submap-records zelf komen niet mee.
+    submap-records zelf komen niet mee. Snelkoppelingen worden opgelost naar hun doel.
     """
     return _lijst_recursief(_dienst(), folder_id, drive_id)
 
 
-def _lijst_recursief(service: Any, folder_id: str, drive_id: str | None) -> list[dict[str, Any]]:
-    """Recursie op één service-object, zodat er per aanroep één credential-uitwisseling is."""
+def _volg_snelkoppeling(service: Any, snelkoppeling: dict[str, Any]) -> dict[str, Any] | None:
+    """Los een Drive-snelkoppeling op naar het record van het doelbestand, of `None`.
+
+    Bewust een extra `files.get` in plaats van het snelkoppeling-record hergebruiken met
+    `targetMimeType` erin geplakt: naam en `modifiedTime` van een snelkoppeling zijn die
+    van de snelkoppeling, niet van het document. Dat laatste is niet cosmetisch — het
+    leeftijdsfilter in de pipeline (2 jaar) beslist op `modifiedTime`, en dan zou een oud
+    document via een verse snelkoppeling als actueel doorgaan, of een actueel document via
+    een oude snelkoppeling als gearchiveerd wegvallen.
+
+    Lukt de `get` niet, dan is dat geen reden om te raden: de caller houdt het
+    snelkoppeling-record, en de source-laag meldt hem als niet-gevolgd.
+    """
+    doel_id = (snelkoppeling.get("shortcutDetails") or {}).get("targetId")
+    if not doel_id:
+        return None
+    try:
+        doel: dict[str, Any] = (
+            service.files()
+            .get(
+                fileId=doel_id,
+                fields="id, name, mimeType, modifiedTime",
+                supportsAllDrives=True,
+            )
+            .execute(num_retries=_MAX_RETRIES)
+        )
+    except Exception:
+        logger.warning(
+            '{"event": "drive_snelkoppeling_niet_gevolgd", "doel": "%s"}',
+            doel_id,
+        )
+        return None
+    return doel
+
+
+def _lijst_recursief(
+    service: Any,
+    folder_id: str,
+    drive_id: str | None,
+    bezocht: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Recursie op één service-object, zodat er per aanroep één credential-uitwisseling is.
+
+    `bezocht` houdt de al bezochte mappen bij. Dat was niet nodig zolang alleen echte
+    submappen werden gevolgd — een mapboom heeft geen cycli — maar een snelkoppeling naar
+    een bovenliggende map wél, en die volgen we sinds 2026-08-18.
+    """
+    if bezocht is None:
+        bezocht = {folder_id}
     alle: list[dict[str, Any]] = []
     page_token: str | None = None
 
@@ -97,9 +152,21 @@ def _lijst_recursief(service: Any, folder_id: str, drive_id: str | None) -> list
             params["pageToken"] = page_token
 
         result = service.files().list(**params).execute(num_retries=_MAX_RETRIES)
-        for bestand in result.get("files", []):
+        for gevonden in result.get("files", []):
+            bestand = gevonden
+            if bestand["mimeType"] == _SNELKOPPELING_MIME:
+                doel = _volg_snelkoppeling(service, bestand)
+                if doel is None:
+                    # Niet stil laten vallen: het snelkoppeling-record gaat mee, en de
+                    # source-laag meldt hem bij de dekking als niet-gevolgd.
+                    alle.append(bestand)
+                    continue
+                bestand = doel
             if bestand["mimeType"] == _MAP_MIME:
-                alle.extend(_lijst_recursief(service, bestand["id"], drive_id))
+                if bestand["id"] in bezocht:
+                    continue
+                bezocht.add(bestand["id"])
+                alle.extend(_lijst_recursief(service, bestand["id"], drive_id, bezocht))
             else:
                 alle.append(bestand)
 
@@ -203,6 +270,26 @@ def drive_exporteer_google_doc(file_id: str) -> str:
         .execute(num_retries=_MAX_RETRIES)
     )
     return ruw.decode("utf-8", errors="replace")
+
+
+def drive_exporteer_bytes(file_id: str, mime: str) -> bytes:
+    """Exporteer een Google-native bestand naar `mime` en geef de ruwe bytes terug.
+
+    Nodig voor de formaten waar de tekst niet uit een `text/plain`-export komt: een Google
+    Sheet exporteert als CSV alleen het **eerste** blad, en dat is precies de stille
+    onvolledigheid die deze change weghaalt. Als `.xlsx` komen alle bladen mee, en de
+    xlsx-lezer die er al is doet de rest.
+
+    Zelfde regel als bij `drive_exporteer_google_doc`: géén `supportsAllDrives` — die hoort
+    bij de `files`-collectie, niet bij export.
+    """
+    ruw: bytes = (
+        _dienst()
+        .files()
+        .export_media(fileId=file_id, mimeType=mime)
+        .execute(num_retries=_MAX_RETRIES)
+    )
+    return ruw
 
 
 def drive_download_bestand(file_id: str) -> bytes:

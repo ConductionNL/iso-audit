@@ -1,6 +1,6 @@
 [project]
 name = "iso-audit"
-version = "0.2.0a16"
+version = "0.2.0a17"
 description = "ISO 9001 + 27001 audit pipeline with pluggable source-adapters and human-in-the-loop modes"
 readme = "README.md"
 authors = [
@@ -42,6 +42,7 @@ dependencies = [
     "fastapi>=0.137.1",
     "uvicorn>=0.49.0",
     "httpx>=0.28.1",
+    "pypdf>=6.15.0",
 ]
 
 [project.scripts]
