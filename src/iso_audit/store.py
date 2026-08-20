@@ -14,6 +14,9 @@ Schema:
   decisions       — audit-trail (§3.1.3): elk hoog-risico beslismoment
                     (autonoom selectief; integer altijd voor hoog) plus
                     de uiteindelijke auditor-actie. Append-only.
+  assistent_vragen — wat de auditor het tool vroeg, met het antwoord, de bronnen
+                    die aan het model meegingen, welke daarvan terugkwamen, en de
+                    kosten met peildatum en grondslag. Append-only.
 
 FTS5 full-text search op documents.naam + documents.tekst voor lokaal
 zoeken zonder API-kosten.
@@ -188,6 +191,35 @@ def initialiseer(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_decisions_punt_resolved
             ON decisions(punt, resolved_at);
 
+        -- Vraagassistent: append-only, nooit overschreven.
+        --
+        -- `meegegeven_json` is het punt waarop een antwoord later na te trekken is: een
+        -- antwoord dat achteraf verkeerd blijkt is alleen te begrijpen als je weet wat de
+        -- assistent op dat moment kon zien. `gebruikt_json` zegt welke daarvan in het
+        -- antwoord terugkwamen — dat verschil is zelf informatie.
+        --
+        -- Kosten met peildatum én grondslag, om dezelfde reden als in `runs.jsonl`: een
+        -- bedrag zonder grondslag is niet te lezen, want lijstprijs is niet hetzelfde als
+        -- wat er gefactureerd wordt.
+        CREATE TABLE IF NOT EXISTS assistent_vragen (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent            TEXT NOT NULL,    -- 'bronbevrager' | 'normuitlegger' | ...
+            vraag            TEXT NOT NULL,
+            antwoord         TEXT NOT NULL,
+            meegegeven_json  TEXT NOT NULL,    -- bron-records die aan het model meegingen
+            gebruikt_json    TEXT NOT NULL,    -- bron-ID's die in het antwoord terugkomen
+            model            TEXT NOT NULL,
+            usd              REAL NOT NULL DEFAULT 0,
+            prijzen_peildatum TEXT NOT NULL,
+            prijzen_grondslag TEXT NOT NULL,
+            storing          TEXT,             -- reden als het antwoord niet geldig was
+            gesteld_door     TEXT NOT NULL DEFAULT '',
+            gesteld_op       TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_assistent_gesteld_op
+            ON assistent_vragen(gesteld_op);
+
         -- FTS5 full-text search over naam + tekst
         CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts
             USING fts5(naam, tekst, content=documents, content_rowid=rowid);
@@ -294,6 +326,47 @@ def log_ingest(conn: sqlite3.Connection, bron: str, folder_id: str | None, count
         (bron, folder_id, count, now()),
     )
     conn.commit()
+
+
+def bewaar_assistentvraag(
+    conn: sqlite3.Connection,
+    *,
+    agent: str,
+    record: dict[str, Any],
+    storing: str | None = None,
+    gesteld_door: str = "",
+) -> int:
+    """Leg één vraag met haar antwoord vast. Append-only; geeft het rij-id terug.
+
+    Ook een storing wordt vastgelegd, met de reden en zonder antwoord. Weglaten maakt het
+    overzicht schoner en het dossier onvolledig — een vraag die op een onverifieerbare
+    verwijzing strandde is precies wat je later wil terugzien, en het is het enige spoor dat
+    de controle heeft gewerkt.
+    """
+    cur = conn.execute(
+        """
+        INSERT INTO assistent_vragen (
+            agent, vraag, antwoord, meegegeven_json, gebruikt_json, model, usd,
+            prijzen_peildatum, prijzen_grondslag, storing, gesteld_door, gesteld_op
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            agent,
+            str(record.get("vraag", "")),
+            str(record.get("antwoord", "")),
+            json.dumps(record.get("meegegeven", []), ensure_ascii=False),
+            json.dumps(record.get("gebruikt", []), ensure_ascii=False),
+            str(record.get("model", "")),
+            float(record.get("usd", 0.0) or 0.0),
+            str(record.get("peildatum", "")),
+            str(record.get("grondslag", "")),
+            storing,
+            gesteld_door,
+            now(),
+        ),
+    )
+    conn.commit()
+    return int(cur.lastrowid or 0)
 
 
 def zoek(conn: sqlite3.Connection, query: str, limit: int = 20) -> list[sqlite3.Row]:

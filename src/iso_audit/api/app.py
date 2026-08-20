@@ -38,9 +38,11 @@ from iso_audit.classification.findings import (
     PRIJZEN_GRONDSLAG,
     PRIJZEN_PEILDATUM,
 )
+from iso_audit.classification.respons import OnleesbaarAntwoordError
 from iso_audit.config import anthropic_auth as aa
 from iso_audit.config import herkomst as hk
 from iso_audit.config.settings import VELDEN, Settings, load_config
+from iso_audit.config.verbinding import normaliseer
 from iso_audit.memo.norm_lookup import laad_norm_db
 
 AUDITS_ROOT_ENV = "ISO_AUDIT_AUDITS_ROOT"
@@ -67,6 +69,17 @@ class LandschapVerzoek(BaseModel):
     """Welke bronnen ingelezen worden voor het documentenlandschap."""
 
     bronnen: list[str] = []
+
+
+class AssistentVraag(BaseModel):
+    """Eén vraag aan de assistent. Geen gespreksgeschiedenis: elk antwoord staat los.
+
+    `norm` bepaalt welke normteksten meegaan; `9001` en `27001` zijn de twee die
+    `data/normteksten` kent.
+    """
+
+    vraag: str
+    norm: str = "27001"
 
 
 class BronVelden(BaseModel):
@@ -381,6 +394,62 @@ def create_app(
         from iso_audit.api import landschap
 
         return landschap.documenten(zoek=zoek, bron=bron, limiet=limiet)
+
+    @app.post("/assistent/vraag")
+    def assistent_vraag(body: AssistentVraag, request: Request) -> dict[str, object]:
+        """Beantwoord één vraag uit het corpus. Leest; schrijft alleen in de trail.
+
+        Achter dezelfde auth-gate als de rest van het portaal: het corpus bevat
+        auditbevindingen en interne memo's, en openstellen is een publicatiebesluit met een
+        eigen afweging.
+
+        Geweigerd tijdens een lopende run, om dezelfde reden als bij de configuratieroute:
+        een vraag tijdens een run leest een halve werkset, en het antwoord zou een dekking
+        suggereren die pas na de run bestaat.
+
+        Een onverifieerbaar antwoord is een storing en wordt als 502 teruggegeven — niet als
+        antwoord met een waarschuwing eronder, want een auditor die een plausibel antwoord
+        ziet met een voetnoot leest het antwoord.
+        """
+        from iso_audit.assistent import vraag as assistent
+        from iso_audit.store import bewaar_assistentvraag, initialiseer, verbinding
+
+        tekst = body.vraag.strip()
+        if not tekst:
+            raise HTTPException(status_code=400, detail="Geen vraag opgegeven.")
+        loopt = _run_loopt()
+        if loopt:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Er loopt een run in audit {loopt}. Wacht tot die klaar is: een vraag "
+                    "tijdens een run leest een halve werkset."
+                ),
+            )
+        wie = identiteit_van(request)
+        conn = verbinding()
+        try:
+            initialiseer(conn)
+            try:
+                uit = assistent.beantwoord(conn, tekst, norm=body.norm)
+            except (assistent.AntwoordOnverifieerbaarError, OnleesbaarAntwoordError) as exc:
+                # Ook een storing gaat in de trail: dat is het enige spoor dat de
+                # verwijzingscontrole heeft gewerkt.
+                _, veilig = normaliseer(exc, bron="assistent")
+                bewaar_assistentvraag(
+                    conn,
+                    agent="bronbevrager",
+                    record={"vraag": tekst, "antwoord": "", "model": ""},
+                    storing=str(exc)[:500],
+                    gesteld_door=wie,
+                )
+                raise HTTPException(status_code=502, detail=veilig) from exc
+            record = uit.als_record()
+            bewaar_assistentvraag(conn, agent="bronbevrager", record=record, gesteld_door=wie)
+        finally:
+            conn.close()
+        log_event("assistent_vraag", wie, bronnen=str(len(uit.meegegeven)))
+        return record
 
     @app.post("/landschap/ingest")
     def landschap_inlezen(

@@ -20,6 +20,9 @@ ONGESCOPED = {
     # Het documentenlandschap hoort bij de organisatie en niet bij één audit: één
     # voorraad die alle audits gebruiken. Daarom bewust zonder audit-prefix.
     "/landschap",
+    # De vraagassistent bevraagt het corpus van de organisatie, niet één audit: hetzelfde
+    # argument als bij het landschap. Wat hij ziet is wat er is ingelezen.
+    "/assistent",
     "/instellingen/health",
     "/instellingen/options",
     "/instellingen/bronnen",
@@ -351,3 +354,30 @@ def test_door_beheerder_gezette_velden_zijn_zichtbaar_vast() -> None:
     bron = _bron()
     assert 'h.bron === "env" || h.bron === "yaml"' in bron
     assert "bronbadge.vast" in bron
+
+
+# --- vraagassistent --------------------------------------------------------
+
+
+def test_vraagscherm_heeft_een_veld_en_geen_geschiedenis() -> None:
+    """Eén vraag, één antwoord. Een gesprek maakt van het vorige antwoord een bron voor het
+    volgende, en dan is niet meer te zeggen waar een bewering vandaan kwam."""
+    bron = _bron()
+    assert 'id="view-vragen"' in bron
+    assert bron.count('id="vr-vraag"') == 1
+    for verboden in ("gesprek", "geschiedenis", "chat"):
+        assert verboden not in bron.lower().split('id="view-vragen"')[1].split("</section>")[0]
+
+
+def test_vraagscherm_zegt_dat_het_antwoord_geen_bewijs_is() -> None:
+    """De auditor opent het document; het antwoord is een aanwijzing."""
+    bron = _bron()
+    blok = bron.split('id="view-vragen"')[1].split("</section>")[0]
+    assert "aanwijzing naar bewijs, niet het bewijs" in blok
+
+
+def test_vraagscherm_toont_meegegeven_bronnen_en_markeert_de_gebruikte() -> None:
+    """Zonder de meegegeven bronnen is een antwoord niet na te trekken."""
+    bron = _bron()
+    assert 'id="vr-bronnen"' in bron
+    assert "gebruikt" in bron

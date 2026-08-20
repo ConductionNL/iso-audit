@@ -6,6 +6,55 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-20 — de Bronbevrager: het corpus is bevraagbaar, zonder oordeel
+
+Eerste agent van change `iso-agents` (21 van de 40 taken). Het portaal kon een audit draaien
+maar geen vraag beantwoorden: de auditor die wilde weten "welk bewijs hebben wij voor 8.24?"
+moest zelf door 295 documenten, 1371 clausule-matches, de bevindingenhistorie en de
+opvolgpunten.
+
+Nieuw scherm **Vragen**, `POST /assistent/vraag`, en `iso_audit.assistent`. Wat de vorm bepaalt
+is niet de vraag maar de bronregel:
+
+- **Clausule eerst, dan tekst.** Staat er een clausule in de vraag, dan is `clause_matches` de
+  ingang — dat is de koppeling die de pipeline zelf legde, en die vindt ook het document waar
+  het woord niet in staat. Alleen zonder clausule valt het terug op `documents_fts`. Geen
+  embeddings: dat is een tweede administratie die uiteenloopt met de eerste.
+- **Leeg corpus, geen aanroep.** Levert het ophalen niets op, dan gaat er geen vraag naar het
+  model en komt er een vaste tekst terug. Een antwoord zonder bronnen kan per definitie niet uit
+  de bronnen komen, en dat is met een `if` af te dwingen in plaats van met een verzoek aan een
+  model dat ISO 27001 gewoon kent.
+- **Verwijzingen worden nagelopen.** Het antwoord verwijst met `[bron:<id>]`; elk id én elke
+  genoemde clausule moet in het meegegeven corpus zitten. Een antwoord zonder enige verwijzing
+  is óók een storing — dan valt er niets na te trekken, en juist zo ziet een antwoord uit
+  modelkennis eruit. Afgekapt op `max_tokens` is een storing om dezelfde reden als bij de
+  classificatie: bij afkapping verdwijnt juist de bronvermelding aan het eind.
+- **Tegenspraak wordt benoemd, niet opgelost.** Een document dat dekking claimt naast een NC op
+  dezelfde clausule: beide gaan mee, de assistent kiest niet. "Nieuwste wint" zou precies de
+  interessantste uitkomst verbergen — een oud NC dat nooit is afgesloten.
+- **Hij schrijft niets.** Geen bevinding, geen triage-suggestie, geen classificatie. De
+  auditor-spiegel is de capability die dit tool draagt.
+
+Trail: `assistent_vragen`, append-only, met de bron-ID's die aan het model meegingen en welke
+daarvan terugkwamen. Ook een storing komt erin, met de reden — dat is het enige spoor dat de
+verwijzingscontrole heeft gewerkt.
+
+Nog niet gebouwd: de Normuitlegger, de Gap-analist en de Opsteller, plus de clusterverificatie.
+
+### Fixed — 2026-08-20 — de testsuite schreef in de echte audit-DB
+
+Gevonden tijdens het bouwen van de route hierboven: drie tests van `test_assistent_route.py`
+zetten `ISO_AUDIT_DB` in plaats van `AUDIT_DB_PATH`, waardoor `store.db_pad()` terugviel op
+`output/audit.db` — de echte audit-DB van deze werkplek. Drie rijen in de echte
+`assistent_vragen`-tabel, suite groen. In een append-only tabel valt dat niet netjes terug te
+draaien; de drie testrijen zijn met de hand verwijderd.
+
+Nu een autouse-fixture in `tests/conftest.py` die `AUDIT_DB_PATH` voor élke test naar een
+wegwerpmap wijst, om dezelfde reden als `_schone_omgeving`: een test die eraan moet dénken
+zichzelf te isoleren, vergeet het uiteindelijk. Precies het geval dat de testisolatie-regel
+beschrijft — de fout is stil, de suite blijft groen, en wat er rot is de echte data.
+
+
 ### Changed — 2026-08-20 — werkelijke tarieven in het rapport, en één plek voor modelnamen
 
 Twee beslissingen van de opdrachtgever, en één vondst die eruit volgde.

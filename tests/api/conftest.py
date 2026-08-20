@@ -27,7 +27,15 @@ EXAMPLES = Path("examples/auditmemo")
 NORMS = "examples/norms"
 AUDITOR = "auditor@conduction.nl"
 
-ONGESCOPED = ("/healthz", "/instellingen", "/audits", "/me", "/openapi.json", "/docs")
+ONGESCOPED = (
+    "/healthz",
+    "/instellingen",
+    "/audits",
+    "/me",
+    "/assistent",
+    "/openapi.json",
+    "/docs",
+)
 """Paden die niet onder een audit vallen; al het andere krijgt de audit-prefix.
 
 `"/"` staat hier **niet** in: elk pad begint ermee, dus `startswith` zou dan altijd

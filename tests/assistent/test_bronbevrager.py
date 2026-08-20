@@ -1,0 +1,333 @@
+"""Tests voor de Bronbevrager — de bronregel is het ontwerp, dus die wordt getest.
+
+Wat hier wordt afgedwongen is niet "het antwoord is goed" maar "het antwoord kan niet uit
+iets anders komen dan het corpus". Dat is het verschil tussen een prompt die het vraagt en
+code die het controleert.
+"""
+
+from __future__ import annotations
+
+import sqlite3
+from typing import Any
+
+import pytest
+
+from iso_audit import modellen
+from iso_audit.assistent import ophalen
+from iso_audit.assistent import vraag as assistent
+from iso_audit.store import bewaar_assistentvraag, initialiseer, now
+
+
+class _Blok:
+    def __init__(self, tekst: str, soort: str = "text") -> None:
+        self.type = soort
+        self.text = tekst
+
+
+class _Usage:
+    input_tokens = 500
+    output_tokens = 200
+    cache_creation_input_tokens = 0
+    cache_read_input_tokens = 0
+
+
+class _Respons:
+    def __init__(self, tekst: str, stop_reason: str = "end_turn") -> None:
+        self.content = [_Blok(tekst)]
+        self.stop_reason = stop_reason
+        self.usage = _Usage()
+
+
+class _Client:
+    """Stub-client die het laatste verzoek onthoudt; geen netwerk."""
+
+    def __init__(self, antwoord: str, stop_reason: str = "end_turn") -> None:
+        self.antwoord = antwoord
+        self.stop_reason = stop_reason
+        self.verzoeken: list[dict[str, Any]] = []
+        self.messages = self
+
+    def create(self, **kw: Any) -> _Respons:
+        self.verzoeken.append(kw)
+        return _Respons(self.antwoord, self.stop_reason)
+
+
+@pytest.fixture
+def conn() -> sqlite3.Connection:
+    c = sqlite3.connect(":memory:")
+    initialiseer(c)
+    return c
+
+
+def _document(c: sqlite3.Connection, doc_id: str, naam: str, tekst: str = "") -> None:
+    c.execute(
+        "INSERT INTO documents (id, naam, tekst, herkomst, ingested_at) VALUES (?,?,?,?,?)",
+        (doc_id, naam, tekst, "Drive", now()),
+    )
+    c.commit()
+
+
+def _koppel(c: sqlite3.Connection, doc_id: str, clausule: str, norm: str = "27001") -> None:
+    c.execute(
+        "INSERT INTO clause_matches (doc_id, herkomst, clausule_id, norm) VALUES (?,?,?,?)",
+        (doc_id, "Drive", clausule, norm),
+    )
+    c.commit()
+
+
+def _bevinding(
+    c: sqlite3.Connection,
+    doc_id: str,
+    clausule: str,
+    classificatie: str,
+    *,
+    herkomst: str = "Drive",
+    naam: str = "Doc",
+) -> None:
+    c.execute(
+        """INSERT INTO bevindingen
+           (doc_id, herkomst, clausule_id, norm, classificatie, beschrijving,
+            document_naam, classified_at)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        (doc_id, herkomst, clausule, "27001", classificatie, "beschrijving", naam, now()),
+    )
+    c.commit()
+
+
+# --- ophalen: clausule eerst ----------------------------------------------
+
+
+def test_clausule_in_de_vraag_gebruikt_clause_matches_en_niet_fts(
+    conn: sqlite3.Connection,
+) -> None:
+    """De koppeling die de pipeline legde is preciezer dan elke tekstmatch.
+
+    Het gekoppelde document bevat het woord "encryptie" níet; via FTS was het onvindbaar.
+    """
+    _document(conn, "d1", "Cryptobeleid.docx", tekst="sleutelbeheer en algoritmen")
+    _koppel(conn, "d1", "8.24")
+    _document(conn, "d2", "Encryptie in de praktijk.docx", tekst="encryptie encryptie")
+
+    corpus = ophalen.haal_bronnen_op(conn, "Welk bewijs hebben wij voor 8.24?")
+
+    assert corpus.via_clausule is True
+    doc_ids = [b.id for b in corpus.bronnen if b.soort == "document"]
+    assert doc_ids == ["d1"], "alleen het gekoppelde document, niet de tekstmatch"
+
+
+def test_zonder_clausule_valt_het_terug_op_fts(conn: sqlite3.Connection) -> None:
+    _document(conn, "d2", "Encryptiebeleid.docx", tekst="encryptie van gegevens")
+
+    corpus = ophalen.haal_bronnen_op(conn, "Wat hebben wij over encryptie?")
+
+    assert corpus.via_clausule is False
+    assert [b.id for b in corpus.bronnen if b.soort == "document"] == ["d2"]
+
+
+def test_vraagteken_en_aanhalingstekens_breken_de_fts_query_niet(
+    conn: sqlite3.Connection,
+) -> None:
+    """Een syntaxfout in de FTS-query zou in de UI lezen als "geen resultaten"."""
+    _document(conn, "d2", "Beleid.docx", tekst="wachtwoorden")
+
+    corpus = ophalen.haal_bronnen_op(conn, 'Wat staat er over "wachtwoorden"? (en MFA)')
+
+    assert [b.id for b in corpus.bronnen if b.soort == "document"] == ["d2"]
+
+
+def test_opvolgpunten_komen_als_eigen_soort_en_niet_dubbel(conn: sqlite3.Connection) -> None:
+    """Opvolgpunten staan in `bevindingen` met herkomst `<bron>-opvolging`."""
+    _bevinding(conn, "ISO-709", "8.24", "OFI", herkomst="Jira-opvolging", naam="ISO-709")
+
+    corpus = ophalen.haal_bronnen_op(conn, "Wat staat open op 8.24?")
+
+    soorten = [b.soort for b in corpus.bronnen if b.soort in ("bevinding", "opvolgpunt")]
+    assert soorten == ["opvolgpunt"]
+
+
+def test_normtekst_gaat_mee_met_bewijslast_en_zonder_normtekst(conn: sqlite3.Connection) -> None:
+    """`bewijslast` is wat deze bron bruikbaar maakt; de normtekst zelf gaat niet mee."""
+    corpus = ophalen.haal_bronnen_op(conn, "Wat eist 5.1?", norm="9001")
+
+    norm = [b for b in corpus.bronnen if b.soort == "normtekst"]
+    assert norm and norm[0].id == "norm:9001:5.1"
+    assert "verwacht bewijs:" in norm[0].samenvatting
+
+
+def test_afkapping_wordt_geteld_en_niet_stil_weggelaten(conn: sqlite3.Connection) -> None:
+    """Een lijst die stil op twaalf stopt leest als "dit is alles"."""
+    for i in range(ophalen.MAX_DOCUMENTEN + 3):
+        _document(conn, f"d{i}", f"Doc {i:02d}.docx")
+        _koppel(conn, f"d{i}", "8.24")
+
+    corpus = ophalen.haal_bronnen_op(conn, "Bewijs voor 8.24?")
+
+    assert len([b for b in corpus.bronnen if b.soort == "document"]) == ophalen.MAX_DOCUMENTEN
+    assert corpus.afgekapt["document"] >= 1
+
+
+# --- geen dekking ---------------------------------------------------------
+
+
+def test_vraag_zonder_dekking_levert_staat_er_niet_in(conn: sqlite3.Connection) -> None:
+    """Geen bronnen betekent geen aanroep: een antwoord zonder bronnen kan niet uit de
+    bronnen komen, en dat is met een `if` af te dwingen in plaats van met een verzoek."""
+    client = _Client("ISO 27001 clausule 8.24 eist cryptografische beheersmaatregelen.")
+
+    uit = assistent.beantwoord(conn, "Wat is de beste encryptiestandaard?", client=client)
+
+    assert uit.geen_dekking is True
+    assert uit.antwoord == assistent.GEEN_DEKKING
+    assert client.verzoeken == [], "er mag geen model bevraagd zijn"
+    assert "8.24" not in uit.antwoord
+
+
+# --- verwijzingscontrole --------------------------------------------------
+
+
+def test_antwoord_met_onbekend_bron_id_is_een_storing(conn: sqlite3.Connection) -> None:
+    """ "Alleen uit de meegegeven bronnen" is een instructie; dit is de controle."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Er is beleid [bron:d-verzonnen].")
+
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="niet zijn meegegeven"):
+        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+
+def test_antwoord_zonder_verwijzing_is_een_storing(conn: sqlite3.Connection) -> None:
+    """Zonder verwijzing is er niets na te trekken — en juist zo ziet modelkennis eruit."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Ja, dat is geregeld.")
+
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="geen enkele"):
+        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+
+def test_antwoord_met_niet_meegegeven_clausule_is_een_storing(conn: sqlite3.Connection) -> None:
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Zie het beleid [bron:d1]; dit raakt ook 5.37.")
+
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="clausules"):
+        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+
+def test_afgekapt_antwoord_is_een_storing(conn: sqlite3.Connection) -> None:
+    """Bij afkapping verdwijnt juist de bronvermelding aan het eind."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Er is beleid [bron:d1]", stop_reason="max_tokens")
+
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="afgekapt"):
+        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+
+def test_geldig_antwoord_geeft_gebruikte_bronnen_terug(conn: sqlite3.Connection) -> None:
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Het cryptobeleid raakt 8.24 [bron:d1] [bron:d1].")
+
+    uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+    assert uit.gebruikt == ["d1"], "zonder duplicaten"
+    assert uit.model == modellen.STANDAARD
+    assert uit.usd > 0
+    assert uit.grondslag and uit.peildatum
+
+
+def test_thinking_staat_expliciet_uit(conn: sqlite3.Connection) -> None:
+    """Weglaten maakt het gedrag afhankelijk van het model; dat kostte op 2026-08-17 stil
+    nul bevindingen op twee van de drie modellen."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Beleid [bron:d1].")
+
+    assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+    assert client.verzoeken[0]["thinking"] == {"type": "disabled"}
+    assert client.verzoeken[0]["max_tokens"] == assistent.MAX_TOKENS
+
+
+# --- tegenspraak ----------------------------------------------------------
+
+
+def test_tegenspraak_levert_beide_bronnen(conn: sqlite3.Connection) -> None:
+    """Een document dat dekking claimt naast een NC op dezelfde clausule: beide gaan mee,
+    en de assistent kiest niet. Een regel als "nieuwste wint" verbergt precies die
+    spanning."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    _bevinding(conn, "d1", "8.24", "NC", naam="Cryptobeleid.docx")
+
+    corpus = ophalen.haal_bronnen_op(conn, "Zijn wij in orde op 8.24?")
+
+    soorten = {b.soort for b in corpus.bronnen}
+    assert {"document", "bevinding"} <= soorten
+    prompt = assistent._user_prompt("Zijn wij in orde op 8.24?", corpus)
+    assert "Cryptobeleid.docx" in prompt and "NC op 8.24" in prompt
+
+
+def test_de_prompt_benoemt_tegenspraak_als_geldige_uitkomst() -> None:
+    """Zonder dat lost het model het stil op door één bron te negeren."""
+    assert "TEGENSPRAAK" in assistent.SYSTEEM
+    assert "kiest niet" in assistent.SYSTEEM
+    assert "geen bevinding" in assistent.SYSTEEM
+
+
+# --- schrijft niets -------------------------------------------------------
+
+
+def test_de_assistent_schrijft_geen_bevinding_en_geen_besluit(conn: sqlite3.Connection) -> None:
+    """De auditor-spiegel is de capability die dit tool draagt: een mens houdt het oordeel."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Beleid [bron:d1].")
+
+    assistent.beantwoord(conn, "Is dit een afwijking op 8.24?", client=client)
+
+    assert conn.execute("SELECT COUNT(*) FROM bevindingen").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 0
+
+
+# --- trail ----------------------------------------------------------------
+
+
+def test_vraag_en_antwoord_staan_met_de_meegegeven_bronnen_in_de_trail(
+    conn: sqlite3.Connection,
+) -> None:
+    """Een antwoord dat achteraf verkeerd blijkt is alleen te begrijpen als je weet wat de
+    assistent op dat moment kon zien."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Beleid [bron:d1].")
+    uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+    rij_id = bewaar_assistentvraag(
+        conn, agent="bronbevrager", record=uit.als_record(), gesteld_door="a@b.c"
+    )
+
+    conn.row_factory = sqlite3.Row
+    rij = conn.execute("SELECT * FROM assistent_vragen WHERE id = ?", (rij_id,)).fetchone()
+    assert rij["vraag"] == "Bewijs voor 8.24?"
+    assert "d1" in rij["meegegeven_json"]
+    assert "d1" in rij["gebruikt_json"]
+    assert rij["model"] == modellen.STANDAARD
+    assert rij["prijzen_grondslag"] and rij["prijzen_peildatum"]
+    assert rij["gesteld_door"] == "a@b.c"
+
+
+def test_storing_wordt_ook_vastgelegd(conn: sqlite3.Connection) -> None:
+    """Het enige spoor dat de verwijzingscontrole heeft gewerkt."""
+    bewaar_assistentvraag(
+        conn,
+        agent="bronbevrager",
+        record={"vraag": "Bewijs voor 8.24?", "antwoord": "", "model": ""},
+        storing="antwoord verwijst naar bronnen die niet zijn meegegeven: d-verzonnen",
+    )
+
+    conn.row_factory = sqlite3.Row
+    rij = conn.execute("SELECT * FROM assistent_vragen").fetchone()
+    assert rij["antwoord"] == ""
+    assert "niet zijn meegegeven" in rij["storing"]

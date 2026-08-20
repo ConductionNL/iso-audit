@@ -61,6 +61,27 @@ def _schone_omgeving(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _eigen_audit_db(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Wijs `AUDIT_DB_PATH` naar een wegwerpmap, voor élke test.
+
+    Zonder dit valt `store.db_pad()` terug op `output/audit.db` **binnen de repo** — de
+    echte audit-DB van deze werkplek. Gemeten op 2026-08-20: drie tests van
+    `test_assistent_route.py` schreven zo drie rijen in de echte `assistent_vragen`-tabel.
+    Groene suite, vervuilde audit-trail, en in een append-only tabel valt dat niet netjes
+    terug te draaien.
+
+    Autouse en repo-breed, om dezelfde reden als `_schone_omgeving`: een test die eraan moet
+    dénken zichzelf te isoleren, vergeet het uiteindelijk. Een test die een eigen pad wil,
+    zet `AUDIT_DB_PATH` gewoon zelf — dat overschrijft dit.
+
+    Zie de testisolatie-regel in `~/.claude/CLAUDE.md`.
+    """
+    monkeypatch.setenv("AUDIT_DB_PATH", str(tmp_path_factory.mktemp("audit-db") / "audit.db"))
+
+
 @pytest.fixture
 def sample_document() -> Document:
     """Een geldig Document-instance voor adapter-conformance tests."""

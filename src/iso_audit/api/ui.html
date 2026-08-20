@@ -97,6 +97,7 @@
 <nav>
   <a href="#/" id="nav-dash">Audits</a>
   <a href="#/landschap" id="nav-landschap">Landschap</a>
+  <a href="#/vragen" id="nav-vragen">Vragen</a>
   <a href="#/config" id="nav-config">Configuratie</a>
   <span class="spacer"></span>
   <span id="wie"></span>
@@ -119,6 +120,40 @@
   <div class="step">
     <h2>Audits</h2>
     <div id="dash-wrap"><p class="note">laden…</p></div>
+  </div>
+</section>
+
+<!-- ============ vragen ============ -->
+<section id="view-vragen" hidden>
+  <div class="step">
+    <h2>Vraag het corpus</h2>
+    <p class="note">Antwoorden komen uitsluitend uit wat dit tool heeft ingelezen: het
+      documentenlandschap, de bevindingen en audithistorie, de opvolgpunten en de
+      normteksten. Staat het er niet in, dan zegt de assistent dat — hij vult niets aan uit
+      algemene ISO-kennis, want dat is voor een audit niet na te trekken.</p>
+    <p class="mini"><strong>Het antwoord is een aanwijzing naar bewijs, niet het bewijs
+      zelf.</strong> Open het document om te zien wat er staat. De assistent citeert niet en
+      velt geen oordeel: hij stelt geen bevinding en geen classificatie voor.</p>
+    <label class="veld">Vraag<br>
+      <textarea id="vr-vraag" rows="3" style="width:100%"
+        placeholder="Welk bewijs hebben wij voor 8.24?"></textarea></label>
+    <label class="veld">Norm<br>
+      <select id="vr-norm">
+        <option value="27001" selected>ISO 27001</option>
+        <option value="9001">ISO 9001</option>
+      </select></label>
+    <div style="margin-top:.5rem">
+      <button onclick="vraagStellen()">Vraag stellen</button>
+      <span id="vr-msg" class="ok"></span>
+    </div>
+  </div>
+  <div class="step" id="vr-antwoordblok" hidden>
+    <h2>Antwoord</h2>
+    <div id="vr-antwoord"></div>
+    <h3>Bronnen die de assistent kon zien</h3>
+    <p class="mini">Alles hieronder is meegegeven; wat in het antwoord terugkomt staat
+      gemarkeerd. Dit staat ook in de trail, zodat een antwoord later na te trekken is.</p>
+    <div id="vr-bronnen"></div>
   </div>
 </section>
 
@@ -310,7 +345,7 @@ function uitloggen(){
 }
 
 function toon(id){
-  for(const v of ["view-dashboard","view-audit","view-landschap","view-config"]){
+  for(const v of ["view-dashboard","view-audit","view-landschap","view-vragen","view-config"]){
     document.getElementById(v).hidden = (v !== id);
   }
 }
@@ -320,6 +355,8 @@ async function route(){
   document.getElementById("nav-config").setAttribute("aria-current", h === "#/config" ? "page" : "false");
   document.getElementById("nav-landschap").setAttribute("aria-current",
     h === "#/landschap" ? "page" : "false");
+  document.getElementById("nav-vragen").setAttribute("aria-current",
+    h === "#/vragen" ? "page" : "false");
   if(h.startsWith("#/audit/")){
     AUDIT = decodeURIComponent(h.slice("#/audit/".length));
     toon("view-audit");
@@ -329,6 +366,7 @@ async function route(){
   AUDIT = null;
   if(h === "#/config"){ toon("view-config"); await loadConfigView(); return; }
   if(h === "#/landschap"){ toon("view-landschap"); await loadLandschap(); return; }
+  if(h === "#/vragen"){ toon("view-vragen"); return; }
   toon("view-dashboard");
   await loadDashboard();
 }
@@ -502,6 +540,56 @@ async function postBron(naam, velden){
     {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({velden})});
   if(!r.ok) msgAn("⚠ " + ((await r.json().catch(()=>({}))).detail || r.status));
   return r.ok;
+}
+
+// --- vragen ----------------------------------------------------------------
+// Eén vraag, één antwoord, geen gespreksgeschiedenis: elk antwoord moet los natrekbaar zijn
+// in de trail. Een gesprek maakt van het vorige antwoord een bron voor het volgende, en dan
+// is niet meer te zeggen waar een bewering vandaan kwam.
+
+function bronRegel(b, gebruikt){
+  const aan = gebruikt.includes(b.id);
+  const clausules = (b.clausules||[]).join(", ");
+  const link = b.link ? ` <a href="${esc(b.link)}">openen</a>` : "";
+  return `<li>${aan ? "<strong>gebruikt</strong> — " : ""}${esc(b.soort)}: ${esc(b.naam)}` +
+    `${clausules ? ` <span class="mini">(${esc(clausules)})</span>` : ""}${link}</li>`;
+}
+
+async function vraagStellen(){
+  const vraag = document.getElementById("vr-vraag").value.trim();
+  const msg = document.getElementById("vr-msg");
+  if(!vraag){ msg.textContent = "⚠ Stel eerst een vraag."; return; }
+  msg.textContent = "bezig…";
+  const r = await fetch("/assistent/vraag", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({vraag, norm: document.getElementById("vr-norm").value})});
+  if(!r.ok){
+    // Een onverifieerbaar antwoord komt hier als 502 binnen. Bewust géén antwoord met een
+    // waarschuwing eronder: dan leest de auditor het antwoord.
+    msg.textContent = "⚠ " + ((await r.json().catch(()=>({}))).detail || r.status);
+    document.getElementById("vr-antwoordblok").hidden = true;
+    return;
+  }
+  msg.textContent = "";
+  const a = await r.json();
+  const gebruikt = a.gebruikt || [];
+  // Verwijzingen als [bron:<id>] worden zichtbaar gemaakt, niet weggepoetst: de verwijzing
+  // is het punt van dit antwoord.
+  const tekst = esc(a.antwoord).replace(/\[bron:([^\]]+)\]/g,
+    (_m, id) => `<span class="mini">[${esc(id)}]</span>`);
+  const afgekapt = Object.entries(a.afgekapt||{}).map(([k,v]) => `${v} extra ${esc(k)}(en)`);
+  document.getElementById("vr-antwoord").innerHTML =
+    `<p>${tekst.replace(/\n/g, "<br>")}</p>` +
+    (a.geen_dekking ? `<p class="mini">Geen bronnen gevonden; er is geen model bevraagd.</p>` : "") +
+    (afgekapt.length ? `<p class="mini">⚠ Er waren meer treffers dan meegegeven:
+       ${afgekapt.join(", ")}. Verfijn de vraag om de rest te zien.</p>` : "") +
+    (a.model ? `<p class="mini">Model ${esc(a.model)}${a.usd ?
+       ` · $${Number(a.usd).toFixed(4)} (${esc(a.grondslag||"")}, peildatum ${esc(a.peildatum||"")})` : ""}</p>` : "");
+  const bronnen = a.meegegeven || [];
+  document.getElementById("vr-bronnen").innerHTML = bronnen.length
+    ? `<ul>${bronnen.map(b => bronRegel(b, gebruikt)).join("")}</ul>`
+    : `<p class="note">Geen bronnen meegegeven.</p>`;
+  document.getElementById("vr-antwoordblok").hidden = false;
 }
 
 // --- landschap -------------------------------------------------------------
