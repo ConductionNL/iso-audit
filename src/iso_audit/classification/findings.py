@@ -20,7 +20,9 @@ Verbeteringen t.o.v. v1:
 3. **`schat_kosten`** — kostenschatting vooraf zonder API-calls.
 4. **Rehash / selective re-classify** — UPSERT i.p.v. INSERT-OR-IGNORE,
    checkpoint op `(doc_id, clausule_id, norm)`.
-5. **`AUDIT_CLASSIFICATION_MODEL`-env** voor model-keuze (default Haiku 4.5).
+5. **`AUDIT_CLASSIFICATION_MODEL`-env** voor model-keuze (default Haiku 4.5). Raakt
+   alleen dit bestand: memo-tekst, thema-bepaling en rapportgeneratie draaien op
+   `modellen.STANDAARD`.
 
 Gebruik:
     # Alleen kostenschatting (géén API-calls):
@@ -36,7 +38,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sqlite3
 import time
 from collections import defaultdict
@@ -48,12 +49,13 @@ from typing import Any
 import anthropic
 from dotenv import load_dotenv
 
+from iso_audit import modellen
 from iso_audit.classification.respons import GEEN_THINKING, OnleesbaarAntwoordError, tekst_uit
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = os.environ.get("AUDIT_CLASSIFICATION_MODEL", "claude-haiku-4-5-20251001")
+DEFAULT_MODEL = modellen.uit_omgeving()
 MAX_TEKST = 2000
 MIRO_BATCH = 20
 CHARS_PER_TOKEN = 4  # ruwe schatting voor dry-run-cost
@@ -65,63 +67,89 @@ CHARS_PER_TOKEN = 4  # ruwe schatting voor dry-run-cost
 # 4.5 op 0.80/4.00 (werkelijk 1.00/5.00), waardoor elke kostenregel in een
 # auditrapport ~25% te laag uitviel, en Opus op 15.00/75.00 (werkelijk 5.00/25.00).
 # Een te lage kostenpost is schadelijker dan geen kostenpost, omdat hij compleet lijkt.
-PRIJZEN_PEILDATUM = "2026-08-14"
+PRIJZEN_PEILDATUM = "2026-08-20"
 """Datum waarop deze tarieven zijn gecontroleerd. Prijzen wijzigen buiten deze repo
 om; rapporteer deze datum mee bij elk kostenbedrag."""
 
-PRIJZEN_GRONDSLAG = "lijstprijs"
-"""Wélke prijs hier staat: `lijstprijs` of `werkelijk` (inclusief tijdelijke acties).
+PRIJZEN_GRONDSLAG = "werkelijk tarief"
+"""Wélke prijs hier staat: `lijstprijs` of `werkelijk tarief` (inclusief tijdelijke acties).
 
-Een bedrag met een peildatum maar zonder grondslag is niet navertelbaar. Concreet geval op
-2026-08-17: Sonnet 5 heeft tot en met 31 augustus 2026 een introductietarief van $2,00/$10,00
-per miljoen tokens, terwijl de tabel hieronder $3,00/$15,00 aanhoudt. Elk gerapporteerd bedrag
-voor Sonnet 5 valt daarmee een derde hoger uit dan wat er gefactureerd wordt.
+Een bedrag met een peildatum maar zonder grondslag is niet navertelbaar. Op verzoek van de
+opdrachtgever (2026-08-20) staat hier het **werkelijke tarief**: het bedrag in het rapport
+moet zo dicht mogelijk bij de factuur liggen. Concreet raakt dat één regel: Sonnet 5 heeft tot
+en met 31 augustus 2026 een introductietarief van $2,00/$10,00 in plaats van $3,00/$15,00 per
+miljoen tokens.
+
+Wat dit *niet* is: de factuur. Hier staat het publieke tarief dat op de peildatum gold. Heeft
+Conduction een eigen afspraak met Anthropic (volumekorting, commitment), dan wijkt de factuur
+daar nog van af en is dit een bovengrens.
 
 Bewust geen datumlogica in de tabel die zelf tussen tarieven kiest: dat is een tweede
 administratie die achterloopt op de leverancier, precies wat `PRIJZEN_PEILDATUM` moet
-voorkomen. Eén handmatig bijgehouden tabel met een peildatum en een benoemde grondslag is
-saai en controleerbaar.
+voorkomen. In plaats daarvan noteert `TIJDELIJK_TARIEF_TOT` welk tarief tijdelijk is, en
+waarschuwt `prijs_voor()` zodra die datum verstreken is."""
 
-Staat hier `lijstprijs` en wil de opdrachtgever werkelijke kosten zien, dan is dat een
-waardewijziging in de tabel plus deze constante — geen codewijziging."""
+TIJDELIJK_TARIEF_TOT: dict[str, str] = {
+    modellen.SONNET_5: "2026-08-31",
+}
+"""Modellen waarvan het tarief hieronder een tijdelijke actie is, met de einddatum.
+
+Zonder dit vervalt de keuze voor werkelijke tarieven stil: op 1 september loopt het
+introtarief van Sonnet 5 af, staat er nog $2,00 in de tabel, en rapporteert elk auditrapport
+een derde te laag. Een te laag bedrag is schadelijker dan geen bedrag, want het ziet compleet
+uit — dezelfde reden waarom de Haiku-prijs op 2026-08-14 is gecorrigeerd."""
 
 PRIJZEN: dict[str, dict[str, float]] = {
-    # Alias én gedateerde ID: beide zijn geldige model-strings, en er staan
-    # historische runs in de DB op de gedateerde vorm.
-    "claude-haiku-4-5": {
+    modellen.HAIKU_4_5: {
         "input": 1.00,
         "output": 5.00,
         "cache_write_5m": 1.25,
         "cache_read": 0.10,
     },
-    "claude-haiku-4-5-20251001": {
-        "input": 1.00,
-        "output": 5.00,
-        "cache_write_5m": 1.25,
-        "cache_read": 0.10,
+    # Introtarief t/m 2026-08-31; lijstprijs is 3.00/15.00. Zie TIJDELIJK_TARIEF_TOT.
+    modellen.SONNET_5: {
+        "input": 2.00,
+        "output": 10.00,
+        "cache_write_5m": 2.50,
+        "cache_read": 0.20,
     },
-    "claude-sonnet-5": {
-        "input": 3.00,
-        "output": 15.00,
-        "cache_write_5m": 3.75,
-        "cache_read": 0.30,
-    },
-    "claude-opus-5": {
+    modellen.OPUS_5: {
         "input": 5.00,
         "output": 25.00,
         "cache_write_5m": 6.25,
         "cache_read": 0.50,
     },
 }
+"""Prijzen USD per miljoen tokens, op de alias gesleuteld. Een gedateerd model-ID uit een
+historisch record wordt door `prijs_voor()` naar zijn alias herleid; dat scheelt een tweede
+regel per model die uit de eerste kan lopen."""
 
-KIESBARE_MODELLEN: tuple[str, ...] = (
-    "claude-haiku-4-5",
-    "claude-sonnet-5",
-    "claude-opus-5",
-)
-"""Wat een auditor in de UI kan kiezen, van goedkoop naar duur. Elk model hier MOET
-een prijsregel hebben — `tests/config/test_modelkeuze.py` faalt anders. Zonder die
-test kan een nieuw model stil zonder kostenrapportage gaan lopen."""
+KIESBARE_MODELLEN: tuple[str, ...] = modellen.KIESBAAR
+"""Doorgeefluik naar `iso_audit.modellen.KIESBAAR`; de UI en de tests importeren dit hier."""
+
+_TARIEF_GEWAARSCHUWD: set[str] = set()
+
+
+def prijs_voor(model: str) -> dict[str, float] | None:
+    """Tarieven voor `model`, of `None` als het model geen prijsregel heeft.
+
+    Herleidt een gedateerd model-ID naar zijn alias, zodat historische records uit de
+    audit-trail geprijsd blijven zonder dubbele regels in de tabel.
+
+    Waarschuwt eenmalig per model als het tarief een verlopen tijdelijke actie is: dan
+    staat er een te laag bedrag in de tabel en dat is erger dan geen bedrag.
+    """
+    alias = modellen.normaliseer(model)
+    tot = TIJDELIJK_TARIEF_TOT.get(alias)
+    if tot and datetime.now(UTC).date().isoformat() > tot and alias not in _TARIEF_GEWAARSCHUWD:
+        _TARIEF_GEWAARSCHUWD.add(alias)
+        logger.warning(
+            "Tarief voor %s was een actie tot %s en is verlopen; het gerapporteerde bedrag "
+            "is te laag. Werk PRIJZEN en PRIJZEN_PEILDATUM bij.",
+            alias,
+            tot,
+        )
+    return PRIJZEN.get(alias)
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +179,7 @@ class Kostenteller:
         self.cache_read_tokens += getattr(usage, "cache_read_input_tokens", 0) or 0
 
     def kosten_usd(self) -> float:
-        p = PRIJZEN.get(self.model)
+        p = prijs_voor(self.model)
         if not p:
             return 0.0
         return (
@@ -611,7 +639,7 @@ def schat_kosten(
     system_tokens = max(len(system_tekst) // CHARS_PER_TOKEN, 1024)
     miro_system_tokens = max(len(_SYSTEM_MIRO) // CHARS_PER_TOKEN, 1024)
 
-    p = PRIJZEN.get(model, {"input": 0, "output": 0, "cache_write_5m": 0, "cache_read": 0})
+    p = prijs_voor(model) or {"input": 0, "output": 0, "cache_write_5m": 0, "cache_read": 0}
 
     s = _KostenSchatting(model=model)
 

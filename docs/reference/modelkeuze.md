@@ -1,6 +1,6 @@
 ---
 status: current
-last_reviewed: 2026-08-17
+last_reviewed: 2026-08-20
 ---
 
 # Modelkeuze en kosten
@@ -10,28 +10,53 @@ die keuze betekent — en wat er níet bij hoort — staat hier.
 
 ## Kiesbare modellen
 
-`KIESBARE_MODELLEN` in `classification/findings.py`. Elk model hier moet een prijsregel hebben;
+`iso_audit.modellen.KIESBAAR`, doorgegeven als `KIESBARE_MODELLEN` in
+`classification/findings.py`. Elk model hier moet een prijsregel hebben;
 `tests/config/test_modelkeuze.py` faalt anders, want een model zonder prijsregel draait met een
 kostenpost van nul en dat ziet in een auditrapport compleet uit.
 
 | model | invoer | uitvoer | cache-read | cache-minimum |
 |---|---|---|---|---|
 | Haiku 4.5 | $1,00 | $5,00 | $0,10 | 4096 tokens |
-| Sonnet 5 | $3,00 | $15,00 | $0,30 | 1024 tokens |
+| Sonnet 5 | $2,00* | $10,00* | $0,20 | 1024 tokens |
 | Opus 5 | $5,00 | $25,00 | $0,50 | 512 tokens |
 
 Bedragen per miljoen tokens, peildatum in `PRIJZEN_PEILDATUM`.
+\* Introtarief t/m 2026-08-31; lijstprijs is $3,00/$15,00.
+
+## Elke modelnaam staat in `iso_audit.modellen`
+
+Eén module met de namen, en elders alleen verwijzingen. Tot 2026-08-20 stond dezelfde naam in
+vijf spellingen in `src/` — vier constanten op `claude-haiku-4-5-20251001` en één fallback op
+`claude-haiku-4-5`. Vijf plekken die uit elkaar kunnen lopen zonder dat iets faalt: een model
+bumpen was vijf greps, en één vergeten regel geeft geen foutmelding maar een run die stil op een
+ander model draait dan het rapport zegt.
+
+`test_geen_modelnaam_als_letterlijke_string_buiten_modellen_py` is de gate: een modelnaam als
+letterlijke string buiten die module laat de suite falen. In een comment of docstring mag hij.
+
+Een gedateerd model-ID uit een historisch record (`claude-haiku-4-5-20251001`) wordt via
+`modellen.GEDATEERDE_VORM` naar zijn alias herleid, zodat `prijs_voor()` oude runs kan prijzen
+zonder een tweede prijsregel per spelling.
 
 ## Prijsgrondslag: lees `PRIJZEN_GRONDSLAG`
 
-De tabel staat op **lijstprijs**. Dat is niet altijd wat er gefactureerd wordt: Sonnet 5 had
-op 2026-08-17 een introductietarief van $2,00/$10,00 tot en met 31 augustus 2026, een derde
-onder de lijstprijs. Een gerapporteerd bedrag voor dat model valt dus hoger uit dan de factuur.
+De tabel staat sinds 2026-08-20 op het **werkelijke tarief**, op verzoek van de opdrachtgever:
+het bedrag in het rapport moet zo dicht mogelijk bij de factuur liggen. Concreet raakt dat één
+regel — Sonnet 5 staat op zijn introtarief van $2,00/$10,00 in plaats van de lijstprijs
+$3,00/$15,00.
 
-Wil de opdrachtgever werkelijke kosten in het rapport, dan is dat een waardewijziging in
-`PRIJZEN` plus `PRIJZEN_GRONDSLAG`, geen codewijziging. Er zit bewust **geen datumlogica** in
-de tabel die zelf tussen tarieven kiest: dat zou een tweede administratie zijn die achterloopt
-op de leverancier, precies wat de peildatum moet voorkomen.
+Wat het **niet** is: de factuur. Hier staat het publieke tarief dat op de peildatum gold. Heeft
+Conduction een eigen afspraak met Anthropic (volumekorting, commitment), dan wijkt de factuur
+daar nog van af en is dit een bovengrens. Dat hoort zo te blijven staan in het rapport: een
+bovengrens die je kunt navertellen is bruikbaar, een bedrag dat een contract nabootst niet.
+
+Er zit bewust **geen datumlogica** in de tabel die zelf tussen tarieven kiest: dat zou een
+tweede administratie zijn die achterloopt op de leverancier, precies wat de peildatum moet
+voorkomen. In plaats daarvan noteert `TIJDELIJK_TARIEF_TOT` welk tarief tijdelijk is en tot
+wanneer, en logt `prijs_voor()` een waarschuwing zodra die datum verstreken is. **Voor Sonnet 5
+is dat 2026-08-31**: daarna staat er een te laag bedrag in de tabel tot iemand hem bijwerkt, en
+een te laag bedrag is schadelijker dan geen bedrag omdat het compleet lijkt.
 
 ## Wat een run kost — gemeten, niet geschat
 
@@ -89,9 +114,16 @@ afweging tussen promptkwaliteit en cachewinst, niet een instelling.
 
 ## De modelkeuze bereikt alleen de classificatie
 
-`memo/draft.py`, `classification/thema.py` en `reporting/report_generation.py` hardcoderen
-`claude-haiku-4-5-20251001`. De keuze in de UI gaat alleen naar `classification/findings.py`.
+`AUDIT_CLASSIFICATION_MODEL` gaat naar `classification/findings.py` en verder niet.
+`classification/llm.py`, `classification/thema.py`, `memo/draft.py` en
+`reporting/report_generation.py` draaien op `modellen.STANDAARD` (Haiku 4.5).
 
-De UI-kaart zegt "Classificatie en memo-tekst", en dat is dus te ruim: de memo-tekst volgt de
-keuze niet. Bekend, niet opgelost — uitbreiden of de kaarttekst aanpassen is een aparte
-afweging.
+Dat is een keuze en geen restant: die vier paden schrijven tekst op basis van al
+geclassificeerde bevindingen en vellen zelf geen oordeel over bewijs. Het duurdere model kopen
+voor een samenvatting levert geen beter auditoordeel op.
+
+De UI-kaart zei tot 2026-08-20 "Classificatie en memo-tekst" en dat was te ruim — de memo-tekst
+volgt de keuze niet. De kaart zegt nu "Classificatie van bevindingen", met eronder expliciet dat
+memo-tekst en rapportgeneratie altijd op Haiku draaien. Dat is dezelfde soort valse belofte als
+de zes die op 16, 17 en 18 augustus zijn weggehaald: een scherm dat meer belooft dan de code
+doet.

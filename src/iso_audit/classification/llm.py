@@ -25,12 +25,14 @@ from typing import Any
 import anthropic
 from dotenv import load_dotenv
 
+from iso_audit import modellen
 from iso_audit.classification.respons import GEEN_THINKING, tekst_uit
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-haiku-4-5-20251001"
+MODEL = modellen.STANDAARD
+"""Niet de auditor-keuze: die raakt alleen `classification/findings.py`."""
 NORM = "9001"
 MAX_TEKST = 500  # chars documenttekst meegestuurd
 DEFAULT_BATCH = 8

@@ -34,6 +34,8 @@ from typing import Any, Literal
 
 import yaml
 
+from iso_audit import modellen
+
 _log = logging.getLogger("iso_audit.audit")
 
 Bron = Literal["ui-override", "env", "yaml", "ui", "default", "leeg"]
@@ -102,7 +104,7 @@ VELDEN: tuple[Veld, ...] = (
     Veld("planning.sheets_id", "AUDIT_PLANNING_SHEETS_ID"),
     Veld("anthropic.auth_mode", "ANTHROPIC_AUTH_MODE", default="api_key"),
     Veld("anthropic.api_key", "ANTHROPIC_API_KEY", geheim=True),
-    Veld("anthropic.model", "AUDIT_CLASSIFICATION_MODEL", default="claude-haiku-4-5"),
+    Veld("anthropic.model", "AUDIT_CLASSIFICATION_MODEL", default=modellen.STANDAARD),
 )
 
 API_KEY_ENV = "ANTHROPIC_API_KEY"

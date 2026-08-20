@@ -25,13 +25,13 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from iso_audit import modellen
 from iso_audit.agent import tools as agent_tools
-from iso_audit.classification.findings import PRIJZEN, PRIJZEN_PEILDATUM
+from iso_audit.classification.findings import PRIJZEN_PEILDATUM, prijs_voor
 
 _log = logging.getLogger("iso_audit.audit")
 
@@ -78,7 +78,7 @@ class RunResultaat:
 
 
 def _kosten(model: str, in_tok: int, uit_tok: int) -> float:
-    tarief = PRIJZEN.get(model)
+    tarief = prijs_voor(model)
     if tarief is None:
         # Geen prijsregel = we weten het niet. Nul teruggeven zou een run laten lijken
         # alsof hij gratis was; daarom loggen we het expliciet.
@@ -103,7 +103,7 @@ def draai(
     """
     import anthropic
 
-    model = model or os.environ.get("AUDIT_CLASSIFICATION_MODEL") or "claude-haiku-4-5"
+    model = model or modellen.uit_omgeving()
     ctx = agent_tools.RunContext(audit_id=audit_id)
     agent_tools.zet_context(ctx)
     resultaat = RunResultaat()

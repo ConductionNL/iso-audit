@@ -6,6 +6,50 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-20 — werkelijke tarieven in het rapport, en één plek voor modelnamen
+
+Twee beslissingen van de opdrachtgever, en één vondst die eruit volgde.
+
+**Werkelijke tarieven in plaats van lijstprijs.** `PRIJZEN_GRONDSLAG` staat op
+`"werkelijk tarief"`; concreet raakt dat één regel, want Sonnet 5 heeft t/m 31 augustus 2026 een
+introtarief van $2,00/$10,00 in plaats van $3,00/$15,00. Het gerapporteerde bedrag ligt daarmee
+zo dicht bij de factuur als publiek te weten valt — het blijft een bovengrens, want een eigen
+afspraak met Anthropic zou er nog onder liggen, en dat staat nu ook zo in de documentatie.
+
+Die keuze heeft een houdbaarheidsdatum, en die maakt zichzelf niet kenbaar: op 1 september staat
+er een te laag bedrag in de tabel, en te laag is schadelijker dan afwezig omdat het compleet
+lijkt — dezelfde fout als de Haiku-prijs die op 2026-08-14 25% te laag stond. Daarom
+`TIJDELIJK_TARIEF_TOT`: per model de einddatum van een actietarief, en `prijs_voor()` logt een
+waarschuwing zodra die verstreken is. Nog steeds geen datumlogica die zelf tussen tarieven
+kiest — dat zou een tweede administratie zijn die achterloopt op de leverancier.
+
+**Eén module voor alle modelnamen: `iso_audit.modellen`.** Bij het eerlijk maken van de UI-kaart
+bleek dezelfde modelnaam in **vijf spellingen** in `src/` te staan: `classification/llm.py`,
+`classification/thema.py`, `memo/draft.py` en `reporting/report_generation.py` hadden elk een
+eigen constante op `claude-haiku-4-5-20251001`, en `agent/runner.py` viel terug op
+`claude-haiku-4-5` — hetzelfde model, andere string. Vijf plekken die uit elkaar kunnen lopen
+zonder dat iets faalt: een model bumpen was vijf greps, en één vergeten regel geeft geen
+foutmelding maar een run die stil op een ander model draait dan het rapport zegt.
+
+Nu één tabel met namen en elders verwijzingen, met
+`test_geen_modelnaam_als_letterlijke_string_buiten_modellen_py` als gate: een modelnaam als
+letterlijke string buiten die module laat de suite falen. In comments en docstrings mag hij.
+`PRIJZEN` is op de alias gesleuteld en `prijs_voor()` herleidt een gedateerd ID uit een
+historisch record naar zijn alias — dat scheelt een tweede prijsregel per spelling, die uit de
+eerste kan lopen. Een onbekend model levert `None` en geen tarief van nul, zodat de caller het
+verschil ziet.
+
+**De UI-kaart is eerlijk gemaakt.** Er stond "Classificatie en memo-tekst" terwijl
+`AUDIT_CLASSIFICATION_MODEL` alleen `classification/findings.py` bereikt. De kaart zegt nu
+"Classificatie van bevindingen", met eronder dat memo-tekst en rapportgeneratie altijd op Haiku
+draaien, en de prijsgrondslag staat naast de peildatum in het scherm. Dat die vier paden op het
+standaardmodel blijven is een keuze en geen restant: ze schrijven tekst op basis van al
+geclassificeerde bevindingen en vellen zelf geen oordeel over bewijs.
+
+Zevende valse-groen van deze week, en de goedkoopste: een scherm dat meer belooft dan de code
+doet.
+
+
 ### Added — 2026-08-18 — dekking van het landschap: 42% van de bron werd niet gelezen
 
 Change `landschap-dekking`. Gemeten op 2026-08-17 tegen de gekoppelde Shared Drive: 512

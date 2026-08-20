@@ -18,10 +18,10 @@
 - [x] 4.2 Run-record krijgt totale kosten met `PRIJZEN_PEILDATUM` én de prijsgrondslag
 - [x] 5.1 `PRIJZEN` krijgt een expliciete grondslag (lijstprijs of werkelijk tarief); geen
       datumlogica in de tabel
-- [x] 5.2 Grondslag staat op `lijstprijs` en de tabel volgt dat; **openstaande vraag aan de
-      opdrachtgever**: moet het auditrapport lijstprijs of werkelijke kosten noemen? Wisselen
-      is een waardewijziging, geen code. Oorspronkelijk: vraag aan de opdrachtgever welke van de twee
-      het auditrapport moet noemen
+- [x] 5.2 **Beslist op 2026-08-20: werkelijke kosten.** `PRIJZEN_GRONDSLAG` staat op
+      `werkelijk tarief`, Sonnet 5 op zijn introtarief ($2,00/$10,00 t/m 31-08-2026).
+      `TIJDELIJK_TARIEF_TOT` plus een waarschuwing in `prijs_voor()` zorgen dat de keuze niet
+      stil verloopt zodra de actie afloopt. Nog steeds geen datumlogica in de tabel
 - [x] 5.3 Cache: `cache_control` staat op prompts van 122–726 tokens terwijl het minimum 4096
       (Haiku), 1024 (Sonnet 5) en 512 (Opus 5) is — gemeten cache_read = 0 over 215 calls.
       Zichtbaar maken dat er niet gecachet wordt, en de "~10x goedkoper"-belofte uit de

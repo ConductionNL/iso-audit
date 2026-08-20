@@ -16,10 +16,12 @@ from typing import Any
 
 import anthropic
 
+from iso_audit import modellen
 from iso_audit.memo.models import ActionRow, BronRef, Finding
 from iso_audit.memo.norm_lookup import NormDatabase
 
-CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+CLAUDE_MODEL = modellen.STANDAARD
+"""Memo-tekst schrijven, geen bewijs beoordelen — dus het standaardmodel."""
 _PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 
 

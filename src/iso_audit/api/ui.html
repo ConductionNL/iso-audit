@@ -422,7 +422,7 @@ function anthropicKaart(a){
     `<option value="${esc(m)}"${m===a.model?" selected":""}>${esc(modelLabel(m))}</option>`).join("");
   return `<div class="bronkaart">
     <div class="bronkop"><strong>Claude (Anthropic)</strong> ${badge}</div>
-    <div class="mini">Classificatie en memo-tekst.</div>
+    <div class="mini">Classificatie van bevindingen.</div>
     <label class="veld">Manier van inloggen<br>
       <select id="an-modus" onchange="zetAnthropicModus()">
         <option value="api_key"${sso?"":" selected"}>API-key</option>
@@ -442,7 +442,10 @@ function anthropicKaart(a){
       <div><button onclick="bewaarAnthropicKey()">Opslaan</button>
         <span id="an-msg" class="ok"></span></div>`}
     <label class="veld">Model<br><select id="an-model" onchange="zetModel()">${opties}</select></label>
-    <div class="mini">Tarieven gecontroleerd op ${esc(a.prijzen_peildatum||"")}.</div>
+    <div class="mini">Geldt voor de classificatie van bevindingen. Memo-tekst en
+      rapportgeneratie draaien altijd op Haiku.</div>
+    <div class="mini">Tarieven gecontroleerd op ${esc(a.prijzen_peildatum||"")}
+      (${esc(a.prijzen_grondslag||"")}).</div>
   </div>`;
 }
 function modelLabel(m){

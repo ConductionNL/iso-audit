@@ -27,12 +27,15 @@ from typing import Any
 import anthropic
 from dotenv import load_dotenv
 
+from iso_audit import modellen
 from iso_audit.classification.respons import tekst_uit
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-MODEL = "claude-haiku-4-5-20251001"
+MODEL = modellen.STANDAARD
+"""Thema-bepaling leunt op al-geclassificeerde bevindingen en velt zelf geen oordeel over
+bewijs; vandaar het standaardmodel en niet de auditor-keuze."""
 BATCH_GROOTTE = 50
 MAX_BESCHRIJVING_CHARS = 500
 MAX_ONDERBOUWING_CHARS = 250

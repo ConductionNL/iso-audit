@@ -19,12 +19,14 @@ from typing import Any
 
 import anthropic
 
+from iso_audit import modellen
 from iso_audit.clients.gws import _gws
 
 logger = logging.getLogger(__name__)
 
 VOLGORDE: dict[str, int] = {"NC": 0, "OFI": 1, "positief": 2}
-CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+CLAUDE_MODEL = modellen.STANDAARD
+"""Rapporttekst, geen classificatie — dus het standaardmodel."""
 
 # Near-idempotentie: lage temperatuur → stabiele, reproduceerbare output bij
 # herdraaien (bv. via --report-only). Zie memory "architectuur-harness-fundament".

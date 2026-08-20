@@ -153,7 +153,10 @@ STANDAARD: list[BronDefinitie] = [
     BronDefinitie(
         naam="anthropic",
         label="Claude (Anthropic)",
-        uitleg="Classificatie en memo-tekst.",
+        # "Classificatie en memo-tekst" stond hier tot 2026-08-20 en was niet waar: de
+        # modelkeuze raakt alleen de classificatie. Memo-tekst, thema-bepaling en
+        # rapportgeneratie draaien altijd op `modellen.STANDAARD`.
+        uitleg="Classificatie van bevindingen.",
         eigen_kaart=True,
         velden=[
             Veld(
@@ -167,7 +170,11 @@ STANDAARD: list[BronDefinitie] = [
                 naam="AUDIT_CLASSIFICATION_MODEL",
                 label="Model",
                 verplicht=False,
-                hint="Haiku is het snelst en goedkoopst; grotere modellen kosten meer per run.",
+                hint=(
+                    "Geldt voor de classificatie van bevindingen. Memo-tekst en "
+                    "rapportgeneratie draaien altijd op Haiku. Haiku is het snelst en "
+                    "goedkoopst; grotere modellen kosten meer per run."
+                ),
             ),
         ],
     ),

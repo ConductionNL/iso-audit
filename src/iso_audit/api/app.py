@@ -33,7 +33,11 @@ from iso_audit.api.routes_audit import maak_router as router_audit
 from iso_audit.api.routes_memo import maak_router as router_memo
 from iso_audit.api.routes_triage import maak_router as router_triage
 from iso_audit.api.session import SessionError, bron_health, valideer_bronselectie
-from iso_audit.classification.findings import KIESBARE_MODELLEN, PRIJZEN_PEILDATUM
+from iso_audit.classification.findings import (
+    KIESBARE_MODELLEN,
+    PRIJZEN_GRONDSLAG,
+    PRIJZEN_PEILDATUM,
+)
 from iso_audit.config import anthropic_auth as aa
 from iso_audit.config import herkomst as hk
 from iso_audit.config.settings import VELDEN, Settings, load_config
@@ -303,6 +307,10 @@ def create_app(
             "model": huidig["anthropic.model"].waarde,
             "modellen": list(KIESBARE_MODELLEN),
             "prijzen_peildatum": PRIJZEN_PEILDATUM,
+            # Een bedrag zonder grondslag is niet te lezen: lijstprijs is niet hetzelfde
+            # als wat er gefactureerd wordt. Sinds 2026-08-20 staat de tabel op het
+            # werkelijke tarief; de UI hoort te zeggen welke van de twee ze ziet.
+            "prijzen_grondslag": PRIJZEN_GRONDSLAG,
             **sessie,
         }
 
