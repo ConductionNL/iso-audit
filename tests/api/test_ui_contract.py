@@ -381,3 +381,18 @@ def test_vraagscherm_toont_meegegeven_bronnen_en_markeert_de_gebruikte() -> None
     bron = _bron()
     assert 'id="vr-bronnen"' in bron
     assert "gebruikt" in bron
+
+
+def test_run_historie_kan_verbergen_zonder_verwijderen() -> None:
+    """Geen DELETE in de UI: verbergen voegt een regel toe aan de append-only trail.
+
+    De aanleiding was een historie met negen runs waarvan vier weesrecords — als werklijst
+    onbruikbaar. Een onbruikbare lijst wordt genegeerd, en dat is een slechtere uitkomst dan
+    een lijst waarin iemand met zijn naam eronder ruis heeft weggezet.
+    """
+    bron = _bron()
+    assert "zichtbaarheid" in bron
+    assert "toon verborgen" in bron
+    assert "Verbergen verwijdert niets" in bron
+    assert "verborgen door" in bron, "wie het deed hoort zichtbaar te zijn"
+    assert 'method:"DELETE"' not in bron

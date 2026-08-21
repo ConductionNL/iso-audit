@@ -6,6 +6,42 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-21 — runs verbergen zonder ze te verwijderen (0.2.0a23)
+
+De run-historie stond op negen regels waarvan vier weesrecords en drie mislukte pogingen. Als
+werklijst onbruikbaar, en een onbruikbare lijst wordt genegeerd.
+
+`POST /audits/<id>/runs/<run_id>/zichtbaarheid` haalt een run uit de werklijst door een **regel
+toe te voegen** met wie het deed, wanneer en waarom. `GET /runs` blijft alles teruggeven met een
+`verborgen`-vlag; de UI filtert en heeft een schakelaar "toon verborgen (N)", waar ze gedimd
+staan met de naam van degene die ze wegzette. Omkeerbaar, ook weer als extra regel.
+
+Geen `DELETE`, en dat is de afweging: een certificerende instantie moet kunnen zien dat er runs
+zijn geweest die faalden, en een bestand waaruit regels geschrapt kunnen worden is precies
+zoveel waard als de discipline van degene die schrapt. De test die dat afdwingt vergelijkt de
+volledige oude bestandsinhoud met de nieuwe (`na[:-1] == voor`).
+
+Twee regels eromheen. Een **lopende run kan niet verborgen worden** (409) — dat zou de enige
+aanwijzing weghalen dat er iets bezig is. En **wie de run startte blijft staan**: het
+zichtbaarheidsrecord zet `verborgen_door` erbij en overschrijft `door` niet, anders leest de
+historie alsof de opruimer de run had gedraaid.
+
+Rollen: het portaal kent er één — wie door de auth-gate komt is auditor. Wat vastligt is de
+identiteit van degene die verborg. Een echt rolmodel is een aparte change.
+
+Nieuw: `docs/reference/run-historie.md`, met wat er in een run-record staat en waarom.
+
+### Fixed — 2026-08-21 — de reconciliatie van verweesde runs was niet aangesloten
+
+De code uit `a22` zocht `manifest.json`, terwijl het bestand `audit.json` heet. De lus sloeg
+élke audit over en deed stil niets — in het cluster bleven de vier "loopt nog…"-records staan na
+de uitrol.
+
+De unit-test riep `sluit_verweesde_runs()` direct aan en bewees daarmee dat de functie werkt,
+niet dat hij is aangesloten. De nieuwe test gaat door `create_app()` op een map met een
+lopend-gemarkeerde run — dat is het gedrag dat een podherstart nabootst, en het is wat de fout
+had gevangen.
+
 ### Added — 2026-08-21 — 0.2.0a22 brengt de a20-inhoud terug, met de drie oorzaken erbij
 
 De rollback naar a19-inhoud (`a21`) was een tijdelijke maatregel terwijl de crash werd

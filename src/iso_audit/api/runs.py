@@ -272,6 +272,52 @@ def sluit_verweesde_runs(audit_dir: str | Path) -> list[str]:
     return verweesd
 
 
+def verberg(
+    audit_dir: str | Path,
+    run_id: str,
+    *,
+    door: str,
+    reden: str = "",
+    verborgen: bool = True,
+) -> dict[str, Any]:
+    """Zet een run uit (of weer aan) in de werklijst. Append-only.
+
+    **Geen verwijderen, en dat is een ontwerpkeuze.** `runs.jsonl` is de audittrail: een
+    certificerende instantie moet kunnen zien dat er runs zijn geweest die faalden, en een
+    bestand waaruit regels geschrapt kunnen worden is precies zoveel waard als de discipline
+    van degene die schrapt. Verbergen voegt daarom een regel toe in plaats van er een weg te
+    halen; `lijst()` blijft alles teruggeven, de werklijst laat het weg.
+
+    Waarom het er tóch is: op 2026-08-21 stonden er negen runs in één audit waarvan vier
+    weesrecords en drie mislukte pogingen. Zo'n lijst is als werklijst onbruikbaar, en een
+    onbruikbare lijst wordt genegeerd — dat is een slechtere uitkomst dan een lijst waarin
+    iemand expliciet, met zijn naam eronder, ruis heeft weggezet.
+
+    `door` en `reden` gaan mee in het record: wie iets uit het zicht haalt, hoort daarbij te
+    staan. Omkeerbaar met `verborgen=False`, ook weer als extra regel.
+    """
+    dir_ = Path(audit_dir)
+    bekend = {str(r.get("run_id", "")) for r in lijst(dir_)}
+    if run_id not in bekend:
+        raise KeyError(f"onbekende run: {run_id}")
+    record: dict[str, Any] = {
+        "run_id": run_id,
+        "soort": "zichtbaarheid",
+        "verborgen": verborgen,
+        "door": door,
+        "op": _nu(),
+    }
+    if reden:
+        record["reden_verborgen"] = reden[:300]
+    _append(dir_, record)
+    return record
+
+
+def is_verborgen(record: dict[str, Any]) -> bool:
+    """Of een samengevoegd run-record uit de werklijst gefilterd moet worden."""
+    return bool(record.get("verborgen"))
+
+
 def _append(audit_dir: Path, record: dict[str, Any]) -> None:
     """Eén regel toevoegen. Eén `write` van één regel < 4 KiB is op POSIX atomair genoeg
     voor gelijktijdige appends; dat is dezelfde aanname waarop `triage_log.jsonl` leunt."""
@@ -309,7 +355,13 @@ def samengevat(audit_dir: str | Path) -> list[dict[str, Any]]:
         if not rid:
             continue
         if rid in per_run:
-            per_run[rid].update(r)
+            # `door` en `soort` van het startrecord blijven staan: een zichtbaarheidsrecord
+            # zegt wie iets verborg, niet wie de run startte. Zonder deze uitzondering leest
+            # de historie alsof degene die opruimde ook de run had gedraaid.
+            aanvulling = {k: v for k, v in r.items() if k not in ("door", "soort")}
+            if r.get("soort") == "zichtbaarheid":
+                aanvulling["verborgen_door"] = r.get("door", "")
+            per_run[rid].update(aanvulling)
         else:
             per_run[rid] = dict(r)
     return list(per_run.values())

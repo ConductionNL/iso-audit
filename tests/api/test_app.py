@@ -426,3 +426,34 @@ def test_index_serveert_ui(tmp_path: Path) -> None:
     assert "auditorportaal" in r.text
     assert 'id="view-dashboard"' in r.text
     assert "Triage" in r.text
+
+
+def test_app_sluit_verweesde_runs_bij_opstart(tmp_path: Path) -> None:
+    """Niet of de functie werkt, maar of hij is **aangesloten**.
+
+    De eerste versie hiervan zocht `manifest.json` terwijl het bestand `audit.json` heet:
+    de lus sloeg élke audit over en deed stil niets. De unit-test riep
+    `sluit_verweesde_runs()` direct aan en zag dat niet. Gemeten in het cluster op
+    2026-08-21: vier records bleven op "loopt" staan na de uitrol.
+    """
+    from iso_audit.api import runs as runs_mod
+    from iso_audit.api.app import create_app
+    from iso_audit.api.registry import AuditRegistry
+
+    root = tmp_path / "audits"
+    registry = AuditRegistry(root)
+    aid = registry.maak(normen=["27001"], periode="2026-Q3", door="a@b.c")
+    audit_dir = registry.pad(aid)
+    runs_mod.registreer(audit_dir, door="a@b.c", modus="live", norm="27001", bronnen=["drive"])
+    assert runs_mod.samengevat(audit_dir)[-1]["status"] == "loopt"
+
+    # Een nieuwe app op dezelfde map: dat is wat een podherstart doet.
+    create_app(
+        AuditRegistry(root),
+        profile=str(Path("examples/auditmemo/conduction.profile.yaml")),
+        norms_dir="examples/norms",
+    )
+
+    laatste = runs_mod.samengevat(audit_dir)[-1]
+    assert laatste["status"] == "fout"
+    assert "proces" in laatste["fout"]

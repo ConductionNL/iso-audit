@@ -29,6 +29,19 @@ class RunConfig(BaseModel):
     sources: list[str] = []
 
 
+class Zichtbaarheid(BaseModel):
+    """Een run uit de werklijst zetten (of terugzetten), met een reden.
+
+    Op moduleniveau en niet in de router-functie: met `from __future__ import annotations`
+    zijn annotaties strings, en FastAPI zoekt het model op in de **module**-globals. Een
+    lokaal gedefinieerde klasse vindt hij daar niet, en dan wordt het body-model als
+    queryparameter gelezen — resultaat: 422 op een geldig verzoek.
+    """
+
+    verborgen: bool = True
+    reden: str = ""
+
+
 class RunStartRequest(BaseModel):
     """Run-start binnen deze audit: live pipeline of sim-timer, met scoping.
 
@@ -69,7 +82,48 @@ def maak_router(audits: Audits) -> APIRouter:
         afsluiting) en de UI wil de laatste stand per run. Het ruwe spoor blijft
         onaangetast in `runs.jsonl`.
         """
-        return runs_mod.samengevat(audits.dir(audit_id))
+        alles = runs_mod.samengevat(audits.dir(audit_id))
+        # Verborgen runs gaan mee met een vlag in plaats van eruit gefilterd te worden: de
+        # UI beslist wat zichtbaar is, en `GET /runs` blijft de volledige trail. Zo kan een
+        # auditor "toon verborgen" aanzetten zonder een tweede endpoint.
+        return alles
+
+    @router.post("/runs/{run_id}/zichtbaarheid")
+    def run_zichtbaarheid(
+        audit_id: str, run_id: str, body: Zichtbaarheid, request: Request
+    ) -> dict[str, object]:
+        """Zet een run uit of aan in de werklijst — append-only, met wie en waarom.
+
+        Geen `DELETE`: `runs.jsonl` is de audittrail. Een run die faalde moet zichtbaar
+        blijven voor wie ernaar zoekt; hij hoeft alleen niet in de weg te staan. Zie
+        `runs.verberg()` voor de afweging.
+
+        Een lopende run kan niet verborgen worden: dat zou de enige aanwijzing weghalen dat
+        er iets bezig is.
+        """
+        wie = audits.muteert(audit_id, request)
+        dir_ = audits.dir(audit_id)
+        huidig = {str(r.get("run_id")): r for r in runs_mod.samengevat(dir_)}
+        record = huidig.get(run_id)
+        if record is None:
+            raise HTTPException(status_code=404, detail=f"Onbekende run: {run_id}")
+        if body.verborgen and record.get("status") == "loopt":
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Deze run loopt nog. Een lopende run verbergen haalt de enige aanwijzing "
+                    "weg dat er iets bezig is."
+                ),
+            )
+        uit = runs_mod.verberg(dir_, run_id, door=wie, reden=body.reden, verborgen=body.verborgen)
+        log_event(
+            "run_verborgen" if body.verborgen else "run_teruggezet",
+            wie,
+            audit=audit_id,
+            run=run_id,
+            reden=body.reden[:200],
+        )
+        return uit
 
     @router.post("/run/start")
     def run_start(

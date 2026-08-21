@@ -18,7 +18,7 @@ from iso_audit.api.app import create_app
 from iso_audit.api.auth_gate import REQUIRE_AUTH_ENV
 from iso_audit.api.registry import AuditRegistry
 
-from .conftest import AUDITOR, EXAMPLES, NORMS
+from .conftest import AUDITOR, EXAMPLES, NORMS, maak_portaal
 
 _FINDINGS = [
     {
@@ -328,3 +328,46 @@ def test_me_zonder_logout_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.delenv("ISO_AUDIT_LOGOUT_URL", raising=False)
     client, _ = _portaal(tmp_path)
     assert client.get("/me").json()["logout_url"] is None
+
+
+# --- runs verbergen via de API ---------------------------------------------
+
+
+def test_run_verbergen_en_terugzetten(tmp_path: Path) -> None:
+    """Geen DELETE: verbergen is een POST die een regel toevoegt met wie en waarom."""
+    from iso_audit.api import runs as runs_mod
+
+    client = maak_portaal(tmp_path)
+    audit_dir = client.audit_dir
+    runs_mod.registreer(
+        audit_dir, door="auditor@b.c", modus="live", norm="27001", bronnen=["drive"]
+    )
+    runs_mod.afsluiten(audit_dir, "run-0001", fout="mislukt")
+
+    r = client.post("/runs/run-0001/zichtbaarheid", json={"verborgen": True, "reden": "ruis"})
+    assert r.status_code == 200
+
+    uit = {x["run_id"]: x for x in client.get("/runs").json()}
+    assert uit["run-0001"]["verborgen"] is True
+    assert uit["run-0001"]["reden_verborgen"] == "ruis"
+
+    assert client.post("/runs/run-0001/zichtbaarheid", json={"verborgen": False}).status_code == 200
+    assert client.get("/runs").json()[0]["verborgen"] is False
+
+
+def test_lopende_run_kan_niet_verborgen_worden(tmp_path: Path) -> None:
+    """Dat zou de enige aanwijzing weghalen dat er iets bezig is."""
+    from iso_audit.api import runs as runs_mod
+
+    client = maak_portaal(tmp_path)
+    audit_dir = client.audit_dir
+    runs_mod.registreer(audit_dir, door="a@b.c", modus="live", norm="27001", bronnen=["drive"])
+
+    r = client.post("/runs/run-0001/zichtbaarheid", json={"verborgen": True})
+    assert r.status_code == 409
+    assert "loopt nog" in r.json()["detail"]
+
+
+def test_onbekende_run_verbergen_geeft_404(tmp_path: Path) -> None:
+    client = maak_portaal(tmp_path)
+    assert client.post("/runs/run-0099/zichtbaarheid", json={"verborgen": True}).status_code == 404

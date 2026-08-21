@@ -68,6 +68,9 @@
   .warn { background:#fff5e0; border-left:3px solid #b8860b; padding:.5rem .8rem; margin:.5rem 0;
           font-size:.85rem; }
   .mini { font-size:.78rem; color:var(--muted); }
+  /* Verborgen runs zijn niet weg, ze staan alleen niet in de weg: gedimd tonen zodra de
+     auditor ze opvraagt, zodat het verschil met een gewone regel zichtbaar blijft. */
+  tr.verborgen { opacity:.55; }
   #nieuw-audit { display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap; }
   #nieuw-audit input, #nieuw-audit select { border:1px solid var(--border); border-radius:4px; padding:.3rem; }
   .bronkaart { border:1px solid var(--border); border-radius:6px; padding:.6rem .8rem; margin:.5rem 0; }
@@ -991,23 +994,55 @@ function runResultaat(r){
     + ((r.overgeslagen||0) ? `, ${r.overgeslagen} al bekend` : "");
 }
 
+// Verborgen runs blijven in de trail staan; ze staan alleen niet in de weg. Het is geen
+// verwijderen: `runs.jsonl` moet kunnen laten zien dat er runs zijn geweest die faalden.
+let TOON_VERBORGEN = false;
+
+async function zetZichtbaarheid(runId, verborgen){
+  const reden = verborgen
+    ? (prompt("Waarom uit de werklijst? (komt in de trail)", "ruis") || "")
+    : "";
+  const r = await fetch(A(`/runs/${encodeURIComponent(runId)}/zichtbaarheid`),
+    {method:"POST", headers:{"Content-Type":"application/json"},
+     body: JSON.stringify({verborgen, reden})});
+  if(!r.ok){
+    alert((await r.json().catch(()=>({}))).detail || `Mislukt (${r.status})`);
+    return;
+  }
+  await loadRuns();
+}
+
+function schakelVerborgen(){ TOON_VERBORGEN = !TOON_VERBORGEN; loadRuns(); }
+
 async function loadRuns(){
   const runs = await j(A("/runs"));
   const wrap = document.getElementById("runs-wrap");
   if(!runs.length){ wrap.innerHTML = `<p class="note">Nog geen runs in deze audit.</p>`; return; }
-  const rijen = runs.slice().reverse().map(r => `
-    <tr>
+  const verborgen = runs.filter(r => r.verborgen);
+  const zichtbaar = TOON_VERBORGEN ? runs : runs.filter(r => !r.verborgen);
+  const rijen = zichtbaar.slice().reverse().map(r => `
+    <tr${r.verborgen ? ' class="verborgen"' : ""}>
       <td>${esc(r.run_id)}<br><span class="mini">${esc(r.gestart)}</span></td>
       <td>${esc(r.door)}</td>
       <td>${esc(r.modus)} · ${esc(r.norm)}${r.hoofdstuk ? " · §"+esc(r.hoofdstuk) : ""}</td>
       <td>${(r.bronnen||[]).map(esc).join(", ") || "—"}</td>
-      <td>${runResultaat(r)}</td>
+      <td>${runResultaat(r)}${r.verborgen ? `<br><span class="mini">verborgen door
+        ${esc(r.verborgen_door||"?")}${r.reden_verborgen ? " — "+esc(r.reden_verborgen) : ""}</span>` : ""}</td>
+      <td>${r.verborgen
+        ? `<button class="alt" onclick="zetZichtbaarheid('${esc(r.run_id)}', false)">terugzetten</button>`
+        : `<button class="alt" onclick="zetZichtbaarheid('${esc(r.run_id)}', true)">verbergen</button>`}</td>
     </tr>`).join("");
+  const schakel = verborgen.length
+    ? `<button class="alt" onclick="schakelVerborgen()">${TOON_VERBORGEN
+        ? "verberg ze weer" : `toon verborgen (${verborgen.length})`}</button>`
+    : "";
   wrap.innerHTML = `<table><thead><tr>
-      <th>Run</th><th>Door</th><th>Modus</th><th>Bronnen</th><th>Resultaat</th>
+      <th>Run</th><th>Door</th><th>Modus</th><th>Bronnen</th><th>Resultaat</th><th></th>
     </tr></thead><tbody>${rijen}</tbody></table>
     <p class="note">Nieuwste bovenaan. Een volgende run vult aan: bestaande triage blijft staan
-    en al bekende kandidaten worden geteld, niet stil weggelaten.</p>`;
+    en al bekende kandidaten worden geteld, niet stil weggelaten. ${schakel}</p>
+    <p class="mini">Verbergen verwijdert niets: het voegt een regel toe aan de append-only
+    trail met wie het deed en waarom. Een run die faalde blijft vindbaar.</p>`;
 }
 
 async function loadConfig(){

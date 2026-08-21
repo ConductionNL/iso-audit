@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from iso_audit.api import runs
 
 # --- kosten in het afsluitrecord -------------------------------------------
@@ -134,3 +136,44 @@ def test_verweesde_runs_is_append_only(tmp_path: Path) -> None:
 
 def test_sluit_verweesde_runs_zonder_bestand(tmp_path: Path) -> None:
     assert runs.sluit_verweesde_runs(tmp_path) == []
+
+
+# --- verbergen zonder verwijderen ------------------------------------------
+
+
+def test_verbergen_haalt_niets_uit_de_trail(tmp_path: Path) -> None:
+    """De kern van de afweging: verbergen voegt een regel toe, het schrapt er geen.
+
+    `runs.jsonl` is de audittrail. Een bestand waaruit regels geschrapt kunnen worden is
+    precies zoveel waard als de discipline van degene die schrapt.
+    """
+    runs.registreer(tmp_path, door="auditor@b.c", modus="live", norm="27001", bronnen=["drive"])
+    runs.afsluiten(tmp_path, "run-0001", fout="mislukt")
+    voor = runs.lijst(tmp_path)
+
+    runs.verberg(tmp_path, "run-0001", door="mark@b.c", reden="ruis")
+
+    na = runs.lijst(tmp_path)
+    assert len(na) == len(voor) + 1
+    assert na[:-1] == voor, "bestaande regels zijn ongewijzigd"
+    samen = runs.samengevat(tmp_path)[0]
+    assert runs.is_verborgen(samen) is True
+    assert samen["verborgen_door"] == "mark@b.c"
+    assert samen["reden_verborgen"] == "ruis"
+    assert samen["door"] == "auditor@b.c", "wie de run startte blijft staan"
+    assert samen["status"] == "fout", "de uitkomst blijft leesbaar"
+
+
+def test_verbergen_is_omkeerbaar(tmp_path: Path) -> None:
+    runs.registreer(tmp_path, door="a@b.c", modus="sim", norm="9001", bronnen=[])
+    runs.verberg(tmp_path, "run-0001", door="mark@b.c", reden="ruis")
+
+    runs.verberg(tmp_path, "run-0001", door="mark@b.c", verborgen=False)
+
+    assert runs.is_verborgen(runs.samengevat(tmp_path)[0]) is False
+
+
+def test_verbergen_van_onbekende_run_raised(tmp_path: Path) -> None:
+    runs.registreer(tmp_path, door="a@b.c", modus="sim", norm="9001", bronnen=[])
+    with pytest.raises(KeyError, match="onbekende run"):
+        runs.verberg(tmp_path, "run-0099", door="mark@b.c")

@@ -30,7 +30,7 @@ from iso_audit.api.audit_log import log_event
 from iso_audit.api.auth_gate import identiteit_van, installeer_auth_gate
 from iso_audit.api.bron_config import BronConfig, ConfigError
 from iso_audit.api.deps import Audits
-from iso_audit.api.registry import AuditRegistry, RegistryError
+from iso_audit.api.registry import MANIFEST, AuditRegistry, RegistryError
 from iso_audit.api.routes_audit import maak_router as router_audit
 from iso_audit.api.routes_memo import maak_router as router_memo
 from iso_audit.api.routes_triage import maak_router as router_triage
@@ -176,7 +176,11 @@ def create_app(
     # trail die zegt dat er iets loopt wat niet loopt, is erger dan een lege trail.
     if registry.root.is_dir():
         for _dir in sorted(registry.root.iterdir()):
-            if not (_dir.is_dir() and (_dir / "manifest.json").is_file()):
+            # `MANIFEST` en geen letterlijke naam: hier stond "manifest.json" terwijl het
+            # bestand `audit.json` heet, waardoor deze lus élke audit oversloeg en de
+            # reconciliatie stil niets deed. De test riep de functie direct aan en bewees
+            # daarmee dat hij werkt, niet dat hij aangesloten is.
+            if not (_dir.is_dir() and (_dir / MANIFEST).is_file()):
                 continue
             _verweesd = runs.sluit_verweesde_runs(_dir)
             if _verweesd:
