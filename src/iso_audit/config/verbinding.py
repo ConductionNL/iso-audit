@@ -88,8 +88,33 @@ def normaliseer(exc: BaseException, *, bron: str) -> tuple[Soort, str]:
         bron,
         soort,
         ruw[:500],
+        # Niet naar de browser: `ruw` is de leveranciersmelding, en die kan een URL met
+        # credential of een tokenfragment bevatten. De live-log van een run wordt in de
+        # browser opgevraagd; zonder deze markering stond die tekst daar.
+        extra={"alleen_serverlog": True},
     )
     return soort, TEKST[soort]
+
+
+def log_veilig(
+    logger: logging.Logger,
+    boodschap: str,
+    *args: object,
+    exc: BaseException,
+    bron: str,
+) -> str:
+    """Log één veilige regel (browser + serverlog) en de ruwe melding (alleen serverlog).
+
+    Retourneert de veilige tekst, zodat de caller hem ook in een record kan zetten.
+
+    Bestaat omdat de live-log van een run in de browser wordt opgevraagd: een
+    `logger.warning("… mislukt: %s", e)` zette daarmee de leveranciersrespons in het scherm.
+    De veilige regel zegt wát er misging en waar de details staan; `normaliseer` schrijft de
+    ruwe tekst naar het serverlog, gemarkeerd zodat de voortgangs-handler hem overslaat.
+    """
+    _, veilig = normaliseer(exc, bron=bron)
+    logger.warning(boodschap + " (%s; details in het serverlog)", *args, veilig)
+    return veilig
 
 
 def anthropic_check(model: str) -> dict[str, object]:

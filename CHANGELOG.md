@@ -6,6 +6,34 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-21 — de live-log liet ruwe leveranciersmeldingen in de browser zien
+
+Begon als een leesbaarheidsklacht en werd een lekpad. In het portaal stond tijdens een run:
+
+    {"event": "drive_snelkoppeling_niet_gevolgd", "doel": "1VZvW-0MJIJ8VWCNgcHQuHBqmpxbdkoG0"}
+
+Een JSON-gebeurtenis met een ruw bestand-ID, die niet zei wat er aan de hand was en
+alarmerender klonk dan het is. Die regel is nu een Nederlandse zin met de naam van de
+snelkoppeling, de vermoedelijke oorzaak (doel verwijderd, in de prullenbak, of niet gedeeld met
+het service-account) en wat er met het bestand gebeurt (handmatige review).
+
+Bij het naspeuren bleek waarom die regel in de browser stond: `_ProgressHandler` hangt aan de
+logger `iso_audit`, dus **élke** onderliggende regel belandt in de live-log die de browser
+opvraagt — inclusief de ruwe `verbinding_fout` met `detail`. Dat is precies de
+leveranciersrespons die `config/verbinding.normaliseer` uit de client moet houden, omdat er een
+URL met credential of een tokenfragment in kan staan. Op 2026-08-14 is dat lekpad gesloten voor
+de bron-health en het run-record; de live-log was de derde weg en die stond nog open.
+
+Twee maatregelen. `normaliseer` markeert zijn ruwe regel met `extra={"alleen_serverlog": True}`
+en de voortgangs-handler slaat gemarkeerde regels over. En de plekken in het ingest-pad die de
+uitzondering rechtstreeks logden (`"Bron %s overgeslagen: %s", e` en drie soortgenoten) gaan nu
+via `log_veilig()`: één veilige regel voor browser én serverlog, plus de ruwe tekst alleen naar
+het serverlog.
+
+Nog niet omgezet: de waarschuwingen in de rapportagefase (HTML/DOCX/PDF-conversie,
+tabulaire export, Sheets-sync, thema-verfijning). Die loggen de uitzondering nog rechtstreeks;
+ze vuren pas ná de classificatie en staan op de lijst.
+
 ### Fixed — 2026-08-21 — de planning werd per document opnieuw ingelezen (429's)
 
 De productierun stond vol `HttpError 429` van de Sheets-API, met tabs die daardoor werden
