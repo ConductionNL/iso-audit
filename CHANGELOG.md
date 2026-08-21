@@ -6,6 +6,23 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-21 — "mogelijk een scan" werd een feit in plaats van een vermoeden
+
+`Actiepunten uit Waveland.docx` bleef ook na de tabellenfix nul tekens opleveren. Uitgezocht met
+het echte bestand: 569 KB, drie lege alinea's, nul tabellen, **zes `w:drawing`-elementen** —
+screenshots in een Word-document. Er staat dus letterlijk geen tekst in.
+
+Een docx zonder tekst maar met tekeningen meldt nu wát er aan de hand is: "bevat 6 ingevoegde
+afbeelding(en) en geen tekst; zonder OCR is hier niets uit te lezen". En de dekkingscategorie
+noemt geen oorzaak meer — die stond op "geen tekst uit het bestand; mogelijk een scan" voor élk
+formaat, terwijl de oorzaak per bestand in de reviewregel staat. De categorie telt, de reden
+verklaart.
+
+Dit is de derde keer deze week dat één tekst voor meerdere gevallen de auditor het verkeerde bos
+in stuurde (na de locatiestatus van 17-08 en "staat er niet in" van vandaag). Het patroon is
+steeds hetzelfde: een melding die klopt voor het geval waarvoor hij geschreven is, en misleidt
+zodra hij hergebruikt wordt.
+
 ### Fixed — 2026-08-21 — de live-log liet ruwe leveranciersmeldingen in de browser zien
 
 Begon als een leesbaarheidsklacht en werd een lekpad. In het portaal stond tijdens een run:

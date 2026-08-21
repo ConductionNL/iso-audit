@@ -904,3 +904,35 @@ def test_reden_bij_geen_tekst_hangt_af_van_het_formaat() -> None:
     assert "scan" not in per_naam["Leeg.docx"]
     assert "tekstvakken" in per_naam["Leeg.docx"]
     assert "scan" in per_naam["Scan.pdf"]
+
+
+def test_docx_met_alleen_afbeeldingen_meldt_dat_als_feit() -> None:
+    """Gemeten op 2026-08-21: `Actiepunten uit Waveland.docx` is 569 KB met drie lege
+    alinea's, nul tabellen en zes `w:drawing`-elementen — screenshots in een Word-bestand.
+    "Mogelijk een scan" zei daar het verkeerde over."""
+    import io as _io
+
+    import docx as _docx
+
+    # Een `w:drawing` rechtstreeks in de body: `add_picture` vraagt een echte
+    # afbeeldingsheader, en die hoort niet in een test over tekstextractie.
+    d = _docx.Document()
+    alinea = d.add_paragraph()
+    alinea._p.append(
+        _docx.oxml.parse_xml(
+            '<w:drawing xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'
+        )
+    )
+    buffer = _io.BytesIO()
+    d.save(buffer)
+
+    bestanden = [_bestand("f1", "Actiepunten.docx", drive.DOCX_MIME)]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=buffer.getvalue()),
+    ):
+        docs, review = drive.haal_documenten_op(folder_id="x")
+    assert docs == []
+    assert "ingevoegde afbeelding" in review[0]["reden"]
+    assert "scan" not in review[0]["reden"]
+    assert "OCR" in review[0]["reden"]
