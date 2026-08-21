@@ -75,3 +75,29 @@ def test_bron_url_jira_zonder_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_bron_url_onbekend_of_leeg() -> None:
     assert _bron_url("planning", "x") is None  # geen well-known vorm
     assert _bron_url("Drive", "") is None  # geen id → geen link
+
+
+# --- één run per audit -----------------------------------------------------
+
+
+def test_tweede_run_wordt_geweigerd_met_409(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Vier startknoppen binnen twintig seconden maakten vier threads in één proces.
+
+    Die deelden één niet-thread-safe Google-client; het proces viel om met SIGSEGV. Los
+    daarvan betalen vier gelijktijdige ingests viermaal de classificatie.
+    """
+    import json
+
+    from iso_audit.api.session import AuditSession, RunLooptError
+
+    (tmp_path / "findings.json").write_text(json.dumps([]), encoding="utf-8")
+    sessie = AuditSession(
+        tmp_path,
+        profile="examples/auditmemo/conduction.profile.yaml",
+        norms_dir="examples/norms",
+        memo_input_path=tmp_path / "memo-input.yaml",
+    )
+    sessie._run.status = "running"
+
+    with pytest.raises(RunLooptError, match="loopt al een run"):
+        sessie.start_run(mode="live", norm="27001", sources=["drive"])

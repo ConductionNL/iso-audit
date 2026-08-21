@@ -15,6 +15,7 @@ en `/instellingen/*` — of de bronnen gekoppeld zijn is geen eigenschap van é�
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import asdict
 from pathlib import Path
@@ -24,6 +25,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from iso_audit.api import overzicht as ov
+from iso_audit.api import runs
 from iso_audit.api.audit_log import log_event
 from iso_audit.api.auth_gate import identiteit_van, installeer_auth_gate
 from iso_audit.api.bron_config import BronConfig, ConfigError
@@ -44,6 +46,8 @@ from iso_audit.config import herkomst as hk
 from iso_audit.config.settings import VELDEN, Settings, load_config
 from iso_audit.config.verbinding import normaliseer
 from iso_audit.memo.norm_lookup import laad_norm_db
+
+_log_start = logging.getLogger("iso_audit.audit")
 
 AUDITS_ROOT_ENV = "ISO_AUDIT_AUDITS_ROOT"
 """Root-directory met de audits. Expliciet, geen fallback — zie `audits_root()`."""
@@ -165,6 +169,23 @@ def create_app(
     settings = _laad_settings()
     hk.log_herkomst(settings)
     _audits = Audits(registry=registry, profile=profile, norms_dir=norms_dir)
+
+    # Runs die `loopt` zeggen bij een verse start kunnen niet lopen: een run leeft in een
+    # thread van dit proces. Op 2026-08-21 stonden er vier zulke records in één audit nadat
+    # het proces was omgevallen — de historie beweerde dat er vier runs bezig waren. Een
+    # trail die zegt dat er iets loopt wat niet loopt, is erger dan een lege trail.
+    if registry.root.is_dir():
+        for _dir in sorted(registry.root.iterdir()):
+            if not (_dir.is_dir() and (_dir / "manifest.json").is_file()):
+                continue
+            _verweesd = runs.sluit_verweesde_runs(_dir)
+            if _verweesd:
+                _log_start.warning(
+                    "Run(s) %s stonden op 'loopt' bij het opstarten en zijn afgesloten als "
+                    "afgebroken (audit %s).",
+                    ", ".join(_verweesd),
+                    _dir.name,
+                )
 
     def _run_loopt() -> str | None:
         """Naam van de audit met een lopende run, of None.

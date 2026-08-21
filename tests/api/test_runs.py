@@ -96,3 +96,41 @@ def test_afsluiten_zonder_dekking_laat_het_veld_weg(tmp_path: Path) -> None:
     runs.registreer(tmp_path, door="a@b.c", modus="live", norm="27001", bronnen=["jira"])
     runs.afsluiten(tmp_path, "run-0001", toegevoegd=1)
     assert "dekking" not in runs.samengevat(tmp_path)[-1]
+
+
+# --- verweesde runs --------------------------------------------------------
+
+
+def test_verweesde_run_wordt_bij_opstart_afgesloten(tmp_path: Path) -> None:
+    """Een run leeft in een thread van dit proces; `loopt` bij een verse start kan niet.
+
+    Gemeten op 2026-08-21: vier records stonden op `loopt` nadat het proces met SIGSEGV was
+    omgevallen. De historie beweerde dat er vier runs bezig waren.
+    """
+    runs.registreer(tmp_path, door="a@b.c", modus="live", norm="27001", bronnen=["drive"])
+    runs.registreer(tmp_path, door="a@b.c", modus="live", norm="27001", bronnen=["drive"])
+    runs.afsluiten(tmp_path, "run-0002", toegevoegd=3)
+
+    verweesd = runs.sluit_verweesde_runs(tmp_path)
+
+    assert verweesd == ["run-0001"], "alleen de run die nog 'loopt' zei"
+    per_run = {r["run_id"]: r for r in runs.samengevat(tmp_path)}
+    assert per_run["run-0001"]["status"] == "fout"
+    assert "proces" in per_run["run-0001"]["fout"]
+    assert per_run["run-0002"]["status"] == "klaar", "een afgeronde run blijft ongemoeid"
+
+
+def test_verweesde_runs_is_append_only(tmp_path: Path) -> None:
+    """Er wordt niets herschreven: het startrecord blijft staan zoals het was."""
+    runs.registreer(tmp_path, door="a@b.c", modus="live", norm="27001", bronnen=["drive"])
+    voor = len(runs.lijst(tmp_path))
+
+    runs.sluit_verweesde_runs(tmp_path)
+
+    na = runs.lijst(tmp_path)
+    assert len(na) == voor + 1
+    assert na[0]["soort"] == "start" and na[0]["status"] == "loopt"
+
+
+def test_sluit_verweesde_runs_zonder_bestand(tmp_path: Path) -> None:
+    assert runs.sluit_verweesde_runs(tmp_path) == []

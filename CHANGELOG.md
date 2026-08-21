@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-21 — vier startknoppen maakten vier runs in één proces (SIGSEGV)
+
+Diagnose van de crash die `0.2.0a20` leek te veroorzaken. Het was a20 niet: drie reproducties
+liepen schoon — de a20-code lokaal (439 documenten gelezen, piek 181 MiB), het a20-**image**
+met de listing in een achtergrond-thread, en de a19-code **in de draaiende pod** (715
+bestanden). De diff a19→a20 in het lees-pad is bovendien alléén logtekst.
+
+Wat er wél gebeurde, zichtbaar in de run-historie: vier startrecords op 13:28:09, :12, :24 en
+:28. De auditor klikte vier keer omdat de knop niets leek te doen, en `start_run()` had **geen
+gate**: elke POST zette `self._run` opnieuw en startte een nieuwe thread. Die threads deelden
+één `@lru_cache`'d Google-service, en `google-api-python-client` is niet thread-safe — de
+onderliggende `httplib2.Http` houdt één socket. Exit 139, pod in `BackOff`, UI: "onbekende
+fout".
+
+Drie maatregelen, alle drie op een eigen oorzaak:
+
+1. **Eén run per audit.** `start_run()` weigert een tweede run met `RunLooptError`; de route
+   maakt daar 409 van (niet 400 — het verzoek is niet ongeldig, het moment is verkeerd) en
+   sluit het net aangemaakte record af, zodat er geen tweede "loopt nog" blijft staan. Vier
+   gelijktijdige ingests betaalden bovendien viermaal de classificatie.
+2. **Verweesde runs worden bij het opstarten afgesloten.** Een run leeft in een thread van het
+   portaalproces; zegt een record `loopt` bij een verse start, dan is hij per definitie
+   afgebroken. `sluit_verweesde_runs()` schrijft daar een afsluitrecord bij — append-only, het
+   startrecord blijft staan. Een trail die beweert dat er iets loopt wat niet loopt, is erger
+   dan een lege trail.
+3. **Google-service per thread.** `@lru_cache(maxsize=1)` is `threading.local()` geworden. Het
+   hergebruik blijft (de token-uitwisseling kost 33s op een vers credentials-object, een
+   volgende call 0,48s), maar er is geen gedeelde socket meer. Geen lock: dat zou de calls
+   serialiseren, terwijl een service per thread simpelweg geen gedeelde staat heeft.
+
 ### Reverted — 2026-08-21 — 0.2.0a21 zet de code terug op de inhoud van a19
 
 `0.2.0a20` liet het portaal met **exitCode 139 (SIGSEGV)** omvallen, één seconde na het

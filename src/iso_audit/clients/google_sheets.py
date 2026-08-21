@@ -12,7 +12,7 @@ bron te hangen.
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
+import threading
 from typing import Any
 
 from iso_audit import auth
@@ -20,14 +20,28 @@ from iso_audit import auth
 logger = logging.getLogger("iso_audit.audit")
 
 
-@lru_cache(maxsize=1)
-def _dienst() -> Any:
-    """Eén Sheets-service hergebruiken; zie `google_drive._dienst` voor het waarom.
+_lokaal = threading.local()
 
-    Hier weegt het extra: `sheets_lees_alle_tabs` doet één call per tab, en de
+
+def _dienst() -> Any:
+    """Eén Sheets-service **per thread**; zie `google_drive._dienst` voor het waarom.
+
+    Hier weegt het hergebruik extra: `sheets_lees_alle_tabs` doet één call per tab, en de
     auditplanning heeft zeven tabs.
     """
-    return auth.sheets_read_service()
+    dienst = getattr(_lokaal, "dienst", None)
+    if dienst is None:
+        dienst = auth.sheets_read_service()
+        _lokaal.dienst = dienst
+    return dienst
+
+
+def _wis_dienst() -> None:
+    """Vergeet de service van deze thread (voor tests)."""
+    _lokaal.dienst = None
+
+
+_dienst.cache_clear = _wis_dienst  # type: ignore[attr-defined]
 
 
 _MAX_RETRIES = 3

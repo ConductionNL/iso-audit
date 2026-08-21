@@ -19,7 +19,7 @@ from iso_audit.api.audit_log import log_event
 from iso_audit.api.auth_gate import identiteit_van
 from iso_audit.api.deps import Audits
 from iso_audit.api.registry import MANIFEST, RegistryError, run_code
-from iso_audit.api.session import SessionError
+from iso_audit.api.session import RunLooptError, SessionError
 
 
 class RunConfig(BaseModel):
@@ -113,6 +113,19 @@ def maak_router(audits: Audits) -> APIRouter:
                 pace_s=r.pace,
                 run_id=run_id,
             )
+        except RunLooptError as exc:
+            # 409 en niet 400: het verzoek is niet ongeldig, het moment is verkeerd. Het
+            # record wordt afgesloten zodat er geen tweede "loopt nog" in de historie blijft
+            # staan — precies wat er op 2026-08-21 vier keer gebeurde.
+            runs_mod.afsluiten(dir_, run_id, fout=str(exc))
+            log_event(
+                "run_geweigerd_dubbel",
+                wie,
+                audit=audit_id,
+                modus=r.mode,
+                reden=str(exc)[:200],
+            )
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except (SessionError, ValueError, OSError) as exc:
             # Ook een geweigerde run hoort in de historie: "iemand probeerde te draaien
             # zonder bron" is precies de diagnose die je later mist. Afsluiten, niet

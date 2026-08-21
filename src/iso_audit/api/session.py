@@ -29,6 +29,20 @@ class SessionError(ValueError):
     """Sessie kon niet geladen worden of een actie is ongeldig."""
 
 
+class RunLooptError(SessionError):
+    """Er loopt al een run in deze audit; een tweede starten is geweigerd.
+
+    Gemeten op 2026-08-21: het portaal liet vier startknoppen binnen twintig seconden vier
+    threads maken in één proces. Die delen één Google-service-object, en
+    `google-api-python-client` is niet thread-safe — het proces viel om met SIGSEGV, de pod
+    ging in `BackOff`, en de UI meldde "onbekende fout". Los daarvan: vier gelijktijdige
+    ingests betalen viermaal de classificatiekosten voor dezelfde documenten.
+
+    Een aparte fout en geen generieke `SessionError`, zodat de route hier 409 van kan maken:
+    "probeer het later opnieuw" is een ander antwoord dan "je verzoek is ongeldig".
+    """
+
+
 # Leesbare namen voor de memo-context (scope + geraadpleegde bronnen).
 _NORM_NAAM = {"9001": "ISO 9001:2015", "27001": "ISO 27001:2022"}
 _BRON_NAAM = {"drive": "Google Drive", "jira": "Jira", "miro": "Miro", "planning": "Planning"}
@@ -317,6 +331,14 @@ class AuditSession:
         `run_id` is het record dat de route al heeft aangelegd; de worker sluit dat af met
         de echte tellingen.
         """
+        # Eén run per sessie. Zonder deze gate zette elke POST `self._run` opnieuw en startte
+        # een nieuwe thread: de eerste run verdween uit het zicht maar bleef draaien, en de
+        # threads deelden één niet-thread-safe Google-client. Zie `RunLooptError`.
+        if self._run.status == "running":
+            raise RunLooptError(
+                "Er loopt al een run in deze audit. Wacht tot die klaar is; een tweede run "
+                "leest dezelfde documenten opnieuw en betaalt de classificatie dubbel."
+            )
         gekozen = list(sources or [])
         # Inlezen zit niet hier maar op `POST /landschap/ingest`: het documentenlandschap
         # is van de organisatie en niet van één audit, en twee ingangen naar dezelfde

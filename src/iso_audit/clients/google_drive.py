@@ -21,7 +21,7 @@ inhoudelijk gelijk. Zo bewijst de bestaande suite dat het gedrag niet verschoof.
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
+import threading
 from typing import Any
 
 from iso_audit import auth
@@ -29,20 +29,45 @@ from iso_audit import auth
 logger = logging.getLogger("iso_audit.audit")
 
 
-@lru_cache(maxsize=1)
+_lokaal = threading.local()
+
+
 def _dienst() -> Any:
-    """Eén Drive-service hergebruiken binnen dit proces.
+    """Eén Drive-service **per thread**, hergebruikt binnen die thread.
 
-    Niet om het bouwen te sparen — dat kost 0,07s — maar om de **token-uitwisseling**.
-    Gemeten: de eerste API-call op een vers credentials-object kostte 33s, een volgende
-    call op hetzelfde object 0,48s. Een nieuwe service per document zou die eerste kost
-    per document opnieuw betalen.
+    Hergebruik is er om de **token-uitwisseling** te sparen, niet het bouwen: gemeten kostte
+    de eerste API-call op een vers credentials-object 33s en een volgende call op hetzelfde
+    object 0,48s. Een nieuwe service per document zou die eerste kost per document opnieuw
+    betalen.
 
-    `google-auth` verlengt het token zelf op het credentials-object, dus hergebruik is
-    veilig. Tests roepen `_dienst.cache_clear()` zodat een gestubde service niet
-    doorlekt naar de volgende test.
+    **Per thread en niet per proces.** Tot 2026-08-21 stond hier `@lru_cache(maxsize=1)`, dus
+    één service voor het hele proces. `google-api-python-client` is niet thread-safe — de
+    onderliggende `httplib2.Http` houdt één socket en één bufferstand — en het portaal draait
+    elke run in een eigen thread. Zolang er één run liep ging dat goed; op 2026-08-21 maakten
+    vier startknoppen binnen twintig seconden vier threads, en het proces viel om met SIGSEGV
+    (exitCode 139). De gate in `session.start_run` voorkomt die vier runs; dit voorkomt dat
+    één gelijktijdige lezer elders hetzelfde opnieuw doet.
+
+    `threading.local()` en geen lock: een lock zou de calls serialiseren en een run onnodig
+    vertragen, terwijl een service per thread simpelweg geen gedeelde staat heeft.
+
+    Tests roepen `_dienst.cache_clear()` — die naam blijft bestaan zodat gestubde services
+    niet doorlekken naar de volgende test.
     """
-    return auth.drive_read_service()
+    dienst = getattr(_lokaal, "dienst", None)
+    if dienst is None:
+        dienst = auth.drive_read_service()
+        _lokaal.dienst = dienst
+    return dienst
+
+
+def _wis_dienst() -> None:
+    """Vergeet de service van deze thread (voor tests)."""
+    _lokaal.dienst = None
+
+
+_dienst.cache_clear = _wis_dienst  # type: ignore[attr-defined]
+"""Zelfde naam als de oude `lru_cache`-API, zodat bestaande tests ongewijzigd blijven."""
 
 
 _MAX_RETRIES = 3

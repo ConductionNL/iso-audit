@@ -239,6 +239,39 @@ def afsluiten(
     return record
 
 
+AFGEBROKEN_REDEN = (
+    "Het proces dat deze run uitvoerde is gestopt (podherstart, crash of deploy). "
+    "Wat er tot dat moment is vastgelegd blijft staan."
+)
+"""Reden bij een run die door een procesherstart is afgebroken.
+
+Waarom dit bestaat: een run leeft in een thread van het portaalproces. Sneuvelt dat proces,
+dan is er niemand meer die het afsluitrecord schrijft en blijft het startrecord voor altijd
+`loopt` beweren. Op 2026-08-21 stonden er vier zulke records in één audit — het proces was
+omgevallen met SIGSEGV, maar de historie zei "loopt nog…" alsof er vier runs bezig waren.
+
+Een audittrail die beweert dat er iets loopt wat niet loopt, is erger dan een lege trail: je
+kunt er niet uit opmaken welke run echt gedraaid heeft."""
+
+
+def sluit_verweesde_runs(audit_dir: str | Path) -> list[str]:
+    """Sluit runs die `loopt` zeggen maar niet meer kunnen lopen. Retourneert hun ID's.
+
+    Bedoeld om **bij het opstarten** van het portaal te draaien: een run leeft in een thread
+    van dit proces, dus een run die bij een verse start nog `loopt` zegt, is per definitie
+    afgebroken. Append-only, net als elk ander afsluitrecord — er wordt niets herschreven.
+    """
+    dir_ = Path(audit_dir)
+    if not (dir_ / RUNS).is_file():
+        return []
+    verweesd = [
+        str(r["run_id"]) for r in samengevat(dir_) if r.get("status") == "loopt" and r.get("run_id")
+    ]
+    for rid in verweesd:
+        afsluiten(dir_, rid, fout=AFGEBROKEN_REDEN)
+    return verweesd
+
+
 def _append(audit_dir: Path, record: dict[str, Any]) -> None:
     """Eén regel toevoegen. Eén `write` van één regel < 4 KiB is op POSIX atomair genoeg
     voor gelijktijdige appends; dat is dezelfde aanname waarop `triage_log.jsonl` leunt."""
