@@ -407,7 +407,6 @@ def run_audit(
         schat_kosten,
     )
     from iso_audit.classification.thema import bepaal_thema
-    from iso_audit.config.verbinding import log_veilig
     from iso_audit.miro.ingest import (
         haal_notities_op,
         koppel_aan_clausules,
@@ -489,9 +488,7 @@ def run_audit(
             # concludeert dan dat er niets te vinden was.
             _norm = _veilige_reden(e, bron)
             mislukt[bron] = _norm
-            log_veilig(
-                logger, "Bron %s overgeslagen (ingest-fout, niet kritiek)", bron, exc=e, bron=bron
-            )
+            logger.warning("Bron %s overgeslagen (ingest-fout, niet kritiek): %s", bron, e)
 
     logger.info("Stap 3/7: Miro-notities inlezen...")
     miro_notities: list[dict[str, Any]] = []
@@ -501,9 +498,9 @@ def run_audit(
             miro_notities = koppel_aan_clausules(miro_notities_raw, clause_map)
             logger.info("%d Miro-notities ingelezen", len(miro_notities))
         except OSError as e:
-            log_veilig(logger, "Miro overgeslagen", exc=e, bron="miro")
+            logger.warning("Miro overgeslagen: %s", e)
         except Exception as e:
-            log_veilig(logger, "Miro-ingest mislukt (niet kritiek)", exc=e, bron="miro")
+            logger.warning("Miro-ingest mislukt (niet kritiek): %s", e)
 
     logger.info("Stap 4/7: Documenten koppelen aan clausules...")
     cutoff = (date.today() - timedelta(days=2 * 365)).isoformat()
@@ -541,7 +538,7 @@ def run_audit(
             aantal_punten += len(punten)
         except Exception as e:
             mislukt[bron] = _veilige_reden(e, bron)
-            log_veilig(logger, "Opvolgpunten uit %s overgeslagen", bron, exc=e, bron=bron)
+            logger.warning("Opvolgpunten uit %s overgeslagen: %s", bron, e)
 
     if alleen_ingest:
         logger.info(

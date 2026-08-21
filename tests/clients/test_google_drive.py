@@ -342,39 +342,3 @@ def test_snelkoppeling_naar_map_wordt_gevolgd_zonder_lus(dienst: Any) -> None:
     uit = gd.drive_lijst_bestanden("map1")
 
     assert [b["id"] for b in uit] == ["a"], "de startmap wordt niet opnieuw doorlopen"
-
-
-def test_melding_bij_een_onvolgbare_snelkoppeling_is_leesbaar(
-    dienst: Any, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Deze regel komt via de voortgangs-handler in het portaal terecht; een auditor leest hem.
-
-    Er stond `{"event": "drive_snelkoppeling_niet_gevolgd", "doel": "1VZv…"}` — een
-    JSON-gebeurtenis met een ruw bestand-ID, die niet zei wat er aan de hand was en
-    alarmerender klonk dan het is.
-    """
-    _, antwoorden = dienst
-    antwoorden.extend(
-        [
-            {
-                "files": [
-                    {
-                        "id": "kort",
-                        "name": "link naar VvT",
-                        "mimeType": _SNELKOPPELING,
-                        "shortcutDetails": {"targetId": "weg"},
-                    }
-                ]
-            },
-            RuntimeError("404"),
-        ]
-    )
-
-    with caplog.at_level("WARNING", logger="iso_audit.audit"):
-        gd.drive_lijst_bestanden("map1")
-
-    melding = "\n".join(caplog.messages)
-    assert "event" not in melding, "geen JSON-gebeurtenis in een regel die de auditor leest"
-    assert "link naar VvT" in melding, "de naam, niet alleen het id"
-    assert "niet gedeeld met het service-account" in melding
-    assert "handmatige review" in melding

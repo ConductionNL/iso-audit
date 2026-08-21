@@ -6,6 +6,27 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Reverted — 2026-08-21 — 0.2.0a21 zet de code terug op de inhoud van a19
+
+`0.2.0a20` liet het portaal met **exitCode 139 (SIGSEGV)** omvallen, één seconde na het
+starten van de Drive-ingest. Geen Python-exception maar een crash in native code: uvicorn viel
+mee om, de pod ging in `BackOff`, en de UI meldde "onbekende fout". Drie startpogingen, drie
+keer hetzelfde. Geen OOM — de limiet is 1 GiB en dat had exitCode 137 gegeven.
+
+Op verzoek van de opdrachtgever teruggedraaid terwijl de oorzaak wordt uitgezocht. De code is
+regel voor regel gelijk aan `0.2.0a19`, dat een volledige run haalde (502 bestanden gelezen,
+118 classificaties, 1480 bevindingen).
+
+**Waarom a21 en niet gewoon `newTag: 0.2.0a19`:** de image-workflow bouwt en pusht bij elke
+push naar `main`. Zou `newTag` terug naar a19 gaan, dan werd díe tag herbouwd met de huidige
+code en had de registry andere inhoud onder een bestaande tag — precies de mutable tag die
+`deploy/kustomization.yaml` beschrijft. Een nieuw nummer met bekende inhoud is de saaie weg.
+
+Wat hiermee tijdelijk terug is: de ruwe leveranciersmeldingen in de live-log, de cryptische
+snelkoppelingsmelding, de afbeeldingen-docx-melding, en de sorteerfout in stap 7/7. Die laatste
+betekent dat een run met een document zonder `modifiedTime` opnieuw in stap 7 omvalt — de
+classificatie blijft wel bewaard.
+
 ### Fixed — 2026-08-21 — stap 7/7 viel om op een document zonder wijzigingsdatum
 
 De run haalde de hele classificatie (118 documenten, 1480 bevindingen, $0,6943, nul fouten) en

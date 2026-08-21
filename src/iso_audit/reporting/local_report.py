@@ -551,12 +551,7 @@ def schrijf_rapport(
             "dienen te worden herzien of ingetrokken._"
         )
         regels.append("")
-        # `.get(k, "")` geeft **None** terug als de sleutel bestaat met waarde None, en dan
-        # klapt de sortering op `'<' not supported between NoneType and str`. Dat gebeurde op
-        # 2026-08-21 in stap 7/7, ná 118 classificaties en $0,69: Drive geeft geen
-        # `modifiedTime` voor elk bestand, en sinds de dekkingsuitbreiding komen zulke
-        # bestanden ook echt in het landschap. Elders in de pipeline staat daarom `or ""`.
-        for doc in sorted(gearchiveerd, key=lambda d: d.get("modified_at") or ""):
+        for doc in sorted(gearchiveerd, key=lambda d: d.get("modified_at", "")):
             datum = (doc.get("modified_at") or "")[:10]
             url = f"https://drive.google.com/file/d/{doc['id']}/view"
             regels.append(f"- [{doc['naam']}]({url}) _(laatst gewijzigd: {datum})_")
