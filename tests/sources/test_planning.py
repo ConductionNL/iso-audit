@@ -386,3 +386,55 @@ def test_valideer_sheet_id_waarschuwt_bij_misvorming(caplog: pytest.LogCaptureFi
     # Waarde wordt NIET aangepast (geen stille verkeerde-sheet-bug), wel gewaarschuwd.
     assert out == kapot
     assert "misvormd" in caplog.text
+
+
+# --- de spreadsheet wordt één keer gelezen, niet per document ---------------
+
+
+def test_planning_leest_de_sheet_een_keer_voor_alle_documenten(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`fetch_content` per document las de hele spreadsheet opnieuw.
+
+    Gemeten in de productierun van 2026-08-21: bij ~200 planning-rijen en ~15 tabs zijn dat
+    duizenden Sheets-calls, ruim boven het leesquotum per minuut. Gevolg: `HttpError 429`,
+    overgeslagen tabs, en een planning die half gelezen werd.
+    """
+    tabs = {
+        "NEN-EN-ISO_IEC 27001_2026": [
+            ["", "", "", "", ""],
+            ["", "Clausule", "januari", "februari", "Notitie"],
+            ["", "8.24", "x", "", "Cryptobeleid"],
+            ["", "9.2", "", "x", "Interne audit"],
+        ]
+    }
+    aanroepen: list[str] = []
+
+    def _lees(sid: str) -> dict[str, list[list[object]]]:
+        aanroepen.append(sid)
+        return tabs
+
+    monkeypatch.setattr(planning, "sheets_lees_alle_tabs", _lees)
+    src = planning.PlanningSource(spreadsheet_id="1" + "a" * 20)
+
+    docs = list(src.list_documents())
+    for d in docs:
+        src.fetch_content(d)
+
+    assert docs, "er moeten documenten uitkomen, anders bewijst deze test niets"
+    assert len(aanroepen) == 1, f"spreadsheet {len(aanroepen)}x gelezen voor {len(docs)} docs"
+
+
+def test_twee_instanties_delen_de_momentopname_niet(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cachen op de instantie en niet op de klasse: klasse-state lekt tussen runs."""
+    aanroepen: list[str] = []
+
+    def _lees(sid: str) -> dict[str, list[list[object]]]:
+        aanroepen.append(sid)
+        return {}
+
+    monkeypatch.setattr(planning, "sheets_lees_alle_tabs", _lees)
+    planning.PlanningSource(spreadsheet_id="1" + "a" * 20)._fetch_alle()
+    planning.PlanningSource(spreadsheet_id="1" + "b" * 20)._fetch_alle()
+
+    assert len(aanroepen) == 2

@@ -77,11 +77,28 @@ def sheets_lees_alle_tabs(spreadsheet_id: str) -> dict[str, list[list[Any]]]:
     kapotte tab mag een auditplanning niet onleesbaar maken. Daarom ook per tab een
     losse `values.get` en geen `batchGet` — die faalt op de héle batch.
     """
+    tabs = sheets_tabnamen(spreadsheet_id)
     resultaat: dict[str, list[list[Any]]] = {}
-    for tab in sheets_tabnamen(spreadsheet_id):
+    overgeslagen: list[str] = []
+    for tab in tabs:
         try:
             resultaat[tab] = sheets_lees_sheet(spreadsheet_id, f"'{tab}'!{_TAB_BEREIK}")
             logger.info("Tab '%s': %d rijen", tab, len(resultaat[tab]))
         except Exception as e:
             logger.warning("Tab '%s' overgeslagen: %s", tab, e)
+            overgeslagen.append(tab)
+    # Eén regel die zegt hoeveel van hoeveel er gelezen is. De per-tab-waarschuwingen
+    # stonden er al, maar niemand telt waarschuwingen: op 2026-08-21 werd een planning half
+    # gelezen door quotumfouten en meldde de run niets over die halve lezing. Zelfde
+    # redenering als bij de Drive-dekking — wat je niet leest, moet je zeggen.
+    if overgeslagen:
+        logger.warning(
+            "Planning-sheet: %d van %d tabs gelezen, %d overgeslagen (%s)",
+            len(resultaat),
+            len(tabs),
+            len(overgeslagen),
+            ", ".join(overgeslagen),
+        )
+    else:
+        logger.info("Planning-sheet: alle %d tabs gelezen", len(tabs))
     return resultaat

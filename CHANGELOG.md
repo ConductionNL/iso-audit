@@ -6,6 +6,27 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-21 — de planning werd per document opnieuw ingelezen (429's)
+
+De productierun stond vol `HttpError 429` van de Sheets-API, met tabs die daardoor werden
+overgeslagen: `Tab 'NEN-ISO 9001:2015 2025' overgeslagen`, tientallen keren. Het quotum was
+het symptoom; de oorzaak is een N+1.
+
+`protocol_ingest` roept `fetch_content()` **per document** aan, en `PlanningSource.fetch_content`
+riep `_fetch_alle()` opnieuw aan: één `spreadsheets.get` plus één `values.get` per tab, per
+planning-rij. Bij ~200 rijen en ~15 tabs zijn dat duizenden Sheets-calls in één run, ruim boven
+het leesquotum per minuut.
+
+De momentopname wordt nu één keer per instantie gelezen. Op de instantie en niet op de klasse:
+klasse-state lekt tussen runs en tussen tests. Een volgende run bouwt een nieuwe Source en leest
+opnieuw — dat is precies de levensduur die bij "een Source leest zijn configuratie bij
+constructie" hoort.
+
+Daarnaast meldt `sheets_lees_alle_tabs` nu hoeveel van hoeveel tabs zijn gelezen. De per-tab
+waarschuwingen stonden er al, maar niemand telt waarschuwingen: een planning die half werd
+gelezen leverde een run op die daar niets over zei. Zelfde regel als bij de Drive-dekking — wat
+je niet leest, moet je zeggen.
+
 ### Fixed — 2026-08-21 — een run van 119 documenten strandde op document 2
 
 Eerste productierun met de nieuwe ingest faalde bij stap 5/7, op

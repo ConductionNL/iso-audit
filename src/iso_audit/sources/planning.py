@@ -244,18 +244,36 @@ class PlanningSource:
 
     def __init__(self, spreadsheet_id: str | None = None) -> None:
         self._spreadsheet_id = _resolve_spreadsheet_id(spreadsheet_id)
+        # Momentopname van de planning voor deze instantie; zie `_fetch_alle`. Op de
+        # instantie en niet op de klasse: klasse-state lekt tussen runs en tussen tests.
+        self._rijen: list[_PlanningRow] | None = None
 
     @property
     def spreadsheet_id(self) -> str:
         return self._spreadsheet_id
 
     def _fetch_alle(self) -> list[_PlanningRow]:
-        """Lees alle tabs en parse elke tab tot planning-rows."""
-        tabs = sheets_lees_alle_tabs(_vereis_id(self._spreadsheet_id))
-        alle: list[_PlanningRow] = []
-        for tab_naam, rijen in tabs.items():
-            alle.extend(_parse_tab(tab_naam, rijen))
-        return alle
+        """Lees alle tabs en parse elke tab tot planning-rows; één keer per instantie.
+
+        De cache is geen optimalisatie maar een reparatie. `protocol_ingest` roept
+        `fetch_content()` **per document** aan, en die riep dit opnieuw aan — dus per
+        planning-rij één `spreadsheets.get` plus één `values.get` per tab. Bij ~200 rijen en
+        ~15 tabs zijn dat duizenden Sheets-calls in één run, ruim boven het leesquotum per
+        minuut. Gemeten in de productierun van 2026-08-21: tientallen
+        `HttpError 429`-waarschuwingen en tabs die daardoor werden overgeslagen, dus een
+        planning die half werd gelezen zonder dat het rapport dat zei.
+
+        Cachen op de instantie en niet module-breed: een Source leest zijn configuratie bij
+        constructie en is daarmee de natuurlijke levensduur van deze momentopname. Een
+        volgende run bouwt een nieuwe instantie en leest opnieuw.
+        """
+        if self._rijen is None:
+            tabs = sheets_lees_alle_tabs(_vereis_id(self._spreadsheet_id))
+            alle: list[_PlanningRow] = []
+            for tab_naam, rijen in tabs.items():
+                alle.extend(_parse_tab(tab_naam, rijen))
+            self._rijen = alle
+        return self._rijen
 
     def list_documents(self, filter: dict[str, object] | None = None) -> Iterator[Document]:
         """Yield één Document per planning-rij in de bron-spreadsheet.
