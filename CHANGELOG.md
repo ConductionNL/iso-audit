@@ -6,6 +6,49 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-21 — een run van 119 documenten strandde op document 2
+
+Eerste productierun met de nieuwe ingest faalde bij stap 5/7, op
+`Bevindingen_beide_v3.3_2026-05-05.csv`. Serverlog:
+
+    ValueError: Streaming is required for operations that may take longer than 10 minutes.
+
+De SDK rekent in `_calculate_nonstreaming_timeout` de verwachte duur als
+`3600 * max_tokens / 128000` en weigert een niet-streamende aanroep boven tien minuten — dus
+boven **21.333 output-tokens**. Dat bestand raakt 63 clausules, en met het budget van
+2026-08-17 (`450 * n + 128`) wordt dat 28.478. Vanaf 48 clausules in één document gaat het mis;
+met het oude budget (`150 * n + 64`) lag die grens op 142 clausules en kwam het nooit voor.
+
+Twee eigen wijzigingen kwamen hier samen: het ruimere budget van 17-08 en de
+dekkingsuitbreiding van 18-08, die `text/csv` leesbaar maakte en juist dát bestand met zijn 63
+clausules het landschap in bracht.
+
+Erger dan de fout zelf was het gevolg: een `ValueError` is geen `anthropic.APIError`, dus hij
+glipte langs de per-document foutopvang en nam de hele run mee — 117 documenten die niet meer
+geclassificeerd werden, na tien minuten Drive-ingest.
+
+De classificatie streamt nu (`_vraag_model` met `messages.stream` +
+`get_final_message()`), waarmee de drempel niet geldt en het budget bij de gemeten
+werkelijkheid van het model kan blijven. Twee gates erbij: een test dat `_vraag_model` echt
+streamt, en een test dat `messages.create(` niet meer in `classification/findings.py` voorkomt —
+één vergeten aanroep en de bug is terug.
+
+### Fixed — 2026-08-21 — docx-tabellen werden niet gelezen, en heetten "mogelijk een scan"
+
+Uit dezelfde run: `Actiepunten uit Waveland.docx` kwam binnen als "extractie leverde geen tekst
+op; mogelijk een scan of een leeg bestand". Een docx kan geen scan zijn. `_tekst_uit_docx` las
+alleen `document.paragraphs`, en een actiepuntenlijst of RI&E-overzicht is één **tabel** — nul
+alinea's, dus nul tekens.
+
+Tabelcellen worden nu meegelezen, in docx én pptx. En de reden bij een lege extractie hangt af
+van het formaat: "mogelijk een scan" hoort bij PDF, bij de rest staat er dat de inhoud
+vermoedelijk in afbeeldingen, tekstvakken of koppen zit. Eén reden voor alle formaten wees de
+auditor de verkeerde kant op bij precies het bestand dat wél te repareren was.
+
+Tekstvakken en koppen/voetteksten blijven buiten bereik — die zitten niet in het body-model van
+python-docx. Een docx die daardoor leeg blijft, wordt gemeld als onleesbaar in plaats van stil
+te verdwijnen.
+
 ### Fixed — 2026-08-21 — "staat er niet in" verzweeg dat de clausule niet bestond
 
 Eerste echte vraag in het portaal: "welk bewijs hebben we voor 8.2.4?". Antwoord: staat er niet

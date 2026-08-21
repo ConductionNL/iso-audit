@@ -307,6 +307,41 @@ def _bouw_miro_user_prompt(notities: list[dict[str, Any]], clausules: dict[str, 
 # ---------------------------------------------------------------------------
 
 
+SDK_NIET_STREAMEND_PLAFOND = 21_333
+"""Boven dit output-budget weigert de SDK een niet-streamende aanroep.
+
+`_calculate_nonstreaming_timeout` in `anthropic/_base_client.py` rekent
+`3600 * max_tokens / 128000` als verwachte duur en raist een `ValueError` zodra die boven de
+tien minuten komt. Dat is `max_tokens > 21333`, en met `450 * n + 128` gebeurt dat vanaf 48
+clausules in één document.
+
+Waarom dit getal hier staat en niet als grens wordt gebruikt: het budget hoort bij de
+werkelijkheid van het model, niet bij een SDK-drempel. Daarom streamen we de aanroep — dan
+geldt de drempel niet. Het getal staat er om de keuze uitlegbaar te houden."""
+
+
+def _vraag_model(client: Any, **kw: Any) -> Any:
+    """Eén classificatie-aanroep, streamend, met het volledige bericht als resultaat.
+
+    Streamend en niet `messages.create`, om één gemeten reden. Op 2026-08-21 strandde een
+    productierun op document 2 van 119: `Bevindingen_beide_v3.3_2026-05-05.csv` raakt 63
+    clausules, dus `max_tokens` werd 28.478, en de SDK weigert dat niet-streamend met
+    `ValueError: Streaming is required for operations that may take longer than 10 minutes`.
+    Die fout is geen `APIError`, dus hij glipte langs de per-document foutopvang en nam de
+    hele run mee — 117 documenten die niet meer geclassificeerd werden.
+
+    Twee dingen kwamen daar samen: het ruimere budget van 2026-08-17 (`450 * n + 128`) en de
+    dekkingsuitbreiding van 2026-08-18, die `text/csv` leesbaar maakte en dat bestand met zijn
+    63 clausules het landschap in bracht.
+
+    `get_final_message()` levert hetzelfde object als een niet-streamende aanroep — content,
+    usage en `stop_reason` — zodat de afkap-controle en de kostenteller ongewijzigd werken.
+    """
+    with client.messages.stream(**kw) as stroom:
+        bericht: Any = stroom.get_final_message()
+    return bericht
+
+
 def _max_tokens_voor(aantal_items: int) -> int:
     """Output-budget per classificatie-aanroep.
 
@@ -389,11 +424,12 @@ def _classificeer_doc(
     user = _bouw_doc_user_prompt(doc, clausule_ids, clausules)
     t0 = time.time()
     try:
-        resp = client.messages.create(
+        resp = _vraag_model(
+            client,
             model=teller.model,
             max_tokens=_max_tokens_voor(len(clausule_ids)),
             thinking=GEEN_THINKING,
-            system=_maak_system_param(system),  # type: ignore[arg-type]
+            system=_maak_system_param(system),
             messages=[{"role": "user", "content": user}],
         )
     except anthropic.APIError as e:
@@ -460,11 +496,12 @@ def _classificeer_miro_batch(
     user = _bouw_miro_user_prompt(notities, clausules)
     t0 = time.time()
     try:
-        resp = client.messages.create(
+        resp = _vraag_model(
+            client,
             model=teller.model,
             max_tokens=_max_tokens_voor(len(notities)),
             thinking=GEEN_THINKING,
-            system=_maak_system_param(system),  # type: ignore[arg-type]
+            system=_maak_system_param(system),
             messages=[{"role": "user", "content": user}],
         )
     except anthropic.APIError as e:

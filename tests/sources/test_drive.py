@@ -849,3 +849,58 @@ def test_doel_van_snelkoppeling_telt_een_keer() -> None:
     ):
         docs, _ = drive.haal_documenten_op(folder_id="x")
     assert [d["id"] for d in docs] == ["echt"]
+
+
+def test_docx_tabellen_worden_gelezen() -> None:
+    """Een actiepuntenlijst is één tabel en levert nul alinea's op.
+
+    Gemeten in de eerste productierun (2026-08-21): `Actiepunten uit Waveland.docx` kwam
+    binnen als "geen tekst, mogelijk een scan" — wat voor een docx onmogelijk is.
+    """
+    import io as _io
+
+    import docx as _docx
+
+    d = _docx.Document()
+    tabel = d.add_table(rows=2, cols=2)
+    tabel.cell(0, 0).text = "Actiepunt"
+    tabel.cell(1, 0).text = "RI&E afronden"
+    buffer = _io.BytesIO()
+    d.save(buffer)
+
+    bestanden = [_bestand("f1", "Actiepunten.docx", drive.DOCX_MIME)]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(drive, "drive_download_bestand", return_value=buffer.getvalue()),
+    ):
+        docs, review = drive.haal_documenten_op(folder_id="x")
+    assert docs, "een docx met alleen een tabel mag niet als leeg gelden"
+    assert "RI&E afronden" in docs[0]["tekst"]
+    assert review == []
+
+
+def test_reden_bij_geen_tekst_hangt_af_van_het_formaat() -> None:
+    """ "Mogelijk een scan" hoort bij PDF. Bij een docx wijst dat de auditor de verkeerde
+    kant op — juist bij het bestand dat wél te repareren is."""
+    import io as _io
+
+    import docx as _docx
+
+    leeg = _io.BytesIO()
+    _docx.Document().save(leeg)
+
+    bestanden = [
+        _bestand("f1", "Leeg.docx", drive.DOCX_MIME),
+        _bestand("f2", "Scan.pdf", "application/pdf"),
+    ]
+    with (
+        patch.object(drive, "drive_lijst_bestanden", return_value=bestanden),
+        patch.object(
+            drive, "drive_download_bestand", side_effect=[leeg.getvalue(), _pdf_bytes(None)]
+        ),
+    ):
+        _, review = drive.haal_documenten_op(folder_id="x")
+    per_naam = {r["naam"]: r["reden"] for r in review}
+    assert "scan" not in per_naam["Leeg.docx"]
+    assert "tekstvakken" in per_naam["Leeg.docx"]
+    assert "scan" in per_naam["Scan.pdf"]

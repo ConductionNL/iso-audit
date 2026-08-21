@@ -178,6 +178,63 @@ def test_kostenteller_rapport_string() -> None:
 # ---------- _classificeer_doc ----------
 
 
+_ECHTE_VRAAG_MODEL = findings._vraag_model
+"""De ongepatchte `_vraag_model`, vastgelegd bij import — de fixture hieronder vervangt hem
+voor de rest van dit bestand, en de grenstest moet juist het echte ding testen."""
+
+
+@pytest.fixture(autouse=True)
+def _stream_via_create(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Leid de streamende aanroep naar dezelfde `messages.create`-stub.
+
+    De classificatie streamt sinds 2026-08-21 (`_vraag_model`): niet-streamend weigert de SDK
+    elk output-budget boven ~21.333 tokens, en dat nam een productierun van 119 documenten mee
+    op document 2. De stubs in dit bestand stubben `messages.create`, en die willen we niet
+    allemaal omschrijven — de klassenlogica die ze testen is niet veranderd.
+
+    De streamende weg zelf wordt daarom apart getest:
+    `test_vraag_model_streamt` en `test_geen_niet_streamende_aanroep_meer`. Zonder die twee zou
+    deze fixture de regressie kunnen verbergen die hij zelf beschrijft.
+    """
+
+    def _vraag(client: Any, **kw: Any) -> Any:
+        return client.messages.create(**kw)
+
+    monkeypatch.setattr(findings, "_vraag_model", _vraag)
+
+
+def test_vraag_model_streamt() -> None:
+    """De echte `_vraag_model` gebruikt `messages.stream` en pakt het volledige bericht.
+
+    De SDK raist een `ValueError` op een niet-streamende aanroep zodra `max_tokens > 21333`;
+    dat is bij `450 * n + 128` al vanaf 48 clausules in één document. Die fout is geen
+    `APIError`, dus hij glipte langs de per-document foutopvang en nam de hele run mee.
+    """
+    client = MagicMock()
+    bericht = _fake_resp("[]")
+    client.messages.stream.return_value.__enter__.return_value.get_final_message.return_value = (
+        bericht
+    )
+
+    uit = _ECHTE_VRAAG_MODEL(client, model="m", max_tokens=30_000)
+
+    assert uit is bericht
+    client.messages.create.assert_not_called()
+    assert client.messages.stream.call_args.kwargs["max_tokens"] == 30_000
+
+
+def test_geen_niet_streamende_aanroep_meer() -> None:
+    """Gate: één vergeten `messages.create` in de classificatie en de bug is terug."""
+    bron = Path(findings.__file__).read_text(encoding="utf-8")
+    assert "messages.create(" not in bron
+
+
+def test_budget_boven_het_sdk_plafond_komt_echt_voor() -> None:
+    """Het plafond is geen theorie: 63 clausules in één document zat in het landschap."""
+    assert findings._max_tokens_voor(63) > findings.SDK_NIET_STREAMEND_PLAFOND
+    assert findings._max_tokens_voor(9) < findings.SDK_NIET_STREAMEND_PLAFOND
+
+
 def _blok(soort: str, text: str = "") -> Any:
     """Eén responsblok met een expliciet `type`, zoals de API het teruggeeft.
 

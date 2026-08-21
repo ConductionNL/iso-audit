@@ -60,6 +60,14 @@ GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
 GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
 GOOGLE_SLIDES_MIME = "application/vnd.google-apps.presentation"
 SNELKOPPELING_MIME = "application/vnd.google-apps.shortcut"
+
+GESCANDE_FORMATEN: frozenset[str] = frozenset({"application/pdf"})
+"""Formaten waarbij "geen tekst" op een scan kan duiden.
+
+Voor de rest kan het dat niet. Een `.docx` zonder tekst is geen scan maar een document
+waarvan de inhoud buiten het bereik van de lezer valt — tot 2026-08-21 stond in de melding
+"mogelijk een scan of een leeg bestand" voor élk formaat, en dat wees de auditor de verkeerde
+kant op bij precies het bestand dat wél te repareren was."""
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
@@ -171,8 +179,25 @@ class LeegDocumentError(Exception):
 
 
 def _tekst_uit_docx(inhoud: bytes) -> str:
+    """Alinea's **en** tabelcellen.
+
+    De tabellen ontbraken tot 2026-08-21, en dat is geen detail: een actiepuntenlijst of een
+    RI&E-overzicht is één tabel en levert dan nul alinea's op. Gemeten in de eerste
+    productierun — `Actiepunten uit Waveland.docx` kwam binnen als "geen tekst, mogelijk een
+    scan", wat voor een docx onmogelijk is.
+
+    Tekstvakken en koppen/voetteksten blijven buiten bereik: die zitten niet in het
+    `document.body`-model van python-docx. Een docx die daardoor leeg blijft, wordt gemeld als
+    onleesbaar — zichtbaar, niet stil.
+    """
     doc = docx.Document(io.BytesIO(inhoud))
-    return "\n".join(p.text for p in doc.paragraphs)
+    delen = [p.text for p in doc.paragraphs]
+    for tabel in doc.tables:
+        for rij in tabel.rows:
+            cellen = [c.text.strip() for c in rij.cells if c.text.strip()]
+            if cellen:
+                delen.append("\t".join(cellen))
+    return "\n".join(delen)
 
 
 def _tekst_uit_xlsx(inhoud: bytes) -> str:
@@ -194,6 +219,7 @@ def _tekst_uit_xlsx(inhoud: bytes) -> str:
 
 
 def _tekst_uit_pptx(inhoud: bytes) -> str:
+    """Tekst per dia, inclusief tabellen — om dezelfde reden als bij docx."""
     presentatie = pptx.Presentation(io.BytesIO(inhoud))
     regels: list[str] = []
     for nummer, dia in enumerate(presentatie.slides, start=1):
@@ -202,6 +228,11 @@ def _tekst_uit_pptx(inhoud: bytes) -> str:
             tekst = getattr(vorm, "text", "")
             if tekst and tekst.strip():
                 regels.append(tekst)
+            if getattr(vorm, "has_table", False):
+                for rij in vorm.table.rows:
+                    cellen = [c.text.strip() for c in rij.cells if c.text.strip()]
+                    if cellen:
+                        regels.append("\t".join(cellen))
     return "\n".join(regels)
 
 
@@ -243,9 +274,12 @@ def _fetch_tekst(file_id: str, mime: str) -> str:
         lezer = _BINAIRE_LEZERS.get(mime)
         tekst = lezer(inhoud) if lezer else inhoud.decode("utf-8", errors="replace")
     if not tekst.strip():
-        raise LeegDocumentError(
-            "extractie leverde geen tekst op; mogelijk een scan of een leeg bestand"
+        reden = (
+            "mogelijk een scan of een leeg bestand"
+            if mime in GESCANDE_FORMATEN
+            else "mogelijk staat de inhoud in afbeeldingen, tekstvakken of koppen"
         )
+        raise LeegDocumentError(f"extractie leverde geen tekst op; {reden}")
     return tekst
 
 
