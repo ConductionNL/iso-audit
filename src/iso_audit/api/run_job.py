@@ -57,14 +57,35 @@ def _bron_url(herkomst: str, doc_id: str) -> str | None:
     return None
 
 
+ALLEEN_SERVERLOG = "alleen_serverlog"
+"""Markering op een logrecord: deze regel gaat niet naar de browser.
+
+Gebruik als `logger.warning(..., extra={ALLEEN_SERVERLOG: True})`. Bedoeld voor ruwe
+leveranciersmeldingen — een API-respons kan een URL met credential of een tokenfragment
+bevatten, en `config/verbinding.normaliseer` bestaat juist om die tekst uit de client te
+houden.
+
+Op 2026-08-21 bleek die scheiding hier een gat te hebben: de handler hieronder hangt aan de
+logger `iso_audit`, dus élke onderliggende regel — inclusief de ruwe `verbinding_fout` met
+`detail` — belandde in de live-log die de browser opvraagt. Op 2026-08-14 is dit lekpad
+gesloten voor de bron-health en het run-record; de live-log was de derde weg en die stond nog
+open."""
+
+
 class _ProgressHandler(logging.Handler):
-    """Duwt pipeline-logregels naar een sink (voor live voortgang in de UI)."""
+    """Duwt pipeline-logregels naar een sink (voor live voortgang in de UI).
+
+    Regels met `extra={ALLEEN_SERVERLOG: True}` worden overgeslagen: die horen in het
+    serverlog en niet in de browser.
+    """
 
     def __init__(self, sink: Callable[[str], None]) -> None:
         super().__init__()
         self._sink = sink
 
     def emit(self, record: logging.LogRecord) -> None:
+        if getattr(record, ALLEEN_SERVERLOG, False):
+            return
         self._sink(record.getMessage())
 
 

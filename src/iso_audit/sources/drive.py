@@ -197,7 +197,20 @@ def _tekst_uit_docx(inhoud: bytes) -> str:
             cellen = [c.text.strip() for c in rij.cells if c.text.strip()]
             if cellen:
                 delen.append("\t".join(cellen))
-    return "\n".join(delen)
+    tekst = "\n".join(delen)
+    if not tekst.strip():
+        # Geen tekst én tekeningen in de body: dan is de inhoud ingevoegde afbeeldingen, en
+        # dat is een feit in plaats van een vermoeden. Gemeten op 2026-08-21:
+        # `Actiepunten uit Waveland.docx` is 569 KB met drie lege alinea's, nul tabellen en
+        # zes `w:drawing`-elementen — screenshots in een Word-bestand. "Mogelijk een scan"
+        # zei daar het verkeerde over; alleen OCR zou hier iets opleveren.
+        tekeningen = doc.element.body.xml.count("w:drawing")
+        if tekeningen:
+            raise LeegDocumentError(
+                f"bevat {tekeningen} ingevoegde afbeelding(en) en geen tekst; "
+                "zonder OCR is hier niets uit te lezen"
+            )
+    return tekst
 
 
 def _tekst_uit_xlsx(inhoud: bytes) -> str:
@@ -388,7 +401,9 @@ class DriveSource:
                     titel=naam,
                     bron="drive",
                     type=ONDERSTEUNDE_MIME_TYPES[mime],
-                    laatst_gewijzigd=bestand.get("modifiedTime", ""),
+                    # `or ""`: een ontbrekende `modifiedTime` komt als None terug, en een
+                    # None in een datumveld klapt verderop in een sortering.
+                    laatst_gewijzigd=bestand.get("modifiedTime") or "",
                     inhoud_uri=file_id,
                 )
         logger.info(
@@ -584,7 +599,10 @@ def _verwerk_batch(
                     "herkomst": "Drive",
                 }
             )
-            teller.sla_over("geen tekst uit het bestand; mogelijk een scan")
+            # De categorie noemt geen oorzaak: die staat per bestand in de reviewregel, en
+            # één oorzaak voor alle formaten was juist de fout ("mogelijk een scan" bij een
+            # docx). De categorie telt; de reden verklaart.
+            teller.sla_over(f"geen tekst uit het bestand ({mime})")
             continue
         except Exception as e:
             logger.warning("Fout bij inlezen %s: %s", naam, e)

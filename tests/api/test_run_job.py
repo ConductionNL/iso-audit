@@ -101,3 +101,40 @@ def test_tweede_run_wordt_geweigerd_met_409(tmp_path: Path, monkeypatch) -> None
 
     with pytest.raises(RunLooptError, match="loopt al een run"):
         sessie.start_run(mode="live", norm="27001", sources=["drive"])
+
+
+# --- de live-log is geen serverlog -----------------------------------------
+
+
+def test_ruwe_leveranciersmelding_gaat_niet_naar_de_browser() -> None:
+    """De live-log van een run wordt in de browser opgevraagd.
+
+    De handler hangt aan de logger `iso_audit`, dus élke onderliggende regel kwam erin —
+    inclusief de ruwe `verbinding_fout` met `detail`, en dat is precies de leveranciersrespons
+    die `normaliseer` uit de client moet houden. Op 2026-08-14 is dit lekpad gesloten voor de
+    bron-health en het run-record; de live-log was de derde weg en die stond nog open.
+    """
+    import logging
+
+    from iso_audit.api.run_job import ALLEEN_SERVERLOG, _ProgressHandler
+    from iso_audit.config.verbinding import normaliseer
+
+    regels: list[str] = []
+    handler = _ProgressHandler(regels.append)
+    log = logging.getLogger("iso_audit")
+    log.addHandler(handler)
+    vorig = log.level
+    log.setLevel(logging.INFO)
+    try:
+        log.info("Stap 5/7: Bevindingen classificeren")
+        normaliseer(
+            RuntimeError("401 from https://example.atlassian.net/rest/api/3/search?token=geheim"),
+            bron="jira",
+        )
+    finally:
+        log.removeHandler(handler)
+        log.setLevel(vorig)
+
+    assert regels == ["Stap 5/7: Bevindingen classificeren"]
+    assert not any("geheim" in r for r in regels)
+    assert ALLEEN_SERVERLOG == "alleen_serverlog"

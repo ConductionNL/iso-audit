@@ -6,6 +6,18 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-21 — 0.2.0a22 brengt de a20-inhoud terug, met de drie oorzaken erbij
+
+De rollback naar a19-inhoud (`a21`) was een tijdelijke maatregel terwijl de crash werd
+uitgezocht. Nu de oorzaak bekend is — vier gelijktijdige runs op één niet-thread-safe
+Google-client, niet de a20-code — komt die inhoud terug: de streamende classificatie stond al
+in a19, en hierbij weer de leeslog-scheiding, de leesbare snelkoppelingsmelding, de
+afbeeldingen-docx-melding en de sorteerfix in stap 7/7.
+
+Ook hier een nieuw nummer in plaats van teruggrijpen op a20: de image-workflow bouwt bij elke
+push, dus een bestaande tag zou herbouwd worden met andere inhoud. a22 = a20-inhoud plus de
+drie maatregelen hierboven.
+
 ### Fixed — 2026-08-21 — vier startknoppen maakten vier runs in één proces (SIGSEGV)
 
 Diagnose van de crash die `0.2.0a20` leek te veroorzaken. Het was a20 niet: drie reproducties

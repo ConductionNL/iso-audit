@@ -131,7 +131,13 @@ def _volg_snelkoppeling(service: Any, snelkoppeling: dict[str, Any]) -> dict[str
     snelkoppeling-record, en de source-laag meldt hem als niet-gevolgd.
     """
     doel_id = (snelkoppeling.get("shortcutDetails") or {}).get("targetId")
+    naam = str(snelkoppeling.get("name", "(zonder naam)"))
     if not doel_id:
+        logger.warning(
+            "Snelkoppeling '%s' wijst nergens naar; Drive geeft geen doelbestand terug. "
+            "Het blijft buiten het landschap en staat in de handmatige review.",
+            naam,
+        )
         return None
     try:
         doel: dict[str, Any] = (
@@ -144,8 +150,15 @@ def _volg_snelkoppeling(service: Any, snelkoppeling: dict[str, Any]) -> dict[str
             .execute(num_retries=_MAX_RETRIES)
         )
     except Exception:
+        # Leesbaar Nederlands en geen JSON-gebeurtenis: deze regel komt via de
+        # voortgangs-handler in `api/run_job.py` in het portaal terecht, dus een auditor
+        # leest hem. `{"event": "drive_snelkoppeling_niet_gevolgd"}` met een ruw bestand-ID
+        # erachter zei niet wat er aan de hand was en klonk alarmerender dan het is.
         logger.warning(
-            '{"event": "drive_snelkoppeling_niet_gevolgd", "doel": "%s"}',
+            "Snelkoppeling '%s' kon niet gevolgd worden: het doelbestand bestaat niet meer, "
+            "staat in de prullenbak, of is niet gedeeld met het service-account. Het blijft "
+            "buiten het landschap en staat in de handmatige review (doel-id %s).",
+            naam,
             doel_id,
         )
         return None
