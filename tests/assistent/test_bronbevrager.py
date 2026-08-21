@@ -331,3 +331,46 @@ def test_storing_wordt_ook_vastgelegd(conn: sqlite3.Connection) -> None:
     rij = conn.execute("SELECT * FROM assistent_vragen").fetchone()
     assert rij["antwoord"] == ""
     assert "niet zijn meegegeven" in rij["storing"]
+
+
+# --- "staat er niet in" met de reden erbij --------------------------------
+#
+# De eerste echte vraag in het portaal (2026-08-21) was "welk bewijs hebben we voor 8.2.4?".
+# Die clausule bestaat niet in ISO 27001:2022 — Annex A kent 8.24, en daar hingen 24
+# documenten aan. De assistent antwoordde correct "staat er niet in" en verzweeg daarmee dat
+# de clausule zélf niet bestaat.
+
+
+def test_niet_bestaande_clausule_wordt_als_zodanig_gemeld(conn: sqlite3.Connection) -> None:
+    corpus = ophalen.haal_bronnen_op(conn, "Welk bewijs hebben we voor 8.2.4?")
+
+    assert corpus.onbekende_clausules == ("8.2.4",)
+    assert corpus.suggesties["8.2.4"] == ["8.24"], "zelfde cijferreeks zonder punten"
+    tekst = assistent.geen_dekking_tekst(corpus, "27001")
+    assert "bestaat niet in ISO 27001" in tekst
+    assert "8.24" in tekst
+
+
+def test_suggestie_is_een_cijfervergelijking_en_geen_drempel() -> None:
+    """Geen gelijkenis-maat: "0.83 leek genoeg" is geen antwoord aan een auditor."""
+    assert ophalen.gelijkende_clausules("8.2.4", "27001") == ["8.24"]
+    assert ophalen.gelijkende_clausules("8.99", "27001") == []
+    assert ophalen.gelijkende_clausules("8.24", "27001") == [], "zichzelf niet suggereren"
+
+
+def test_bestaande_clausule_zonder_bewijs_is_geen_lege_uitkomst(
+    conn: sqlite3.Connection,
+) -> None:
+    """Een clausule die de norm kent maar waar niets aan gekoppeld is, is een dekkingsgat —
+    een auditbevinding in de dop, geen "staat er niet in"."""
+    corpus = ophalen.haal_bronnen_op(conn, "Welk bewijs hebben we voor 8.24?")
+
+    assert corpus.onbekende_clausules == ()
+    assert not corpus.is_leeg(), "de normtekst met bewijslast gaat mee"
+    assert [b.soort for b in corpus.bronnen] == ["normtekst"]
+
+
+def test_zonder_clausule_blijft_de_algemene_tekst(conn: sqlite3.Connection) -> None:
+    corpus = ophalen.haal_bronnen_op(conn, "Wat hebben wij over sleutelbeheer?")
+
+    assert assistent.geen_dekking_tekst(corpus, "27001") == assistent.GEEN_DEKKING

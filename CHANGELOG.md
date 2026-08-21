@@ -6,6 +6,28 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-21 — "staat er niet in" verzweeg dat de clausule niet bestond
+
+Eerste echte vraag in het portaal: "welk bewijs hebben we voor 8.2.4?". Antwoord: staat er niet
+in. Correct, en niemand werd er wijzer van — die clausule bestaat niet in ISO 27001:2022. Annex
+A kent **8.24**, en daar hingen op dat moment 24 documenten aan.
+
+Nu drie te onderscheiden uitkomsten in plaats van één tekst die ze alle drie toedekt:
+
+| geval | antwoord |
+|---|---|
+| clausule bestaat niet in deze norm | dat wordt gezegd, met een suggestie |
+| clausule bestaat, niets aan gekoppeld | de normtekst met `bewijslast` gaat mee — een dekkingsgat is een bevinding in de dop |
+| geen clausule in de vraag | de algemene "staat er niet in" |
+
+De suggestie is een cijfervergelijking en geen gelijkenis-maat: `8.2.4` en `8.24` hebben dezelfde
+cijferreeks zonder punten, dus dat is een kandidaat. Bewust geen drempel — "0.83 leek genoeg" is
+geen antwoord aan een auditor, dezelfde weigering als bij de dedup-sleutel in `api/runs.py`.
+
+Dit was precies de vraag die taak 8.2 van `iso-agents` openhield ("is 'staat er niet in' te
+streng?"). Het antwoord uit het eerste gebruik: op dit punt wel, en alleen echt gebruik bracht
+het aan het licht.
+
 ### Added — 2026-08-20 — de Bronbevrager: het corpus is bevraagbaar, zonder oordeel
 
 Eerste agent van change `iso-agents` (21 van de 40 taken). Het portaal kon een audit draaien

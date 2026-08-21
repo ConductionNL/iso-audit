@@ -81,6 +81,8 @@ class Corpus:
     clausules_in_vraag: tuple[str, ...] = ()
     via_clausule: bool = False
     afgekapt: dict[str, int] = field(default_factory=dict)
+    onbekende_clausules: tuple[str, ...] = ()
+    suggesties: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def ids(self) -> set[str]:
@@ -216,6 +218,22 @@ def _kap_af(rijen: list[sqlite3.Row], grens: int, soort: str, corpus: Corpus) ->
     return rijen
 
 
+def gelijkende_clausules(clausule: str, norm: str) -> list[str]:
+    """Bekende clausules met dezelfde cijfers als `clausule`, zonder de punten.
+
+    Deterministisch en in één regel uit te leggen: `8.2.4` en `8.24` hebben dezelfde
+    cijferreeks, dus dat is een kandidaat. Bewust géén gelijkenis-drempel of afstandsmaat —
+    "0.83 leek genoeg" is geen antwoord aan een auditor, dezelfde weigering als bij de
+    dedup-sleutel in `api/runs.py`.
+
+    Dit bestaat omdat de eerste echte vraag in het portaal (2026-08-21) `8.2.4` was, wat in
+    ISO 27001:2022 niet bestaat — Annex A kent `8.24`. De assistent antwoordde correct "staat
+    er niet in", en verzweeg daarmee dat de clausule zelf niet bestaat.
+    """
+    doel = clausule.replace(".", "")
+    return [c for c in normteksten.available(norm) if c.replace(".", "") == doel and c != clausule]
+
+
 def _normtekst_bronnen(clausules: tuple[str, ...], norm: str) -> list[Bron]:
     bronnen: list[Bron] = []
     for clausule in clausules:
@@ -296,4 +314,18 @@ def haal_bronnen_op(conn: sqlite3.Connection, vraag: str, *, norm: str = "27001"
         )
 
     corpus.bronnen.extend(_normtekst_bronnen(clausules, norm))
+
+    # Een clausule uit de vraag die de norm niet kent én waar niets aan gekoppeld is: dat is
+    # een ander antwoord dan "geen bewijs gevonden", en het verschil hoort de auditor te zien.
+    onbekend: list[str] = []
+    for clausule in clausules:
+        if normteksten.lookup(norm, clausule) is not None:
+            continue
+        if any(clausule in b.clausules for b in corpus.bronnen):
+            continue
+        onbekend.append(clausule)
+        kandidaten = gelijkende_clausules(clausule, norm)
+        if kandidaten:
+            corpus.suggesties[clausule] = kandidaten
+    corpus.onbekende_clausules = tuple(onbekend)
     return corpus

@@ -60,6 +60,34 @@ GEEN_DEKKING = (
 een model dat mag uitleggen dat het niets weet, legt in de praktijk alsnog uit wat de norm
 volgens hem eist."""
 
+
+def geen_dekking_tekst(corpus: Corpus, norm: str) -> str:
+    """De tekst bij een leeg corpus — met de reden erbij als die vast te stellen is.
+
+    Drie gevallen die verschillende dingen betekenen, en "staat er niet in" dekt ze alle
+    drie toe: de clausule bestaat niet in deze norm (een typefout), de clausule bestaat maar
+    er is niets aan gekoppeld (een dekkingsgat, en dus een auditbevinding in de dop), of de
+    vraag had geen clausule en de tekstzoekopdracht leverde niets op.
+
+    Alleen een oorzaak noemen die is vastgesteld — een verzonnen oorzaak stuurt de auditor
+    net zo hard het verkeerde bos in als geen melding. Zelfde regel als bij de
+    locatiestatus in `sources/drive.py`.
+    """
+    if not corpus.onbekende_clausules:
+        return GEEN_DEKKING
+    delen: list[str] = []
+    for clausule in corpus.onbekende_clausules:
+        suggestie = corpus.suggesties.get(clausule)
+        if suggestie:
+            delen.append(
+                f"Clausule {clausule} bestaat niet in ISO {norm}. Bedoelde je "
+                f"{' of '.join(suggestie)}?"
+            )
+        else:
+            delen.append(f"Clausule {clausule} bestaat niet in ISO {norm}.")
+    return " ".join(delen) + " " + GEEN_DEKKING
+
+
 SYSTEEM = """Je bent de Bronbevrager in een ISO-auditwerktuig. Je antwoordt de auditor in \
 het Nederlands, kort en zakelijk.
 
@@ -213,10 +241,13 @@ def beantwoord(
     if corpus.is_leeg():
         # Geen aanroep: een antwoord zonder bronnen kan niet uit de bronnen komen. Dat is
         # met een `if` af te dwingen en niet met een verzoek aan het model.
-        logger.info("Assistent: geen dekking in het corpus voor deze vraag")
+        logger.info(
+            "Assistent: geen dekking in het corpus voor deze vraag (onbekende clausules: %s)",
+            ", ".join(corpus.onbekende_clausules) or "geen",
+        )
         return Assistentantwoord(
             vraag=vraag,
-            antwoord=GEEN_DEKKING,
+            antwoord=geen_dekking_tekst(corpus, norm),
             model=gekozen,
             via_clausule=corpus.via_clausule,
             geen_dekking=True,

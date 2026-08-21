@@ -48,8 +48,13 @@
 - [x] 7.2 CHANGELOG-regel met de motivatie
 - [ ] 8.1 In het cluster verifiëren met drie vragen: één met dekking, één zonder, en één waar
       document en bevinding elkaar tegenspreken
-- [ ] 8.2 **Voorleggen aan Mark:** is "staat er niet in" in de praktijk bruikbaar of te streng?
-      Dat is de enige ontwerpkeuze die pas in gebruik te beoordelen is
+- [x] 8.2 **Beantwoord door het eerste gebruik (2026-08-21):** te streng op één punt. De
+      vraag was "welk bewijs hebben we voor 8.2.4?"; die clausule bestaat niet in ISO
+      27001:2022 (Annex A kent 8.24, met 24 gekoppelde documenten). "Staat er niet in" was
+      correct en verzweeg dat de clausule zelf niet bestaat. Nu drie te onderscheiden
+      uitkomsten: clausule bestaat niet (met een suggestie op gelijke cijferreeks), clausule
+      bestaat zonder gekoppeld bewijs (een dekkingsgat, dus de normtekst met bewijslast gaat
+      mee), of geen clausule in de vraag. Of de rest te streng is, blijft in gebruik te zien
 
 ## Normuitlegger (agent 2)
 

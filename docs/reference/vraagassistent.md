@@ -1,6 +1,6 @@
 ---
 status: current
-last_reviewed: 2026-08-20
+last_reviewed: 2026-08-21
 ---
 
 # Vraagassistent — de Bronbevrager
@@ -61,6 +61,25 @@ Twee harde maatregelen, want de systeem-prompt is een instructie en geen garanti
 Die tweede is het verschil tussen "we hebben het gevraagd" en "we hebben het gecontroleerd" —
 dezelfde discipline als bij de classificatie, waar een onleesbaar of afgekapt antwoord sinds
 2026-08-17 ook geen leeg oordeel meer is.
+
+## "Staat er niet in" — met de reden erbij
+
+Drie uitkomsten die verschillende dingen betekenen, en één tekst zou ze alle drie toedekken:
+
+| geval | antwoord |
+|---|---|
+| de clausule bestaat niet in deze norm | dat wordt gezegd, met een suggestie als er een clausule met dezelfde cijferreeks bestaat |
+| de clausule bestaat, er is niets aan gekoppeld | de normtekst met `bewijslast` gaat mee — een dekkingsgat is een auditbevinding in de dop, geen leeg antwoord |
+| geen clausule in de vraag, tekstzoekopdracht leeg | de algemene "staat er niet in" |
+
+De suggestie is een cijfervergelijking en geen gelijkenis-maat: `8.2.4` en `8.24` hebben
+dezelfde cijferreeks zonder punten, dus dat is een kandidaat. Bewust geen drempel — "0.83 leek
+genoeg" is geen antwoord aan een auditor, dezelfde weigering als bij de dedup-sleutel in
+`api/runs.py`.
+
+Dit staat er omdat de eerste echte vraag in het portaal (2026-08-21) `8.2.4` was. Die clausule
+bestaat niet in ISO 27001:2022; Annex A kent `8.24`, en daar hingen 24 documenten aan. Het
+antwoord "staat er niet in" was juist en hielp niemand.
 
 ## Waarom er niet geciteerd wordt
 
