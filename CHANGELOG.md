@@ -6,6 +6,25 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-21 — stap 7/7 viel om op een document zonder wijzigingsdatum
+
+De run haalde de hele classificatie (118 documenten, 1480 bevindingen, $0,6943, nul fouten) en
+strandde toen in stap 7/7:
+
+    TypeError: '<' not supported between instances of 'NoneType' and 'str'
+
+`local_report.py` sorteerde de gearchiveerde documenten met
+`key=lambda d: d.get("modified_at", "")`. Die default doet niets als de sleutel **bestaat** met
+waarde `None`, en Drive geeft niet voor elk bestand een `modifiedTime`. Sinds de
+dekkingsuitbreiding van 18-08 komen zulke bestanden ook echt in het landschap, dus wat eerst
+theorie was is nu een run die omvalt. Elders in de pipeline stond al `or ""` — dezelfde regel
+staat nu ook hier, en in `sources/drive.py` waar `laatst_gewijzigd` gevuld wordt.
+
+Wat er niet verloren ging: de 1480 bevindingen en 119 classificatie-records staan in de DB.
+Een volgende run slaat de API-calls over (`rehash=False` dedupliceert op `classifications`) en
+gaat direct naar de rapportage. De classificatiekosten zijn dus eenmalig gemaakt, niet
+weggegooid.
+
 ### Changed — 2026-08-21 — "mogelijk een scan" werd een feit in plaats van een vermoeden
 
 `Actiepunten uit Waveland.docx` bleef ook na de tabellenfix nul tekens opleveren. Uitgezocht met

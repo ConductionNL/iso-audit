@@ -247,6 +247,34 @@ def test_schrijf_rapport_gearchiveerd_sectie(tmp_path: Path) -> None:
     assert "2023-01-15" in md
 
 
+def test_schrijf_rapport_gearchiveerd_zonder_datum(tmp_path: Path) -> None:
+    """Een document zonder `modified_at` mag het rapport niet laten klappen.
+
+    Gemeten op 2026-08-21: stap 7/7 viel om met
+    `TypeError: '<' not supported between instances of 'NoneType' and 'str'`, ná 118
+    classificaties en $0,69. Oorzaak: `d.get("modified_at", "")` geeft **None** terug als de
+    sleutel bestaat met waarde None, en Drive levert geen `modifiedTime` voor elk bestand.
+    Sinds de dekkingsuitbreiding van 18-08 komen zulke bestanden ook echt in het landschap.
+    """
+    gearchiveerd = [
+        {"id": "d1", "naam": "Oud beleid", "modified_at": "2023-01-15T10:00:00Z"},
+        {"id": "d2", "naam": "Zonder datum", "modified_at": None},
+        {"id": "d3", "naam": "Sleutel ontbreekt"},
+    ]
+    pad = local_report.schrijf_rapport(
+        bevindingen=[],
+        ontbrekende_clausules=[],
+        handmatige_review=[],
+        management_summary="",
+        norm="9001",
+        output_dir=str(tmp_path),
+        gearchiveerd=gearchiveerd,
+    )
+    md = Path(pad).read_text(encoding="utf-8")
+    for naam in ("Oud beleid", "Zonder datum", "Sleutel ontbreekt"):
+        assert naam in md
+
+
 def test_schrijf_rapport_scherpte_in_bestandsnaam(tmp_path: Path) -> None:
     pad = local_report.schrijf_rapport(
         bevindingen=[],

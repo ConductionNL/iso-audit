@@ -401,7 +401,9 @@ class DriveSource:
                     titel=naam,
                     bron="drive",
                     type=ONDERSTEUNDE_MIME_TYPES[mime],
-                    laatst_gewijzigd=bestand.get("modifiedTime", ""),
+                    # `or ""`: een ontbrekende `modifiedTime` komt als None terug, en een
+                    # None in een datumveld klapt verderop in een sortering.
+                    laatst_gewijzigd=bestand.get("modifiedTime") or "",
                     inhoud_uri=file_id,
                 )
         logger.info(
