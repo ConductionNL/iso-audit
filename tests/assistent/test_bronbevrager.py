@@ -195,14 +195,23 @@ def test_antwoord_met_onbekend_bron_id_is_een_storing(conn: sqlite3.Connection) 
         assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
 
 
-def test_antwoord_zonder_verwijzing_is_een_storing(conn: sqlite3.Connection) -> None:
-    """Zonder verwijzing is er niets na te trekken — en juist zo ziet modelkennis eruit."""
+def test_antwoord_zonder_verwijzing_wordt_vervangen(conn: sqlite3.Connection) -> None:
+    """Niet weigeren en niet waarschuwen: vervangen.
+
+    Weigeren liet een eerlijk "dit staat er niet in" falen. Een merkteken dat het model moet
+    zetten werkte zolang het zich eraan hield — en dat deed het niet. Vervangen dekt beide
+    gevallen tegelijk en hangt niet af van medewerking van het model.
+    """
     _document(conn, "d1", "Cryptobeleid.docx")
     _koppel(conn, "d1", "8.24")
-    client = _Client("Ja, dat is geregeld.")
+    client = _Client("Ja, dat is allemaal netjes geregeld.")
 
-    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="merkteken"):
-        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+    uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+    assert uit.antwoord == assistent.ONVERIFIEERBAAR
+    assert uit.onverifieerbaar is True
+    assert "netjes geregeld" not in uit.antwoord, "de prose van het model bereikt de auditor niet"
+    assert uit.ruw_antwoord == "Ja, dat is allemaal netjes geregeld.", "wél in de trail"
 
 
 def test_antwoord_met_niet_meegegeven_clausule_is_een_storing(conn: sqlite3.Connection) -> None:
@@ -384,36 +393,44 @@ def test_zonder_clausule_blijft_de_algemene_tekst(conn: sqlite3.Connection) -> N
 # stond, en had daarmee niets om naar te verwijzen. De controle weigerde een eerlijk antwoord.
 
 
-def test_niets_gevonden_merkteken_maakt_een_antwoord_zonder_verwijzing_geldig(
+def test_leeg_corpus_en_onverifieerbaar_zijn_twee_verschillende_dingen(
     conn: sqlite3.Connection,
 ) -> None:
+    """Geen bronnen gevonden is iets anders dan bronnen die de vraag niet beantwoorden.
+
+    Het eerste bevraagt geen model; het tweede wel, en het antwoord blijkt dan niet na te
+    trekken. Beide teksten zeggen iets anders tegen de auditor.
+    """
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+
+    leeg = assistent.beantwoord(conn, "Wat is de beste encryptie?", client=_Client("x"))
+    assert leeg.geen_dekking is True and leeg.onverifieerbaar is False
+
+    met_bronnen = assistent.beantwoord(
+        conn, "Staat er iets over catering in 8.24?", client=_Client("Nee, niets.")
+    )
+    assert met_bronnen.geen_dekking is False and met_bronnen.onverifieerbaar is True
+
+
+def test_eerlijk_niet_gevonden_levert_dezelfde_vaste_tekst(conn: sqlite3.Connection) -> None:
+    """Een eerlijk "niet gevonden" en een bewering uit modelkennis komen op hetzelfde neer.
+
+    Beide zijn niet na te trekken, dus beide leveren de vaste tekst. Dat is het punt: het
+    onderscheid is van buitenaf niet te maken, dus het tool doet alsof het dat kan.
+    """
     _document(conn, "d1", "Cryptobeleid.docx")
     _koppel(conn, "d1", "8.24")
     client = _Client(f"Hierover staat niets in de bronnen. {assistent.NIETS_GEVONDEN}")
 
-    # Een clausulevraag, zodat er wél bronnen meegaan: het gaat om het geval waarin de
-    # bronnen bestaan maar de vraag niet beantwoorden. Een lege corpus is het andere pad.
     uit = assistent.beantwoord(conn, "Staat er iets over catering in 8.24?", client=client)
 
-    assert uit.gebruikt == []
-    assert assistent.NIETS_GEVONDEN in uit.antwoord
-    assert uit.geen_dekking is False, "er waren wél bronnen; ze pasten alleen niet"
+    assert uit.antwoord == assistent.ONVERIFIEERBAAR
+    assert uit.onverifieerbaar is True
 
 
-def test_zonder_verwijzing_en_zonder_merkteken_blijft_een_storing(
-    conn: sqlite3.Connection,
-) -> None:
-    """De uitzondering mag geen gat worden: een bewering zonder spoor blijft geweigerd."""
-    _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
-    client = _Client("Ja, dat is allemaal netjes geregeld.")
-
-    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="merkteken"):
-        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
-
-
-def test_merkteken_dekt_geen_verzonnen_bron(conn: sqlite3.Connection) -> None:
-    """Merkteken én een onbekende verwijzing: de verwijzingscontrole gaat voor."""
+def test_verzonnen_bron_blijft_een_storing(conn: sqlite3.Connection) -> None:
+    """Vervangen geldt voor geen verwijzing; een verzónnen verwijzing blijft geweigerd."""
     _document(conn, "d1", "Cryptobeleid.docx")
     _koppel(conn, "d1", "8.24")
     client = _Client(f"Niets gevonden {assistent.NIETS_GEVONDEN}, zie wel [bron:d-verzonnen].")
@@ -422,9 +439,9 @@ def test_merkteken_dekt_geen_verzonnen_bron(conn: sqlite3.Connection) -> None:
         assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
 
 
-def test_de_prompt_legt_het_merkteken_op() -> None:
+def test_de_prompt_noemt_het_merkteken_en_de_vervanging() -> None:
     assert assistent.NIETS_GEVONDEN in assistent.SYSTEEM
-    assert "geweigerd" in assistent.SYSTEEM
+    assert "vervangen" in assistent.SYSTEEM
 
 
 def test_meerdere_bronnen_in_een_merkteken(conn: sqlite3.Connection) -> None:
@@ -453,7 +470,47 @@ def test_een_onbekend_id_in_een_groep_blijft_een_storing(conn: sqlite3.Connectio
         assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
 
 
+def test_bronnen_gescheiden_door_het_woord_en(conn: sqlite3.Connection) -> None:
+    """Het model antwoordt in het Nederlands en schrijft `[bron:a en b]`.
+
+    Gemeten tegen het echte corpus op 2026-08-22, nadat de komma-splitsing al was gerepareerd:
+    twee geldige ID's werden als één onbekend ID geweigerd.
+    """
+    for i in (1, 2):
+        _document(conn, f"d{i}", f"Doc {i}.docx")
+        _koppel(conn, f"d{i}", "8.24")
+    client = _Client("Beide rapporten dekken dit [bron:d1 en d2].")
+
+    uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+    assert uit.gebruikt == ["d1", "d2"]
+
+
+def test_herhaald_bron_voorvoegsel_binnen_een_merkteken(conn: sqlite3.Connection) -> None:
+    """Het model schrijft `[bron:a, bron:b]` — het voorvoegsel herhaald binnen één merkteken.
+
+    Derde vormvariant die pas tegen het echte model boven water kwam, na de komma-lijst en het
+    woord "en". Elke keer geldige verwijzingen die als verzonnen werden geweigerd.
+    """
+    for i in (1, 2):
+        _document(conn, f"d{i}", f"Doc {i}.docx")
+        _koppel(conn, f"d{i}", "8.24")
+    client = _Client("Zie [bron:d1, bron:d2].")
+
+    uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+    assert uit.gebruikt == ["d1", "d2"]
+
+
+def test_een_id_met_en_erin_valt_niet_uiteen() -> None:
+    """Woordgrenzen: `1eDQv1pQ8r2Sv...` bevat "en" maar is één ID — die bestaat echt."""
+    assert assistent._bron_ids("[bron:1eDQv1pQ8r2SvfPmizc6-KG2MHGnFgNwS]") == [
+        "1eDQv1pQ8r2SvfPmizc6-KG2MHGnFgNwS"
+    ]
+
+
 def test_bron_ids_negeert_lege_stukken() -> None:
     assert assistent._bron_ids("[bron:a, , b]") == ["a", "b"]
+    assert assistent._bron_ids("[bron:a; b & c]") == ["a", "b", "c"]
     assert assistent._bron_ids("[bron: a ][bron:a]") == ["a"], "dubbel telt één keer"
     assert assistent._bron_ids("geen merkteken") == []

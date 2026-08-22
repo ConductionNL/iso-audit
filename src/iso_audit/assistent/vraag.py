@@ -114,8 +114,8 @@ de eerdere oordelen met hun bron; de auditor beslist. Je stelt geen bevinding en
 classificatie voor.
 
 Beantwoorden de meegegeven bronnen de vraag niet, dan zeg je dat en zet je het merkteken \
-[niets-gevonden] in je antwoord. Doe dat alleen dán: het is het signaal dat er niets na te \
-trekken valt, en zonder verwijzing én zonder merkteken wordt je antwoord geweigerd.
+[niets-gevonden] in je antwoord. Een antwoord zonder enige verwijzing wordt hoe dan ook \
+vervangen door een vaste tekst — er valt dan niets na te trekken — dus verwijs waar je kunt.
 
 Je antwoord is een aanwijzing naar bewijs, niet het bewijs zelf."""
 
@@ -148,6 +148,13 @@ class Assistentantwoord:
     via_clausule: bool = False
     afgekapt: dict[str, int] = field(default_factory=dict)
     geen_dekking: bool = False
+    onverifieerbaar: bool = False
+    """Het model antwoordde zonder verwijzing; de auditor ziet `ONVERIFIEERBAAR`."""
+    ruw_antwoord: str = ""
+    """Wat het model zei toen het antwoord niet na te trekken was.
+
+    Niet getoond, wel vastgelegd: wat het model zei is onderdeel van hoe het oordeel tot stand
+    kwam, en een auditor mag dat later kunnen nazien."""
 
     def als_record(self) -> dict[str, Any]:
         return {
@@ -162,8 +169,31 @@ class Assistentantwoord:
             "via_clausule": self.via_clausule,
             "afgekapt": dict(self.afgekapt),
             "geen_dekking": self.geen_dekking,
+            "onverifieerbaar": self.onverifieerbaar,
+            "ruw_antwoord": self.ruw_antwoord,
         }
 
+
+ONVERIFIEERBAAR = (
+    "De bronnen die ik bij deze vraag kon vinden, beantwoorden hem niet. Ik toon geen "
+    "antwoord dat nergens naar verwijst: dan is er niets na te trekken, en juist zo ziet een "
+    "antwoord uit modelkennis eruit."
+)
+"""Wat de auditor ziet als het antwoord nergens naar verwijst.
+
+**Vervangen en niet weigeren, en zeker niet tonen met een waarschuwing.** Drie vormen zijn
+geprobeerd en de eerste twee waren fout:
+
+1. *Weigeren* (2026-08-22, eerste versie): een eerlijk "dit staat er niet in" heeft geen bron om
+   naar te verwijzen, en werd daarmee als storing afgewezen. Twee van drie echte vragen faalden.
+2. *Een merkteken dat het model moet zetten*: werkt zolang het model zich eraan houdt, en dat
+   deed het niet. Een instructie is geen garantie — dezelfde les als bij de verwijzingen zelf.
+3. *Vervangen*: is het antwoord niet na te trekken, dan komt de tekst van het model er niet in.
+   Deterministisch, en het dekt beide gevallen tegelijk: een eerlijk "niet gevonden" én een
+   antwoord uit modelkennis leveren allebei deze tekst op.
+
+De tekst van het model gaat wél naar de trail (`ruw_antwoord`), want wat het zei is onderdeel van
+hoe het oordeel tot stand kwam."""
 
 NIETS_GEVONDEN = "[niets-gevonden]"
 """Merkteken dat het model zet als de meegegeven bronnen de vraag niet beantwoorden.
@@ -179,6 +209,12 @@ tweede, onbetrouwbare administratie van hoe het model zich uitdrukt. Eén afgesp
 is deterministisch, en de controle blijft daarmee een controle in plaats van een gok."""
 
 _BRONMARKERING = re.compile(r"\[bron:([^\]]+)\]")
+_VOORVOEGSEL = re.compile(r"^bron:\s*", re.IGNORECASE)
+_SCHEIDING = re.compile(r"\s*(?:,|;|\ben\b|&)\s*")
+"""Waarop een groep bron-ID's uiteenvalt.
+
+`\ben\b` met woordgrenzen: een ID dat toevallig "en" bevat (`1eDQv1pQ8r2Sv...`) mag niet
+uiteenvallen. Nagemeten tegen het echte corpus — die ID's bestaan echt."""
 _CLAUSULE_IN_ANTWOORD = re.compile(r"\b(\d{1,2}(?:\.\d{1,2}){1,3})\b")
 
 
@@ -212,16 +248,22 @@ def _bron_ids(antwoord: str) -> list[str]:
     2026-08-22 tegen het echte corpus: twaalf geldige ID's plus een normtekst werden als één
     onbekend ID gelezen, en het antwoord werd geweigerd als verzonnen terwijl elk ID bestond.
 
-    Splitsen op komma en witruimte strippen maakt de controle tolerant voor die vorm zonder
-    hem zwakker te maken: élk los ID moet daarna nog steeds in het meegegeven corpus zitten.
-    Een strengere prompt ("één bron per merkteken") zou hetzelfde willen bereiken door het
-    model iets te vragen in plaats van door het te controleren — dat is precies de omgekeerde
-    volgorde.
+    Splitsen op komma, puntkomma én het woord "en" — dat laatste omdat het model in het
+    Nederlands antwoordt en `[bron:a en b]` schrijft. Ook dat kwam pas boven water tegen het
+    echte model (2026-08-22, tweede keer).
+
+    Tolerant voor de vorm, niet voor de inhoud: élk los ID moet daarna nog steeds in het
+    meegegeven corpus zitten. Een strengere prompt ("één bron per merkteken") zou hetzelfde
+    willen bereiken door het model iets te vragen in plaats van door het te controleren — dat
+    is precies de omgekeerde volgorde.
     """
     uniek: list[str] = []
     for groep in _BRONMARKERING.findall(antwoord):
-        for ruw in str(groep).split(","):
-            bron_id = ruw.strip()
+        for ruw in _SCHEIDING.split(str(groep)):
+            # Het voorvoegsel eraf: het model herhaalt het binnen één merkteken
+            # (`[bron:a, bron:b]`). Derde vormvariant die pas tegen het echte model boven
+            # water kwam, na de komma-lijst en het woord "en".
+            bron_id = _VOORVOEGSEL.sub("", ruw.strip()).strip()
             if bron_id and bron_id not in uniek:
                 uniek.append(bron_id)
     return uniek
@@ -234,11 +276,9 @@ def verifieer_verwijzingen(antwoord: str, corpus: Corpus) -> list[str]:
     verwijzing naar een bron die niet is meegegeven, of naar een clausule die in geen enkele
     meegegeven bron voorkomt.
 
-    Een antwoord zónder verwijzing is een storing — dan is er niets na te trekken, en juist
-    zo ziet een antwoord uit modelkennis eruit. **Behalve** als het model `NIETS_GEVONDEN`
-    heeft gezet: dan zegt het dat de meegegeven bronnen de vraag niet beantwoorden, en dan is
-    er niets om naar te verwijzen. Zonder die uitzondering weigerde de controle op 2026-08-22
-    twee van drie eerlijke antwoorden tegen het echte corpus.
+    Een lege lijst is een geldige uitkomst: het antwoord verwijst nergens naar. Wat er dán
+    gebeurt beslist `beantwoord()` — niet door de prose van het model te vertrouwen, maar door
+    hem te vervangen. Zie `ONVERIFIEERBAAR`.
     """
     gebruikt = _bron_ids(antwoord)
     onbekend = sorted({g for g in gebruikt if g not in corpus.ids})
@@ -246,11 +286,7 @@ def verifieer_verwijzingen(antwoord: str, corpus: Corpus) -> list[str]:
         raise AntwoordOnverifieerbaarError(
             f"antwoord verwijst naar bronnen die niet zijn meegegeven: {', '.join(onbekend)}"
         )
-    if not gebruikt and NIETS_GEVONDEN not in antwoord:
-        raise AntwoordOnverifieerbaarError(
-            "antwoord bevat geen bronverwijzing en geen "
-            f"{NIETS_GEVONDEN}-merkteken; niets om na te trekken"
-        )
+
     toegestaan = corpus.genoemde_clausules | set(corpus.clausules_in_vraag)
     verzonnen = sorted({c for c in _CLAUSULE_IN_ANTWOORD.findall(antwoord) if c not in toegestaan})
     if verzonnen:
@@ -318,6 +354,21 @@ def beantwoord(
 
     tekst = tekst_uit(resp)
     gebruikt = verifieer_verwijzingen(tekst, corpus)
+    if not gebruikt:
+        # Niet na te trekken: de tekst van het model bereikt de auditor niet. Zie
+        # `ONVERIFIEERBAAR` voor waarom vervangen en niet weigeren of waarschuwen.
+        logger.info("Assistent: antwoord zonder verwijzing vervangen door de vaste tekst")
+        return Assistentantwoord(
+            vraag=vraag,
+            antwoord=ONVERIFIEERBAAR,
+            ruw_antwoord=tekst,
+            meegegeven=list(corpus.bronnen),
+            model=gekozen,
+            usd=teller.kosten_usd(),
+            via_clausule=corpus.via_clausule,
+            afgekapt=dict(corpus.afgekapt),
+            onverifieerbaar=True,
+        )
     return Assistentantwoord(
         vraag=vraag,
         antwoord=tekst,

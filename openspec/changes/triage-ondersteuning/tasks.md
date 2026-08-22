@@ -35,28 +35,37 @@ een probleem te verzachten dat deterministisch op te lossen was.
 
 ## 3. Laag 2 — de agent die voorbereidt
 
-- [ ] 3.1 Per clausule de `bewijslast` uit `data/normteksten` naast de gekoppelde documenten,
+- [x] 3.1 Per clausule de `bewijslast` uit `data/normteksten` naast de gekoppelde documenten,
       bevindingen en opvolgpunten leggen
-- [ ] 3.2 Resultaat: `bewijs_aanwezig`, `bewijs_ontbreekt`, `tegenspraak`, `waarom_nu` — elk
-      met bronverwijzing, via de verificatie uit `assistent/vraag.py`
-- [ ] 3.3 **Geen `voorstel`-veld**, en een test die faalt als het er komt
-- [ ] 3.4 Hergebruik van de Bronbevrager: dezelfde bronregel en dezelfde weigering om uit
+- [x] 3.2 Resultaat: `bewijs_aanwezig`, `bewijs_ontbreekt`, `tegenspraak`, `waarom_nu` — elk
+      met bronverwijzing, via de verificatie uit `assistent/vraag.py`. Plus een controle dat de
+      genoemde bewijslast **letterlijk** in de norm staat: een eis die het model erbij verzint
+      hoort niet in een auditdossier
+- [x] 3.3 **Geen `voorstel`-veld**, en een test die faalt als het er komt
+- [x] 3.4 Hergebruik van de Bronbevrager: dezelfde bronregel en dezelfde weigering om uit
       modelkennis te antwoorden
-- [ ] 3.5 Test: de agent schrijft geen triage-status en geen classificatie
-- [ ] 3.6 Test: ontbrekend bewijs komt als constatering, niet als NC
+- [x] 3.5 Test: de agent schrijft geen triage-status en geen classificatie
+- [x] 3.6 Test: ontbrekend bewijs komt als constatering, niet als NC
 
 ## 4. Ordening
 
-- [ ] 4.1 Ordening op aandacht, met per regel de reden zichtbaar
-- [ ] 4.2 Terug naar clausule-orde met één handeling
-- [ ] 4.3 Contract-test: de reden staat in de UI en de omschakeling bestaat
+- [x] 4.1 Ordening op aandacht, met per regel de reden zichtbaar. **Berekend en niet gevraagd**:
+      het model levert feiten per clausule, de sortering gebeurt op dekkingsgraad en aantal
+      tegenspraken. Een ordening die het model verzint is niet na te rekenen
+- [x] 4.2 Terug naar clausule-orde met één handeling
+- [ ] 4.3 Contract-test: de reden staat in de UI en de omschakeling bestaat. **Nog niet
+      gedaan** — de agent en de ordening bestaan, het scherm nog niet
 
 ## 5. Preflight en documentatie
 
-- [ ] 5.1 Component `triage-agent` in `scripts/preflight.py` (betaald), tegen het echte corpus
+- [x] 5.1 Component `triage-agent` in `scripts/preflight.py` (betaald), gedraaid tegen het
+      echte corpus in het cluster: clausule 5.12, 25 bronnen, 3 bewijslast-items, $0,0051. Die
+      run vond twee fouten: de dekkingsgraad telde rijen in plaats van verschillende items (9.2
+      meldde "2 van 8" terwijl de norm er vier kent), en de check koos een clausule zonder
+      bewijslast en slaagde dus leeg
 - [ ] 5.2 `docs/reference/triage.md`: wat er niet meetelt en waarom, hoe samenvouwen werkt, en
       waar de grens van de agent ligt
-- [ ] 5.3 CHANGELOG met de meting: 462 van 1241 uit eigen output, 264 exacte duplicaten
+- [x] 5.3 CHANGELOG met de meting: 462 van 1241 uit eigen output, 264 exacte duplicaten
 
 ## 6. Aan de opdrachtgever
 

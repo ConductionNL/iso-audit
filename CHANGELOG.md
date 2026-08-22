@@ -6,6 +6,54 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-22 — de clausule-agent: voorbereiden, niet oordelen
+
+Per clausule zet hij de `bewijslast` uit de norm naast wat er in het landschap zit: welk verwacht
+bewijsstuk is gedekt (met verwijzing), welk niet, welke bronnen elkaar tegenspreken, en waarom
+deze clausule aandacht verdient.
+
+**Wat hij niet doet: een triage-status voorstellen.** `VERBODEN_VELDEN` weigert `voorstel`,
+`classificatie`, `oordeel`, `advies`, `triage` en `aanbeveling` in het antwoord, met een test die
+faalt als iemand die grens oprekt. Een voorgestelde klasse maakt van beoordelen bevestigen.
+
+Twee controles bovenop de prompt, om dezelfde reden als bij de Bronbevrager — een instructie is
+geen garantie: elk genoemd bewijslast-item moet **letterlijk** in de norm staan, en elke bron in
+het meegegeven corpus.
+
+De **ordening** is berekend, niet gevraagd: het model levert feiten per clausule, de sortering
+gebeurt hier op dekkingsgraad en aantal tegenspraken. Een ordening die het model zelf verzint is
+niet na te rekenen; deze wel, en per regel staat de reden erbij.
+
+Gedraaid tegen het echte model en corpus (~$0,005 per clausule; 86 clausules ≈ $0,45). Bij 9.2
+vond hij een echt auditinzicht: individuele auditplannen per fase zijn er wél, een **jaarlijks
+intern auditprogramma** niet. Die run vond ook een defect: de dekkingsgraad telde **rijen** in
+plaats van verschillende bewijslast-items — het model levert één rij per bron, dus 9.2 meldde "2
+van 8 bewijsstukken niet gevonden" terwijl de norm er vier kent.
+
+### Changed — 2026-08-22 — een onverifieerbaar antwoord wordt vervangen, niet geweigerd
+
+Derde en laatste vorm van hetzelfde probleem, en de eerste twee waren fout.
+
+Een antwoord zonder bronverwijzing kan twee dingen zijn: een eerlijk "dit staat niet in deze
+bronnen", of een bewering uit modelkennis. **Van buitenaf is dat onderscheid niet te maken.**
+
+1. *Weigeren* (eerste versie): liet twee van drie echte vragen falen met een 502, terwijl het
+   model correct antwoordde.
+2. *Een merkteken dat het model zet*: werkte zolang het model zich eraan hield. Tegen het echte
+   model deed het dat niet.
+3. *Vervangen*: verwijst het antwoord nergens naar, dan ziet de auditor een vaste tekst en niet
+   de prose van het model. Deterministisch, dekt beide gevallen, en hangt niet af van
+   medewerking. Wat het model zei gaat wél naar de trail (`ruw_antwoord`) — dat is onderdeel van
+   hoe het oordeel tot stand kwam.
+
+Daarnaast twee nieuwe vormvarianten die het model gebruikt en die geldige verwijzingen als
+verzonnen lieten afwijzen: `[bron:a en b]` met het Nederlandse "en" als scheidingsteken, en
+`[bron:a, bron:b]` met het voorvoegsel herhaald binnen één merkteken. Beide gesplitst, met
+woordgrenzen zodat een ID dat "en" bevat heel blijft — die bestaan echt in de Drive-ID's.
+
+Elk van deze drie kwam alleen boven water door tegen het echte model te draaien. Een stub
+antwoordt zoals de test wil.
+
 ### Added — 2026-08-22 — interviewvoorstellen: 14 clausules, 42 vragen, geen verzonnen namen
 
 Waar geen documentbewijs is, stelt het tool nu een gesprek voor: per ongedekte clausule één vraag

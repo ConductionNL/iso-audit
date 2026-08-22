@@ -409,12 +409,87 @@ def check_assistent_api() -> str:
         conn, f"Staat er iets over onze cateringleverancier in {clausule}?"
     )
     conn.close()
-    if not met.gebruikt:
-        raise RuntimeError(f"vraag met dekking ({clausule}) leverde geen bronverwijzing op")
+
+    # De invariant is niet "er komen verwijzingen uit" — of het corpus die vraag beantwoordt,
+    # ligt aan het corpus. De invariant is dat de auditor **nooit onverifieerbare prose ziet**:
+    # elk antwoord verwijst, óf is vervangen door de vaste tekst, óf had geen bronnen.
+    for label, uit in (("met dekking", met), ("zonder dekking", zonder)):
+        veilig = bool(uit.gebruikt) or uit.onverifieerbaar or uit.geen_dekking
+        if not veilig:
+            raise RuntimeError(f"vraag {label}: antwoord zonder verwijzing én niet vervangen")
+        if uit.onverifieerbaar and uit.antwoord != assistent.ONVERIFIEERBAAR:
+            raise RuntimeError(f"vraag {label}: onverifieerbaar maar toont eigen tekst")
+
+    hoe = "met verwijzing" if met.gebruikt else "vervangen (bronnen beantwoorden de vraag niet)"
     return (
-        f"clausule {clausule}: {len(met.meegegeven)} bronnen, {len(met.gebruikt)} gebruikt; "
-        f"vraag zonder dekking kwam door de controle; "
+        f"clausule {clausule}: {len(met.meegegeven)} bronnen, {len(met.gebruikt)} gebruikt "
+        f"({hoe}); tweede vraag "
+        f"{'vervangen' if zonder.onverifieerbaar else 'met verwijzing'}; "
         f"${met.usd + zonder.usd:.4f}"
+    )
+
+
+def check_triage_agent() -> str:
+    """De clausule-agent tegen het echte model en corpus. Kost ~$0,01.
+
+    Deze check bestaat omdat de eerste echte run (2026-08-22) een fout vond die geen enkele
+    gestubde test kon zien: het model levert één rij per bron, dus een bewijslast-item dat door
+    vijf documenten wordt gedekt gaf vijf rijen — en clausule 9.2 meldde "2 van 8
+    bewijsstukken niet gevonden" terwijl de norm er vier kent.
+    """
+    _vereis("ANTHROPIC_API_KEY")
+    import sqlite3
+
+    from iso_audit.assistent import clausule as ca
+    from iso_audit.store import verbinding
+
+    conn = verbinding(os.environ.get("PREFLIGHT_CORPUS") or None)
+    conn.row_factory = sqlite3.Row
+    try:
+        # `norm` is in `clause_matches` ook `beide` — een clausule die in allebei de normen
+        # bestaat. Die uitsluiten leverde "corpus bevat geen clause_matches" op een corpus met
+        # 3337 rijen; de melding klopte niet en de check draaide niet.
+        rij = conn.execute(
+            "SELECT clausule_id, norm FROM clause_matches "
+            "WHERE norm IN ('9001','27001','beide') LIMIT 1"
+        ).fetchone()
+    except sqlite3.OperationalError as e:
+        raise OvergeslagenError(f"geen corpus om op te vragen: {e}") from e
+    if rij is None:
+        raise OvergeslagenError("corpus bevat geen bruikbare clause_matches")
+
+    # Een clausule **met** bewijslast: zonder bewijslast bevraagt de agent geen model, en dan
+    # slaagt deze check leeg. Gemeten op 2026-08-22: de eerste clausule uit `clause_matches`
+    # (4.4) heeft er geen, en de check meldde "0 bewijslast-items, $0.0000" als OK.
+    from iso_audit.data import normteksten
+
+    kandidaat: tuple[str, str] | None = None
+    for r in conn.execute(
+        "SELECT DISTINCT clausule_id, norm FROM clause_matches "
+        "WHERE norm IN ('9001','27001','beide')"
+    ).fetchall():
+        # `beide` is geen norm die `normteksten` kent; 27001 is dan de bredere catalogus.
+        n = str(r["norm"]) if str(r["norm"]) in ("9001", "27001") else "27001"
+        entry = normteksten.lookup(n, str(r["clausule_id"])) or {}
+        if entry.get("bewijslast"):
+            kandidaat = (str(r["clausule_id"]), n)
+            break
+    if kandidaat is None:
+        raise OvergeslagenError("geen gekoppelde clausule met bewijslast in de catalogus")
+
+    beeld = ca.bekijk(conn, kandidaat[0], norm=kandidaat[1])
+    conn.close()
+
+    if set(beeld.als_record()) & ca.VERBODEN_VELDEN:
+        raise RuntimeError("de agent leverde een oordeelsveld; die grens moet dicht blijven")
+    items = beeld.gedekte_items | beeld.open_items
+    if not items:
+        raise RuntimeError("clausule met bewijslast leverde geen enkel item op")
+    if len(items) > len(beeld.bewijs_aanwezig) + len(beeld.bewijs_ontbreekt):
+        raise RuntimeError("meer verschillende items dan rijen; dat kan niet")
+    return (
+        f"clausule {beeld.clausule_id}: {len(beeld.meegegeven)} bronnen, "
+        f"{len(items)} bewijslast-items, dekking {beeld.dekkingsgraad:.0%}, ${beeld.usd:.4f}"
     )
 
 
@@ -428,11 +503,12 @@ COMPONENTEN: dict[str, Callable[[], str]] = {
     "nextcloud": check_nextcloud,
     "classificatie": check_classificatie,
     "assistent-api": check_assistent_api,
+    "triage-agent": check_triage_agent,
 }
 """Volgorde is bewust: eerst wat geen netwerk vraagt, dan de bronnen, dan wat geld kost.
 Zo faalt een preflight op een tikfout binnen een seconde in plaats van na tien minuten."""
 
-BETAALD = frozenset({"classificatie", "assistent-api"})
+BETAALD = frozenset({"classificatie", "assistent-api", "triage-agent"})
 """Componenten die de Claude-API raken. Alleen met `--met-api`."""
 
 
