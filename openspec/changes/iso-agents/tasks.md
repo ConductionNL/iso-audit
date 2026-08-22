@@ -46,8 +46,11 @@
 - [x] 7.1 `docs/reference/vraagassistent.md`: het corpus, waarom er niet geciteerd wordt, en
       waarom hij niet uit modelkennis antwoordt
 - [x] 7.2 CHANGELOG-regel met de motivatie
-- [ ] 8.1 In het cluster verifiëren met drie vragen: één met dekking, één zonder, en één waar
-      document en bevinding elkaar tegenspreken
+- [x] 8.1 In het cluster geverifieerd op 2026-08-22 met drie vragen. Uitkomst: **1 van 3
+      slaagde**, en de twee die faalden legden defecten in de verificatie bloot — een eerlijk
+      "niet gevonden" heeft geen bron om naar te verwijzen, en het model groepeert verwijzingen
+      op drie manieren die als verzonnen werden gelezen. Alle drie gerepareerd; een
+      onverifieerbaar antwoord wordt nu vervangen in plaats van geweigerd
 - [x] 8.2 **Beantwoord door het eerste gebruik (2026-08-21):** te streng op één punt. De
       vraag was "welk bewijs hebben we voor 8.2.4?"; die clausule bestaat niet in ISO
       27001:2022 (Annex A kent 8.24, met 24 gekoppelde documenten). "Staat er niet in" was
@@ -62,13 +65,17 @@
       `bewijslast`, geparafraseerd. Beweert niets over Conduction — dat is de Bronbevrager
 - [ ] 9.2 Test: een vraag naar wat een clausule eist noemt geen Conduction-document
 
-## Gap-analist (agent 3)
+## Gap-analist (agent 3) — **gebouwd als de clausule-agent**
 
-- [ ] 10.1 Zet `bewijslast` per clausule naast wat er via `clause_matches` gekoppeld is
-- [ ] 10.2 Oordeel komt uit de bestaande classificatie (`bevindingen`), niet uit deze agent —
-      anders is er een tweede classificatiepad met een ander antwoord
-- [ ] 10.3 Test: de Gap-analist schrijft geen rij in `bevindingen` en velt geen classificatie
-- [ ] 10.4 Test: ontbrekende bewijslast wordt getoond als constatering, niet als NC
+- [x] 10.1 `assistent/clausule.py` zet `bewijslast` per clausule naast de gekoppelde bronnen
+- [x] 10.2 Geen eigen oordeel: `VERBODEN_VELDEN` weigert `voorstel`, `classificatie`, `oordeel`,
+      `advies`, `triage` en `aanbeveling` in het antwoord
+- [x] 10.3 Test: de agent schrijft niets en levert geen oordeelsveld
+- [x] 10.4 Test: ontbrekende bewijslast komt als constatering (`bewijs_ontbreekt`), niet als NC
+
+> Deze agent is gebouwd binnen change `triage-ondersteuning`, omdat de aanleiding daar lag: een
+> werklijst van 1241 bevindingen. Functioneel is het de Gap-analist uit dit voorstel — dezelfde
+> bronregel, dezelfde grens. Twee implementaties zou een tweede oordeelspad opleveren.
 
 ## Opsteller (agent 4)
 
