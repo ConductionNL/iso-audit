@@ -1,6 +1,6 @@
 ---
 status: current
-last_reviewed: 2026-08-21
+last_reviewed: 2026-08-22
 ---
 
 # Vraagassistent — de Bronbevrager
@@ -54,9 +54,39 @@ Twee harde maatregelen, want de systeem-prompt is een instructie en geen garanti
    af te dwingen in plaats van met een verzoek.
 2. **Verwijzingen worden nagelopen.** Het antwoord verwijst met `[bron:<id>]`. Elk id moet in
    het meegegeven corpus voorkomen, en elke clausule die het antwoord noemt moet in een
-   meegegeven bron zitten. Klopt dat niet — of staat er geen enkele verwijzing in — dan is het
-   een **storing** en geen antwoord. Ook een afgekapt antwoord (`stop_reason: max_tokens`) is
-   een storing: bij afkapping verdwijnt juist de bronvermelding aan het eind.
+   meegegeven bron zitten. Klopt dat niet, dan is het een **storing** en geen antwoord. Ook een
+   afgekapt antwoord (`stop_reason: max_tokens`) is een storing: bij afkapping verdwijnt juist de
+   bronvermelding aan het eind.
+3. **Een antwoord zonder énige verwijzing wordt vervangen.** Niet geweigerd en niet getoond met
+   een waarschuwing: de auditor ziet een vaste tekst, en de prose van het model gaat alleen naar
+   de trail. Zie hieronder.
+
+### Waarom vervangen en niet weigeren
+
+Een antwoord zonder verwijzing kan twee dingen zijn: een eerlijk "dit staat niet in deze bronnen",
+of een bewering uit modelkennis. **Van buitenaf is dat onderscheid niet te maken.** Drie vormen
+zijn geprobeerd:
+
+| aanpak | uitkomst |
+|---|---|
+| weigeren (502) | twee van drie echte vragen faalden terwijl het model correct antwoordde |
+| een merkteken dat het model zet | werkt zolang het model zich eraan houdt — tegen het echte model deed het dat niet |
+| **vervangen** | dekt beide gevallen, hangt niet af van medewerking |
+
+Het merkteken `[niets-gevonden]` staat nog wel in de prompt: het helpt, maar de handhaving zit in
+de vervanging.
+
+### Vormvarianten die het model gebruikt
+
+Het model groepeert verwijzingen op manieren die een naïeve parser als verzonnen leest. Alle drie
+gevonden tegen het echte corpus, elk keer met geldige ID's die werden afgewezen:
+
+- `[bron:a, b, c]` — komma-lijst binnen één merkteken
+- `[bron:a en b]` — het Nederlandse "en" als scheidingsteken
+- `[bron:a, bron:b]` — het voorvoegsel herhaald binnen één merkteken
+
+De splitsing gebruikt woordgrenzen, zodat een ID dat "en" bevat (`1eDQv1pQ8r2Sv...`) heel blijft.
+Tolerant voor de vorm, niet voor de inhoud: élk los ID moet in het corpus zitten.
 
 Die tweede is het verschil tussen "we hebben het gevraagd" en "we hebben het gecontroleerd" —
 dezelfde discipline als bij de classificatie, waar een onleesbaar of afgekapt antwoord sinds
