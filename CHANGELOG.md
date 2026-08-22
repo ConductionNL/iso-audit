@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-22 — interviewvoorstellen: 14 clausules, 42 vragen, geen verzonnen namen
+
+Waar geen documentbewijs is, stelt het tool nu een gesprek voor: per ongedekte clausule één vraag
+per verwacht artefact — "waar is dit vastgelegd, of waarom bestaat het niet?".
+
+**De opzet is onderweg omgedraaid, na een meting.** Het plan was: markeer per bewijslast-item of
+een mens het kan bevestigen, en stel daar interviews voor. Gemeten: van de **481
+bewijslast-items** in `data/normteksten` beschrijven er ongeveer **drie** een waarneming — de
+catalogus is vrijwel volledig artefact-gericht ("notulen directiebeoordeling",
+"toegangsrechtenmatrix", "versiehistorie"). 481 items markeren zou betekenen dat dit tool zijn
+eigen bewijsstandaard verzint, en dat is een auditoroordeel.
+
+Dus de andere vraag: niet "wat kan een mens bevestigen" maar "waar is dit artefact". Dat is wat
+een auditor in een gesprek vraagt, het volgt volledig uit de bestaande catalogus, en het antwoord
+is een **aanwijzing naar bewijs** in plaats van een vervanging ervan.
+
+Gemeten tegen het echte corpus: **14 voorstellen met 42 vragen** — 13 voor 27001 (onder andere
+5.20 leveranciersovereenkomsten, 5.28 verzamelen van bewijs, 5.36 naleving) en 1 voor 9001 (8.1
+operationele planning).
+
+Twee dingen bewust níet gedaan. Geen LLM voor de vragen: een agent die vrije interviewvragen
+bedenkt verzint eisen die niet in de norm staan, en dan staat er in een auditdossier een vraag die
+niemand kan herleiden. En `ROLLEN` is **leeg opgeleverd** — wie bij deze organisatie over
+toegangsrechten gaat is organisatiekennis, en een verzonnen naam in een auditplanning ziet eruit
+als een afspraak die iemand heeft gemaakt. Onbekend toont `nog te bepalen`.
+
+Inplannen blijft geblokkeerd op een credential-besluit: `stuur_calendar_uitnodiging` loopt via de
+`gws`-CLI met een persoonlijke OAuth-sessie, en die binary zit niet in het image. Hoort bij
+`iso-portal` 7.4.
+
 ### Added — 2026-08-22 — Nextcloud als bron, en het bronprotocol is bewezen
 
 `NextcloudSource` leest documenten via WebDAV (`PROPFIND` met `Depth: 1`, `GET` voor de inhoud).

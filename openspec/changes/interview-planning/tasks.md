@@ -3,21 +3,37 @@
 Voorstellen kan zonder credential-beslissing; inplannen niet. Vandaar de scheiding: blok 1–3
 levert bruikbare waarde op, blok 5 wacht op een besluit.
 
-## 1. Welke bewijslast een mens kan bevestigen
+## 1. Welke bewijslast een mens kan bevestigen — **vervallen na meting**
 
-- [ ] 1.1 Per bewijslast-item in `data/normteksten` markeren: artefact of waarneming
-- [ ] 1.2 Test: een clausule met uitsluitend artefact-bewijslast levert geen interviewvoorstel
-- [ ] 1.3 Test: de markering bestaat voor élk bewijslast-item — een ontbrekende markering mag
-      niet stil "waarneming" worden
+- [x] 1.1 ~~Per bewijslast-item markeren: artefact of waarneming~~ — **niet gedaan.** Gemeten op
+      2026-08-22: van de **481 bewijslast-items** beschrijven er ongeveer **drie** een
+      waarneming. De catalogus is vrijwel volledig artefact-gericht. 481 items markeren zou
+      betekenen dat dit tool zijn eigen bewijsstandaard verzint, en dat is een auditoroordeel
+- [x] 1.2 ~~Test op artefact-only clausules~~ — vervalt met 1.1
+- [x] 1.3 ~~Test op de volledigheid van de markering~~ — vervalt met 1.1
+
+> **De vraag is omgedraaid.** Niet "welk bewijs kan een mens bevestigen", maar "we vinden dit
+> artefact niet — bestaat het, en waar?" Dat is wat een auditor in een interview vraagt, het volgt
+> volledig uit de bestaande catalogus, en het antwoord is een aanwijzing naar bewijs in plaats van
+> een vervanging ervan. Zie het herziene voorstel en `src/iso_audit/interviewvoorstel.py`.
+>
+> **Aan de opdrachtgever:** de catalogus verrijken met waarneembare bewijslast blijft nuttig, maar
+> is inhoudelijk ISO-werk. Aparte change, en die vraagt Marianne of jou — niet dit tool.
 
 ## 2. Het voorstel
 
-- [ ] 2.1 Per ongedekte clausule (via `interview._haal_gaps_op`) een voorstel: open
-      bewijslast-items, één vraag per item, en de rol
-- [ ] 2.2 Vragen deterministisch uit de bewijslast, geen modelkennis over interviewtechniek
-- [ ] 2.3 Rol per clausule in de norm-catalogus; geen naam, geen e-mailadres
-- [ ] 2.4 Test: elke vraag is te herleiden naar een bewijslast-item
-- [ ] 2.5 Test: er staat geen zelfbedachte persoonsnaam in een voorstel
+- [x] 2.1 `interviewvoorstel.stel_voor()`: per ongedekte clausule (via `_haal_gaps_op`) één
+      vraag per bewijslast-item, plus de rol. **Gemeten tegen het echte corpus: 14 voorstellen
+      met 42 vragen** — 13 voor 27001 (o.a. 5.20 leveranciersovereenkomsten, 5.28 verzamelen van
+      bewijs) en 1 voor 9001 (8.1 operationele planning)
+- [x] 2.2 Vragen deterministisch uit de bewijslast, vaste formulering, geen LLM
+- [x] 2.3 `ROLLEN` bestaat en is **bewust leeg opgeleverd**; onbekend toont `nog te bepalen`.
+      De rol invullen is organisatiekennis en zit niet in de norm
+- [x] 2.4 Test: elke vraag bevat het bewijslast-item waar hij uit komt
+- [x] 2.5 Test: geen zelfbedachte persoonsnaam, en `ROLLEN` is leeg
+- [x] 2.6 Titel uit de clause-map en niet uit `normteksten` — die laatste heeft geen `titel` per
+      clausule (nagemeten: leeg voor élke 27001-clausule), en "5.28" zonder titel laat de
+      auditor eerst opzoeken waar het over gaat
 
 ## 3. In de UI
 

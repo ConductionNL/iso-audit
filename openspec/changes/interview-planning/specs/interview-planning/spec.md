@@ -35,21 +35,34 @@ uit als een afspraak die iemand heeft gemaakt.
 - **THEN** staat er een rol in het voorstel
 - **AND** staat er geen naam die het tool zelf heeft bedacht
 
-### Requirement: Niet elk gat vraagt een interview
+### Requirement: Een interview wijst naar bewijs en vervangt het niet
 
-Een interview MUST alleen worden voorgesteld voor bewijslast die een mens kan bevestigen.
+Een interviewvraag MUST vragen waar een ontbrekend artefact is vastgelegd, of waarom het niet
+bestaat.
 
-Voor bewijslast die om een artefact vraagt MUST NOT een interview in de plaats komen.
+Een gesproken antwoord MUST NOT als bewijs voor een clausule gelden waar de norm een artefact
+verwacht.
 
 Rationale: voor "de Verklaring van Toepasselijkheid is vastgesteld" is een document het enige
-geldige bewijs. Een interview zou daar bewijs vervangen door een bewering, en dan zakt de
-bewijsstandaard zonder dat iemand dat besloot.
+geldige bewijs; een interview dat dat vervangt laat de bewijsstandaard zakken zonder dat iemand
+dat besloot. Maar de vraag "waar staat de VvT?" is juist wat een auditor stelt — en het antwoord
+is een aanwijzing, of de constatering dat het artefact ontbreekt.
 
-#### Scenario: Clausule die om een document vraagt
+Gemeten op 2026-08-22: van de 481 bewijslast-items in `data/normteksten` beschrijven er ongeveer
+drie een waarneming. De catalogus is artefact-gericht, dus "welk bewijs kan een mens bevestigen"
+levert vrijwel niets op; "waar is dit artefact" levert per ongedekte clausule een bruikbare
+vraag.
 
-- **WHEN** de bewijslast uitsluitend uit artefacten bestaat
-- **THEN** stelt het tool geen interview voor
-- **AND** blijft het gat als ontbrekend document staan
+#### Scenario: Clausule zonder documentbewijs
+
+- **WHEN** een clausule geen gekoppeld document heeft
+- **THEN** vraagt het voorstel per ontbrekend artefact waar het is vastgelegd
+
+#### Scenario: Antwoord vastgelegd
+
+- **WHEN** een geïnterviewde antwoordt dat het artefact niet bestaat
+- **THEN** staat dat als aanwijzing in de trail
+- **AND** velt het tool daarover geen classificatie
 
 ### Requirement: Inplannen is een aparte handeling met een spoor
 
