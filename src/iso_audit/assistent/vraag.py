@@ -113,6 +113,10 @@ Je velt geen oordeel. Vraagt de auditor of iets een afwijking is, dan toon je he
 de eerdere oordelen met hun bron; de auditor beslist. Je stelt geen bevinding en geen \
 classificatie voor.
 
+Beantwoorden de meegegeven bronnen de vraag niet, dan zeg je dat en zet je het merkteken \
+[niets-gevonden] in je antwoord. Doe dat alleen dán: het is het signaal dat er niets na te \
+trekken valt, en zonder verwijzing én zonder merkteken wordt je antwoord geweigerd.
+
 Je antwoord is een aanwijzing naar bewijs, niet het bewijs zelf."""
 
 
@@ -161,6 +165,19 @@ class Assistentantwoord:
         }
 
 
+NIETS_GEVONDEN = "[niets-gevonden]"
+"""Merkteken dat het model zet als de meegegeven bronnen de vraag niet beantwoorden.
+
+Bestaat omdat de verwijzingscontrole anders een eerlijk antwoord weigert. Gemeten op
+2026-08-22 tegen het echte corpus: van drie vragen gaf één een antwoord met 25 bronnen, en
+kwamen twee terug als storing met "antwoord bevat geen enkele bronverwijzing". Dat was niet
+het model dat iets verzon — het zei correct dat het gevraagde niet in díe bronnen stond, en
+had daarmee niets om naar te verwijzen.
+
+Een merkteken en geen tekstherkenning: zoeken op zinsneden als "staat niet in" is een
+tweede, onbetrouwbare administratie van hoe het model zich uitdrukt. Eén afgesproken token
+is deterministisch, en de controle blijft daarmee een controle in plaats van een gok."""
+
 _BRONMARKERING = re.compile(r"\[bron:([^\]]+)\]")
 _CLAUSULE_IN_ANTWOORD = re.compile(r"\b(\d{1,2}(?:\.\d{1,2}){1,3})\b")
 
@@ -187,6 +204,29 @@ def _user_prompt(vraag: str, corpus: Corpus) -> str:
     return "\n".join(delen)
 
 
+def _bron_ids(antwoord: str) -> list[str]:
+    """Alle bron-ID's uit de merktekens, in volgorde van voorkomen, zonder duplicaten.
+
+    Eén merkteken kan **meerdere** ID's bevatten: het model schrijft in de praktijk
+    `[bron:id1, id2, id3]` wanneer een bewering op meerdere documenten rust. Gemeten op
+    2026-08-22 tegen het echte corpus: twaalf geldige ID's plus een normtekst werden als één
+    onbekend ID gelezen, en het antwoord werd geweigerd als verzonnen terwijl elk ID bestond.
+
+    Splitsen op komma en witruimte strippen maakt de controle tolerant voor die vorm zonder
+    hem zwakker te maken: élk los ID moet daarna nog steeds in het meegegeven corpus zitten.
+    Een strengere prompt ("één bron per merkteken") zou hetzelfde willen bereiken door het
+    model iets te vragen in plaats van door het te controleren — dat is precies de omgekeerde
+    volgorde.
+    """
+    uniek: list[str] = []
+    for groep in _BRONMARKERING.findall(antwoord):
+        for ruw in str(groep).split(","):
+            bron_id = ruw.strip()
+            if bron_id and bron_id not in uniek:
+                uniek.append(bron_id)
+    return uniek
+
+
 def verifieer_verwijzingen(antwoord: str, corpus: Corpus) -> list[str]:
     """Controleer dat het antwoord alleen naar meegegeven bronnen verwijst.
 
@@ -194,18 +234,22 @@ def verifieer_verwijzingen(antwoord: str, corpus: Corpus) -> list[str]:
     verwijzing naar een bron die niet is meegegeven, of naar een clausule die in geen enkele
     meegegeven bron voorkomt.
 
-    Een antwoord zónder verwijzing is ook een storing: dan is er niets na te trekken, en
-    juist dat is waar een antwoord uit modelkennis op lijkt.
+    Een antwoord zónder verwijzing is een storing — dan is er niets na te trekken, en juist
+    zo ziet een antwoord uit modelkennis eruit. **Behalve** als het model `NIETS_GEVONDEN`
+    heeft gezet: dan zegt het dat de meegegeven bronnen de vraag niet beantwoorden, en dan is
+    er niets om naar te verwijzen. Zonder die uitzondering weigerde de controle op 2026-08-22
+    twee van drie eerlijke antwoorden tegen het echte corpus.
     """
-    gebruikt = _BRONMARKERING.findall(antwoord)
+    gebruikt = _bron_ids(antwoord)
     onbekend = sorted({g for g in gebruikt if g not in corpus.ids})
     if onbekend:
         raise AntwoordOnverifieerbaarError(
             f"antwoord verwijst naar bronnen die niet zijn meegegeven: {', '.join(onbekend)}"
         )
-    if not gebruikt:
+    if not gebruikt and NIETS_GEVONDEN not in antwoord:
         raise AntwoordOnverifieerbaarError(
-            "antwoord bevat geen enkele bronverwijzing; niets om na te trekken"
+            "antwoord bevat geen bronverwijzing en geen "
+            f"{NIETS_GEVONDEN}-merkteken; niets om na te trekken"
         )
     toegestaan = corpus.genoemde_clausules | set(corpus.clausules_in_vraag)
     verzonnen = sorted({c for c in _CLAUSULE_IN_ANTWOORD.findall(antwoord) if c not in toegestaan})
@@ -213,12 +257,9 @@ def verifieer_verwijzingen(antwoord: str, corpus: Corpus) -> list[str]:
         raise AntwoordOnverifieerbaarError(
             f"antwoord noemt clausules die niet in de bronnen staan: {', '.join(verzonnen)}"
         )
-    # Volgorde van eerste voorkomen, zonder duplicaten — dat is hoe het in de trail leest.
-    uniek: list[str] = []
-    for g in gebruikt:
-        if g not in uniek:
-            uniek.append(g)
-    return uniek
+    # `_bron_ids` levert al de volgorde van eerste voorkomen zonder duplicaten — dat is hoe
+    # het in de trail leest.
+    return gebruikt
 
 
 def beantwoord(

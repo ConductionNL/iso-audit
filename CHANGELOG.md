@@ -6,6 +6,89 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-22 — de vraagassistent weigerde twee van drie eerlijke antwoorden
+
+Eerste test tegen het echte model op het echte corpus (`assistent_vragen` stond op nul; taak 8.1
+van `iso-agents`). Van drie vragen leverde één een antwoord met 25 bronnen op, en kwamen twee
+terug als **502**. Twee defecten, allebei in de verificatie en niet in het model:
+
+1. **Een eerlijk "niet gevonden" heeft geen bron om naar te verwijzen.** De controle las "geen
+   verwijzing" als "verzonnen" en weigerde het antwoord. Nu zet het model `[niets-gevonden]` als
+   de meegegeven bronnen de vraag niet beantwoorden; zonder verwijzing **en** zonder merkteken
+   blijft het een storing. Een merkteken en geen tekstherkenning: zoeken op zinsneden als "staat
+   niet in" is een tweede, onbetrouwbare administratie van hoe een model zich uitdrukt.
+2. **Het model schrijft `[bron:a, b, c]`** als een bewering op meerdere documenten rust. De
+   parser las die komma-lijst als één ID: twaalf geldige verwijzingen plus een normtekst werden
+   geweigerd als verzonnen. Nu wordt er op komma gesplitst, en élk los ID moet nog steeds in het
+   meegegeven corpus zitten — tolerant voor de vorm, niet voor de inhoud.
+
+Nagerekend tegen het echte corpus zonder API-kosten: de zes ID's uit de foutmelding bestaan alle
+zes en worden nu geaccepteerd.
+
+Geen van de 1165 tests zag dit, om dezelfde reden: een stub antwoordt zoals de test wil, een
+model antwoordt zoals een model antwoordt.
+
+### Added — 2026-08-22 — `scripts/preflight.py`: elke component lokaal aantoonbaar werkend
+
+Op 21 augustus zijn vijf defecten in productie gevonden die de suite niet kon zien, omdat ze
+alle vijf pas optreden tegen de echte bronnen of in de echte procesvorm. Elk defect kostte een
+uitrol, drie ervan een halve auditrun.
+
+De preflight loopt per component één keer het echte pad af: `landschap`, `rapport`, `assistent`,
+`drive`, `planning`, `jira`, plus `classificatie` en `assistent-api` als betaalde checks. Wat
+hij bewijst in plaats van aanneemt: drie documenten worden **echt gelezen** (daar zaten de
+docx/PDF-fouten), de Sheets-aanroepen worden **geteld** en faalt bij meer dan één (de N+1), het
+rapport krijgt een archiefdocument **zonder datum** mee (de `NoneType < str` uit stap 7/7), en de
+classificatie doet één echte API-call inclusief de plafondberekening.
+
+Drie eigenschappen die erbij horen: eigen tijdelijke DB dus nooit de echte trail, een component
+zonder configuratie wordt **overgeslagen en gemeld** in plaats van stil groen, en de goedkope
+checks lopen eerst zodat een tikfout binnen een seconde faalt in plaats van na tien minuten.
+
+Configuratie komt langs dezelfde weg als het portaal: de shell-omgeving en daarna de
+bron-configuratie die het configuratiescherm beheert (`--config-root`). Zonder die tweede laag
+test een preflight met een ándere configuratie dan een run, en dan zegt "lokaal groen" niets
+over online.
+
+De eerste echte preflight faalde meteen — op de jira-check, die de adapter-registry niet had
+gevuld. Terecht, en tegelijk een aanwijzing dat die registratie hangt aan een functie die
+`beschikbare_bronnen()` heet en niet verraadt dat hij registreert.
+
+### Changed — 2026-08-22 — Jira-opvolgpunten zijn bewijslast, geen triage-kandidaten
+
+Van de 901 kandidaten in de eerste volledige run kwamen er **83 uit `Jira-opvolging`**, elk met
+een triage-vraag die niemand kon beantwoorden. Een openstaand punt is al beoordeeld door degene
+die het aanmaakte; wat het in een audit doet is aantonen dát er opvolging is.
+
+`export_db_findings` filtert ze nu uit de werklijst. Ze blijven in `bevindingen` staan met
+herkomst `<bron>-opvolging`, dus ze zijn opvraagbaar als bewijslast en de vraagassistent leest ze
+al als eigen soort bron.
+
+In `pipeline._bewaar_opvolgpunten` stond letterlijk dat een opvolgpunt "een punt is dat de
+auditor moet wegen". Dat was de verkeerde rechtvaardiging voor de juiste opslagplek; die staat er
+nu goed.
+
+### Added — 2026-08-22 — drie voorstellen: triage-ondersteuning, interview-planning, Nextcloud
+
+`openspec/changes/triage-ondersteuning/` — met een vondst die de vorm van die change bepaalt.
+Gemeten op de echte werkset: **462 van de 1241 bevindingen (37%) komen uit twaalf documenten die
+dit tool zelf heeft geschreven** — hetzelfde auditrapport in md, docx, html én pdf, dezelfde
+bevindingenlijst in csv en xlsx, plus drie eigen managementmemo's. Dat is de kringloop die het
+`iso-agents`-voorstel voor de Opsteller benoemde, en hij is er al. Daarnaast zijn **264 regels
+een exact duplicaat** van een eerdere `(clausule, beschrijving)` — samen te vouwen zonder
+gelijkenis-drempel. Vandaar de volgorde: eerst niet-tellen, dan samenvouwen, en pas daarna een
+agent die voorbereidt zonder te oordelen.
+
+`openspec/changes/interview-planning/` — klantwens. Vragen komen uit de `bewijslast` per clausule
+en niet uit modelkennis over interviewtechniek; het voorstel noemt een rol en geen persoon.
+Inplannen staat apart en wacht op een credential-besluit: `stuur_calendar_uitnodiging` loopt via
+de `gws`-CLI met een persoonlijke OAuth-sessie, en die binary zit niet in het image.
+
+`openspec/changes/nextcloud-bron/` — WebDAV naast Drive, en tegelijk de eerste echte test van het
+`Source`-protocol tegen een bron die niets met Google deelt. De testomgeving staat er al:
+`canary-accept/nextcloud` (32.0.13) in het cluster. De gedeelde tekstlezers verhuizen naar
+`sources/tekst.py`, want een tweede set per bron loopt uit elkaar.
+
 ### Added — 2026-08-21 — runs verbergen zonder ze te verwijderen (0.2.0a23)
 
 De run-historie stond op negen regels waarvan vier weesrecords en drie mislukte pogingen. Als

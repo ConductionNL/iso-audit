@@ -138,3 +138,64 @@ def test_ruwe_leveranciersmelding_gaat_niet_naar_de_browser() -> None:
     assert regels == ["Stap 5/7: Bevindingen classificeren"]
     assert not any("geheim" in r for r in regels)
     assert ALLEEN_SERVERLOG == "alleen_serverlog"
+
+
+# --- opvolgpunten zijn bewijslast, geen triage-kandidaten -------------------
+
+
+def test_opvolgpunten_komen_niet_in_de_triage_werklijst(tmp_path: Path) -> None:
+    """Een openstaand punt uit Jira is al beoordeeld door degene die het aanmaakte.
+
+    Wat het in een audit doet is aantonen dát er opvolging is — bewijslast, geen bevinding.
+    Gemeten op 2026-08-22: van de 901 kandidaten in de eerste volledige run waren er 83 uit
+    `Jira-opvolging`, elk met een triage-vraag die niemand kon beantwoorden.
+    """
+    from iso_audit.api.run_job import export_db_findings
+    from iso_audit.store import initialiseer, now, verbinding
+
+    conn = verbinding()
+    initialiseer(conn)
+    for doc_id, herkomst, klasse in (
+        ("d1", "Drive", "NC"),
+        ("ISO-709", "Jira-opvolging", "OFI"),
+        ("ISO-710", "Miro-opvolging", "OFI"),
+    ):
+        conn.execute(
+            """INSERT INTO bevindingen
+               (doc_id, herkomst, clausule_id, norm, classificatie, beschrijving,
+                document_naam, classified_at)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (doc_id, herkomst, "8.24", "27001", klasse, "beschrijving", doc_id, now()),
+        )
+    conn.commit()
+    conn.close()
+
+    uit = export_db_findings(norm="27001")
+
+    assert [f.bronnen[0].doc_id for f in uit] == ["d1"], "alleen echt bewijs, geen opvolging"
+
+
+def test_opvolgpunten_blijven_in_de_database_staan(tmp_path: Path) -> None:
+    """Uitsluiten van de triage is niet hetzelfde als weggooien: ze zijn bewijslast.
+
+    De vraagassistent leest ze als eigen soort bron, en een auditor moet kunnen aantonen dat
+    er opvolging plaatsvond.
+    """
+    from iso_audit.store import initialiseer, now, verbinding
+
+    conn = verbinding()
+    initialiseer(conn)
+    conn.execute(
+        """INSERT INTO bevindingen
+           (doc_id, herkomst, clausule_id, norm, classificatie, beschrijving,
+            document_naam, classified_at)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        ("ISO-709", "Jira-opvolging", "8.24", "27001", "OFI", "x", "ISO-709", now()),
+    )
+    conn.commit()
+
+    aantal = conn.execute(
+        "SELECT COUNT(*) FROM bevindingen WHERE herkomst LIKE '%-opvolging'"
+    ).fetchone()[0]
+    conn.close()
+    assert aantal == 1

@@ -273,11 +273,16 @@ def run_setup_template() -> None:
 
 
 def _bewaar_opvolgpunten(punten: list[dict[str, Any]], norm: str) -> None:
-    """Schrijf openstaande punten weg als bevindingen, zonder classificatie.
+    """Leg openstaande punten vast als bewijs dat er opvolging plaatsvindt.
 
-    Hergebruikt de `bevindingen`-tabel en dus het bestaande pad naar triage en memo — één
-    administratie, geen tweede tabel voor iets dat in de kern hetzelfde is: een punt dat de
-    auditor moet wegen.
+    Ze gaan in de `bevindingen`-tabel met herkomst `<bron>-opvolging`: één administratie,
+    geen tweede tabel voor iets dat dezelfde vorm heeft (clausule, bron, beschrijving).
+
+    **Maar niet naar de triage.** Hier stond dat een opvolgpunt "een punt is dat de auditor
+    moet wegen", en dat is precies wat het niet is: het is al beoordeeld door degene die het
+    aanmaakte. Wat het in een audit doet, is aantonen dát er opvolging is — bewijslast, geen
+    bevinding. Op 2026-08-22 stonden er daardoor 83 Jira-punten in een werklijst van 901 met
+    een triage-vraag die niemand kon beantwoorden. `export_db_findings` filtert ze eruit.
     """
     if not punten:
         return

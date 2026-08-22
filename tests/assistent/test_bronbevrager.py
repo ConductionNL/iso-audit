@@ -201,7 +201,7 @@ def test_antwoord_zonder_verwijzing_is_een_storing(conn: sqlite3.Connection) -> 
     _koppel(conn, "d1", "8.24")
     client = _Client("Ja, dat is geregeld.")
 
-    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="geen enkele"):
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="merkteken"):
         assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
 
 
@@ -374,3 +374,86 @@ def test_zonder_clausule_blijft_de_algemene_tekst(conn: sqlite3.Connection) -> N
     corpus = ophalen.haal_bronnen_op(conn, "Wat hebben wij over sleutelbeheer?")
 
     assert assistent.geen_dekking_tekst(corpus, "27001") == assistent.GEEN_DEKKING
+
+
+# --- eerlijk "niet gevonden" is geen storing ------------------------------
+#
+# Gemeten op 2026-08-22 tegen het echte corpus: van drie vragen gaf één een antwoord met 25
+# bronnen en kwamen twee terug als 502 met "antwoord bevat geen enkele bronverwijzing". Dat
+# was niet het model dat iets verzon — het zei correct dat het gevraagde niet in díe bronnen
+# stond, en had daarmee niets om naar te verwijzen. De controle weigerde een eerlijk antwoord.
+
+
+def test_niets_gevonden_merkteken_maakt_een_antwoord_zonder_verwijzing_geldig(
+    conn: sqlite3.Connection,
+) -> None:
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client(f"Hierover staat niets in de bronnen. {assistent.NIETS_GEVONDEN}")
+
+    # Een clausulevraag, zodat er wél bronnen meegaan: het gaat om het geval waarin de
+    # bronnen bestaan maar de vraag niet beantwoorden. Een lege corpus is het andere pad.
+    uit = assistent.beantwoord(conn, "Staat er iets over catering in 8.24?", client=client)
+
+    assert uit.gebruikt == []
+    assert assistent.NIETS_GEVONDEN in uit.antwoord
+    assert uit.geen_dekking is False, "er waren wél bronnen; ze pasten alleen niet"
+
+
+def test_zonder_verwijzing_en_zonder_merkteken_blijft_een_storing(
+    conn: sqlite3.Connection,
+) -> None:
+    """De uitzondering mag geen gat worden: een bewering zonder spoor blijft geweigerd."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Ja, dat is allemaal netjes geregeld.")
+
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="merkteken"):
+        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+
+def test_merkteken_dekt_geen_verzonnen_bron(conn: sqlite3.Connection) -> None:
+    """Merkteken én een onbekende verwijzing: de verwijzingscontrole gaat voor."""
+    _document(conn, "d1", "Cryptobeleid.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client(f"Niets gevonden {assistent.NIETS_GEVONDEN}, zie wel [bron:d-verzonnen].")
+
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="niet zijn meegegeven"):
+        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+
+def test_de_prompt_legt_het_merkteken_op() -> None:
+    assert assistent.NIETS_GEVONDEN in assistent.SYSTEEM
+    assert "geweigerd" in assistent.SYSTEEM
+
+
+def test_meerdere_bronnen_in_een_merkteken(conn: sqlite3.Connection) -> None:
+    """Het model schrijft `[bron:a, b, c]` als een bewering op meerdere documenten rust.
+
+    Gemeten op 2026-08-22 tegen het echte corpus: twaalf geldige ID's plus een normtekst
+    werden als één onbekend ID gelezen, en een geldig antwoord werd geweigerd als verzonnen.
+    """
+    for i in (1, 2, 3):
+        _document(conn, f"d{i}", f"Doc {i}.docx")
+        _koppel(conn, f"d{i}", "8.24")
+    client = _Client("De rapporten dekken dit [bron:d1, d2,  d3].")
+
+    uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+    assert uit.gebruikt == ["d1", "d2", "d3"], "gesplitst en gestript, volgorde behouden"
+
+
+def test_een_onbekend_id_in_een_groep_blijft_een_storing(conn: sqlite3.Connection) -> None:
+    """Tolerant voor de vorm, niet voor de inhoud: élk los ID moet meegegeven zijn."""
+    _document(conn, "d1", "Doc 1.docx")
+    _koppel(conn, "d1", "8.24")
+    client = _Client("Zie [bron:d1, d-verzonnen].")
+
+    with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="d-verzonnen"):
+        assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
+
+
+def test_bron_ids_negeert_lege_stukken() -> None:
+    assert assistent._bron_ids("[bron:a, , b]") == ["a", "b"]
+    assert assistent._bron_ids("[bron: a ][bron:a]") == ["a"], "dubbel telt één keer"
+    assert assistent._bron_ids("geen merkteken") == []

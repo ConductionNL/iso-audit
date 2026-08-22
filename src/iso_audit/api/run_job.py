@@ -17,6 +17,7 @@ from iso_audit.api.runs import Dekking, Kosten
 from iso_audit.memo.draft import draft_findings
 from iso_audit.memo.models import BronRef, Finding
 from iso_audit.memo.norm_lookup import NormDatabase, laad_norm_db
+from iso_audit.sources.opvolgpunten import HERKOMST_ACHTERVOEGSEL
 
 
 @dataclass(frozen=True)
@@ -108,7 +109,19 @@ def _resolve_standard(row_norm: str, clause: str, db: NormDatabase | None) -> st
 
 
 def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> list[Finding]:
-    """Lees de bevindingen uit de audit-DB en map ze naar het memo-Finding-model."""
+    """Lees de bevindingen uit de audit-DB en map ze naar het memo-Finding-model.
+
+    **Opvolgpunten blijven hier buiten.** Een openstaand punt uit Jira is geen kandidaat voor
+    triage: het is al beoordeeld door degene die het aanmaakte, en de auditor hoeft niet te
+    wegen of het "valide" is. Wat het wél is, is bewijs dat er opvolging plaatsvindt — en dat
+    is een andere rol in een audit dan een bevinding.
+
+    Tot 2026-08-22 kwamen ze wel mee: van de 901 kandidaten in de eerste volledige run waren
+    er 83 uit `Jira-opvolging`, elk met een triage-status die niemand kon beantwoorden. Ze
+    blijven in `bevindingen` staan (herkomst `<bron>-opvolging`), dus ze zijn opvraagbaar als
+    bewijslast en de vraagassistent leest ze als eigen soort bron; ze staan alleen niet meer
+    in de werklijst.
+    """
     import sqlite3
 
     from iso_audit.classification.clause_mapping import laad_clause_map
@@ -119,7 +132,10 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
     db = laad_norm_db(norms_dir) if norms_dir else None
     conn = verbinding()
     conn.row_factory = sqlite3.Row
-    rows = conn.execute("SELECT * FROM bevindingen ORDER BY clausule_id").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM bevindingen WHERE herkomst NOT LIKE ? ORDER BY clausule_id",
+        (f"%{HERKOMST_ACHTERVOEGSEL}",),
+    ).fetchall()
     conn.close()
     findings: list[Finding] = []
     for r in rows:
