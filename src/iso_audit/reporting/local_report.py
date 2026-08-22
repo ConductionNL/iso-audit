@@ -446,8 +446,15 @@ def schrijf_rapport(
             "detail-secties hieronder en de Excel-bevindingenlijst._"
         )
 
+    from iso_audit.eigen_output import MERKTEKEN
+
     regels: list[str] = [
         f"# Auditrapport {_norm_label(norm)}",
+        "",
+        # Zichtbare regel en geen comment: dit rapport gaat naar docx, html en pdf, en alleen
+        # zichtbare tekst overleeft alle drie. Zonder dit merkteken leest een volgende run zijn
+        # eigen rapport als bewijs — op 2026-08-22 was 37% van de werklijst zo'n echo.
+        f"_{MERKTEKEN}._",
         "",
         "| | |",
         "|---|---|",

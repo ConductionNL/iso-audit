@@ -118,6 +118,42 @@ STANDAARD: list[BronDefinitie] = [
         ],
     ),
     BronDefinitie(
+        naam="nextcloud",
+        label="Nextcloud",
+        uitleg="Documenten uit een Nextcloud- of andere WebDAV-server.",
+        velden=[
+            Veld(
+                naam="NEXTCLOUD_BASE_URL",
+                label="Serveradres",
+                hint="https://cloud.organisatie.nl — zonder /remote.php erachter.",
+            ),
+            Veld(
+                naam="NEXTCLOUD_USER",
+                label="Gebruikersnaam",
+                hint=(
+                    "Bij voorkeur een functioneel account: dan blijft de koppeling werken "
+                    "als iemand de organisatie verlaat."
+                ),
+            ),
+            Veld(
+                naam="NEXTCLOUD_APP_PASSWORD",
+                label="App-wachtwoord",
+                geheim=True,
+                hint=(
+                    "Een app-specifiek wachtwoord uit Instellingen → Beveiliging, geen "
+                    "gebruikerswachtwoord: apart intrekbaar en zonder toegang tot de "
+                    "webinterface."
+                ),
+            ),
+            Veld(
+                naam="NEXTCLOUD_PATHS",
+                label="Mappen",
+                verplicht=False,
+                hint="Leeg = de hele gebruikersmap. Meerdere mappen staan als losse rijen.",
+            ),
+        ],
+    ),
+    BronDefinitie(
         naam="jira",
         label="Jira",
         uitleg="Tickets als bewijs, bijvoorbeeld ISO-verbeteracties.",

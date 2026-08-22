@@ -170,6 +170,53 @@ def check_planning() -> str:
     return f"{len(docs)} planning-rijen, spreadsheet 1x gelezen"
 
 
+def check_nextcloud() -> str:
+    """WebDAV-listing en een steekproef écht lezen, tegen een echte server.
+
+    Gedraaid tegen `canary-accept/nextcloud` (32.0.13) op 2026-08-22. Die run vond meteen twee
+    fouten die de gestubde tests niet zagen: paden werden relatief aan de opgevraagde map
+    teruggegeven (waardoor de recursie in de verkeerde map zocht), en een lege `.txt` kreeg de
+    melding "mogelijk staat de inhoud in tekstvakken" — over een bestand van nul bytes.
+    """
+    _vereis("NEXTCLOUD_BASE_URL", "NEXTCLOUD_USER", "NEXTCLOUD_APP_PASSWORD")
+    from iso_audit.sources.nextcloud import NextcloudSource
+    from iso_audit.sources.tekst import LeegDocumentError
+
+    bron = NextcloudSource()
+    status = bron.probe()
+    if status["status"] != "ok":
+        raise RuntimeError(f"probe faalde: {status.get('reden')}")
+
+    docs = list(bron.list_documents())
+    if not docs:
+        raise RuntimeError("nul documenten uit de geconfigureerde paden")
+
+    gelezen = 0
+    leeg = 0
+    for doc in docs[:MAX_TEKST_STEEKPROEF]:
+        try:
+            if bron.fetch_content(doc).strip():
+                gelezen += 1
+        except LeegDocumentError:
+            leeg += 1
+
+    dekking = bron.dekking()
+    som = dekking["gelezen"] + sum(dekking["overgeslagen"].values())
+    if som != dekking["gezien"]:
+        raise RuntimeError(
+            f"dekking telt niet op: gezien {dekking['gezien']} ≠ gelezen "
+            f"{dekking['gelezen']} + overgeslagen {sum(dekking['overgeslagen'].values())}"
+        )
+    per_type: dict[str, int] = {}
+    for d in docs:
+        per_type[d.type] = per_type.get(d.type, 0) + 1
+    soorten = ", ".join(f"{k}={v}" for k, v in sorted(per_type.items()))
+    return (
+        f"{len(docs)} documenten ({soorten}); steekproef {gelezen} met tekst, {leeg} leeg; "
+        f"dekking {dekking['gezien']} gezien / {dekking['gelezen']} gelezen"
+    )
+
+
 def check_jira() -> str:
     """Opvolgpunten ophalen — en vaststellen dat ze buiten de triage blijven."""
     _vereis("JIRA_BASE_URL", "JIRA_API_TOKEN")
@@ -378,6 +425,7 @@ COMPONENTEN: dict[str, Callable[[], str]] = {
     "drive": check_drive,
     "planning": check_planning,
     "jira": check_jira,
+    "nextcloud": check_nextcloud,
     "classificatie": check_classificatie,
     "assistent-api": check_assistent_api,
 }

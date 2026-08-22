@@ -173,6 +173,7 @@ def lege_registries() -> Iterator[None]:
     # uitvoeren en in dubbele-registratie eindigen.
     for mod_naam in (
         "iso_audit.sources.drive",
+        "iso_audit.sources.nextcloud",
         "iso_audit.sources.planning",
         "iso_audit.sources.jira",
         "iso_audit.notifiers.slack",

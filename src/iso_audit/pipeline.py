@@ -400,6 +400,7 @@ def run_audit(
     """
     audit_id = audit_id or _maak_audit_id()
     _resume_pending_decisions(audit_id, mode)
+    from iso_audit import eigen_output
     from iso_audit.classification.clause_mapping import (
         filter_clause_map,
         koppel_documenten,
@@ -511,6 +512,23 @@ def run_audit(
             log_veilig(logger, "Miro-ingest mislukt (niet kritiek)", exc=e, bron="miro")
 
     logger.info("Stap 4/7: Documenten koppelen aan clausules...")
+
+    # Eigen output telt niet als bewijs. Gemeten op 2026-08-22: 462 van de 1241 bevindingen
+    # (37%) kwamen uit documenten die dit tool zelf schreef — hetzelfde auditrapport in vier
+    # formaten, dezelfde bevindingenlijst in twee, en drie eigen memo's. Een bevinding die als
+    # bewijs een eerder eigen rapport aanwijst is geen observatie maar een echo, en dat raakt
+    # de onafhankelijkheid van de interne auditfunctie.
+    #
+    # Hier en niet in de bron-adapter: het geldt voor élke bron, en de documenten blijven wél
+    # in het landschap staan (zie `_bewaar_ingest` hieronder) zodat navraag mogelijk blijft.
+    documenten, eigen_documenten = eigen_output.splits(documenten)
+    if eigen_documenten:
+        logger.warning(
+            "%d document(en) zijn eigen output van dit tool en tellen niet als bewijs: %s",
+            len(eigen_documenten),
+            [d.get("naam") for d in eigen_documenten][:10],
+        )
+
     cutoff = (date.today() - timedelta(days=2 * 365)).isoformat()
     gekoppeld_alle, niet_geclassificeerd = koppel_documenten(documenten, clause_map)
     gearchiveerd = [d for d in gekoppeld_alle if (d.get("modified_at") or "") < cutoff]
@@ -532,7 +550,9 @@ def run_audit(
     # Los daarvan is het ook wat een auditwerktuig hoort te doen: je hebt bewijs
     # ingezien, dus leg vast wát je hebt ingezien. En het maakt hergebruik mogelijk —
     # zonder opgeslagen documenten valt er niets te cachen.
-    _bewaar_ingest(gekoppeld_alle + niet_geclassificeerd, norm, actieve_bronnen)
+    # Eigen output gaat wél het landschap in: uitsluiten van bewijs is niet hetzelfde als
+    # weggooien, en een auditor mag navragen waarom een document niet is gewogen.
+    _bewaar_ingest(gekoppeld_alle + niet_geclassificeerd + eigen_documenten, norm, actieve_bronnen)
 
     # Openstaande punten gaan buiten de classificatie om: ze zijn al beoordeeld door
     # degene die ze aanmaakte. Daarom ook in alleen-ingest — geen API-key nodig.

@@ -66,6 +66,24 @@ Adapters registreren via `@iso_audit.sources.register` op class-level. De
 registry werpt `ValueError` bij dubbele namen — dat is een
 programmeerfout, geen silent-overschrijving.
 
+### Bestaande bron-adapters
+
+| adapter | leest | documentatie |
+|---|---|---|
+| `DriveSource` | Google Drive en Shared Drives | [`source-drive.md`](docs/reference/source-drive.md) |
+| `NextcloudSource` | Nextcloud en andere WebDAV-servers | [`source-nextcloud.md`](docs/reference/source-nextcloud.md) |
+| `PlanningSource` | auditplanning uit Google Sheets | [`source-planning.md`](docs/reference/source-planning.md) |
+| `JiraSource` | tickets en opvolgpunten | [`source-jira.md`](docs/reference/source-jira.md) |
+
+`NextcloudSource` (2026-08-22) is de eerste adapter voor een bron die niets met Google of
+Atlassian deelt, en daarmee de eerste echte test van dit protocol. Uitkomst: de pipeline hoefde
+niet te wijzigen. Wat wél moest: de tekstlezers (PDF, docx, xlsx, pptx, tekstformaten) zijn uit
+`sources/drive.py` naar `sources/tekst.py` verhuisd, omdat ze functies van bytes naar tekst zijn
+en niets met Drive te maken hebben. Google-exports blijven Drive-specifiek.
+
+Dat is de deelbaarheidsgrens die het protocol niet zelf aangeeft: **hoe je bij de bytes komt** is
+bronspecifiek, **wat je met de bytes doet** niet.
+
 ## Sink Protocol (`iso_audit.sinks.base`)
 
 `DriveSink` is de eerste implementatie (milestone C §3.3.1). Doorgeleiding

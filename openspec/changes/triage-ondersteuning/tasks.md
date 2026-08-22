@@ -6,24 +6,32 @@ een probleem te verzachten dat deterministisch op te lossen was.
 
 ## 1. Laag 0 — eigen output telt niet als bewijs
 
-- [ ] 1.1 Merkteken in de kop van `reporting/local_report.schrijf_rapport` en in de
+- [x] 1.1 Merkteken in de kop van `reporting/local_report.schrijf_rapport` en in de
       memo-render; voor binaire formaten als documenteigenschap
-- [ ] 1.2 Bij het inlezen op dat merkteken filteren; het document blijft in het landschap met
+- [x] 1.2 Bij het inlezen op dat merkteken filteren; het document blijft in het landschap met
       de reden "eigen output, geen bewijs"
-- [ ] 1.3 **Eenmalige lijst** voor de twaalf bestaande bestanden, met datum en reden erbij —
+- [x] 1.3 **Eenmalige lijst** voor de twaalf bestaande bestanden, met datum en reden erbij —
       geen permanente naamregel, want een naam wijzigt en `Auditrapport 2022.docx` is extern
-- [ ] 1.4 Test: document met merkteken levert geen bevinding; extern auditrapport zonder
+- [x] 1.4 Test: document met merkteken levert geen bevinding; extern auditrapport zonder
       merkteken wel
-- [ ] 1.5 Test: het merkteken overleeft de md → docx/html/pdf-conversie
-- [ ] 1.6 Meten na de wijziging: hoeveel bevindingen blijven over van de 1241
+- [x] 1.5 Test: het merkteken overleeft de md → docx/html/pdf-conversie
+- [x] 1.6 **Gemeten na de wijziging: 1241 → 779 bevindingen (−462, 37%).** Clausules met meer
+      dan tien bevindingen: 53 → 27
 
-## 2. Laag 1 — exacte duplicaten samenvouwen
+## 2. Laag 1 — exacte duplicaten samenvouwen — **vervallen, gemeten overbodig**
 
-- [ ] 2.1 Groeperen op `(clausule_id, norm, genormaliseerde beschrijving)` met dezelfde
-      normalisatie als `runs.dedup_sleutel`
-- [ ] 2.2 De samengevouwen regel toont het aantal en de brondocumenten
-- [ ] 2.3 Test: vier identieke beschrijvingen leveren één regel met aantal vier
-- [ ] 2.4 Test: een verschil van meer dan witruimte levert twee regels — geen drempel
+- [x] 2.1 ~~Groeperen op `(clausule_id, norm, genormaliseerde beschrijving)`~~ — **niet
+      gebouwd.** Nagemeten ná laag 0: van de 264 exacte duplicaten blijft er **één** over. Ze
+      zaten vrijwel allemaal ín de eigen output — hetzelfde auditrapport in md, docx, html en
+      pdf levert vier keer dezelfde beschrijving, en die vier vallen nu al weg.
+- [x] 2.2 ~~Aantal en brondocumenten tonen~~ — vervalt met 2.1
+- [x] 2.3 ~~Test op vier identieke beschrijvingen~~ — vervalt met 2.1
+- [x] 2.4 ~~Test op de drempelloosheid~~ — vervalt met 2.1
+
+> Eén samenvouwmechanisme bouwen voor één rij is duurder dan het oplevert: het is code die
+> onderhouden moet worden, en elke groepering maakt de werklijst een stap verder van de ruwe
+> bevindingen af. Blijkt het aantal duplicaten te groeien, dan is dit weer een change — met een
+> nieuwe meting eronder in plaats van de oude.
 
 ## 3. Laag 2 — de agent die voorbereidt
 

@@ -17,18 +17,12 @@ totdat ze omgezet zijn naar `SourceRegistry`-based dispatch.
 
 from __future__ import annotations
 
-import io
 import logging
 import os
 from collections import Counter
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
-
-import docx
-import openpyxl
-import pptx
-import pypdf
 
 from iso_audit.clients.google_drive import (
     drive_download_bestand,
@@ -43,6 +37,15 @@ from iso_audit.config.google_ids import uit_url
 from iso_audit.config.verbinding import normaliseer
 from iso_audit.sources import register
 from iso_audit.sources.base import Document, Finding
+from iso_audit.sources.tekst import (
+    DOCX_MIME,
+    GESCANDE_FORMATEN,
+    PPTX_MIME,
+    XLSX_MIME,
+    LeegDocumentError,
+    lees_bytes,
+    tekst_uit_xlsx,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +63,6 @@ GOOGLE_DOC_MIME = "application/vnd.google-apps.document"
 GOOGLE_SHEET_MIME = "application/vnd.google-apps.spreadsheet"
 GOOGLE_SLIDES_MIME = "application/vnd.google-apps.presentation"
 SNELKOPPELING_MIME = "application/vnd.google-apps.shortcut"
-
-GESCANDE_FORMATEN: frozenset[str] = frozenset({"application/pdf"})
-"""Formaten waarbij "geen tekst" op een scan kan duiden.
-
-Voor de rest kan het dat niet. Een `.docx` zonder tekst is geen scan maar een document
-waarvan de inhoud buiten het bereik van de lezer valt — tot 2026-08-21 stond in de melding
-"mogelijk een scan of een leeg bestand" voor élk formaat, en dat wees de auditor de verkeerde
-kant op bij precies het bestand dat wél te repareren was."""
-DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 ONDERSTEUNDE_MIME_TYPES: dict[str, str] = {
     GOOGLE_DOC_MIME: "google_doc",
@@ -167,107 +159,6 @@ def _is_uitgesloten(naam: str) -> bool:
     return any(naam.startswith(p) for p in UITGESLOTEN_NAAM_PREFIXEN)
 
 
-class LeegDocumentError(Exception):
-    """De extractie lukte, maar leverde geen tekst op.
-
-    Bewust een eigen fout en geen lege string: een gescande PDF levert nul tekens, en als
-    document met lege inhoud opgenomen classificeert de pipeline hem als "geen bewijs" — een
-    oordeel over iets wat niemand heeft gelezen, op een clausule waar het bewijs bestaat.
-    Dezelfde regel als bij de classificatie sinds 2026-08-17, waar een afgekapt antwoord ook
-    geen leeg oordeel meer is.
-    """
-
-
-def _tekst_uit_docx(inhoud: bytes) -> str:
-    """Alinea's **en** tabelcellen.
-
-    De tabellen ontbraken tot 2026-08-21, en dat is geen detail: een actiepuntenlijst of een
-    RI&E-overzicht is één tabel en levert dan nul alinea's op. Gemeten in de eerste
-    productierun — `Actiepunten uit Waveland.docx` kwam binnen als "geen tekst, mogelijk een
-    scan", wat voor een docx onmogelijk is.
-
-    Tekstvakken en koppen/voetteksten blijven buiten bereik: die zitten niet in het
-    `document.body`-model van python-docx. Een docx die daardoor leeg blijft, wordt gemeld als
-    onleesbaar — zichtbaar, niet stil.
-    """
-    doc = docx.Document(io.BytesIO(inhoud))
-    delen = [p.text for p in doc.paragraphs]
-    for tabel in doc.tables:
-        for rij in tabel.rows:
-            cellen = [c.text.strip() for c in rij.cells if c.text.strip()]
-            if cellen:
-                delen.append("\t".join(cellen))
-    tekst = "\n".join(delen)
-    if not tekst.strip():
-        # Geen tekst én tekeningen in de body: dan is de inhoud ingevoegde afbeeldingen, en
-        # dat is een feit in plaats van een vermoeden. Gemeten op 2026-08-21:
-        # `Actiepunten uit Waveland.docx` is 569 KB met drie lege alinea's, nul tabellen en
-        # zes `w:drawing`-elementen — screenshots in een Word-bestand. "Mogelijk een scan"
-        # zei daar het verkeerde over; alleen OCR zou hier iets opleveren.
-        tekeningen = doc.element.body.xml.count("w:drawing")
-        if tekeningen:
-            raise LeegDocumentError(
-                f"bevat {tekeningen} ingevoegde afbeelding(en) en geen tekst; "
-                "zonder OCR is hier niets uit te lezen"
-            )
-    return tekst
-
-
-def _tekst_uit_xlsx(inhoud: bytes) -> str:
-    """Celtekst per blad, met de bladnaam als kop.
-
-    `data_only=True` geeft de laatst berekende waarde in plaats van de formule: in een
-    RI&E-actielijst is "hoog" het bewijs, niet `=ALS(...)`.
-    """
-    boek = openpyxl.load_workbook(io.BytesIO(inhoud), data_only=True, read_only=True)
-    regels: list[str] = []
-    for blad in boek.worksheets:
-        regels.append(f"## {blad.title}")
-        for rij in blad.iter_rows(values_only=True):
-            cellen = [str(c) for c in rij if c is not None and str(c).strip()]
-            if cellen:
-                regels.append("\t".join(cellen))
-    boek.close()
-    return "\n".join(regels)
-
-
-def _tekst_uit_pptx(inhoud: bytes) -> str:
-    """Tekst per dia, inclusief tabellen — om dezelfde reden als bij docx."""
-    presentatie = pptx.Presentation(io.BytesIO(inhoud))
-    regels: list[str] = []
-    for nummer, dia in enumerate(presentatie.slides, start=1):
-        regels.append(f"## Dia {nummer}")
-        for vorm in dia.shapes:
-            tekst = getattr(vorm, "text", "")
-            if tekst and tekst.strip():
-                regels.append(tekst)
-            if getattr(vorm, "has_table", False):
-                for rij in vorm.table.rows:
-                    cellen = [c.text.strip() for c in rij.cells if c.text.strip()]
-                    if cellen:
-                        regels.append("\t".join(cellen))
-    return "\n".join(regels)
-
-
-def _tekst_uit_pdf(inhoud: bytes) -> str:
-    """Doorlopende tekst per pagina via `pypdf`. Geen OCR.
-
-    Een gescande PDF levert hier nul tekens op; die wordt door de caller als onleesbaar
-    gemeld en niet als leeg document opgenomen.
-    """
-    lezer = pypdf.PdfReader(io.BytesIO(inhoud))
-    return "\n".join(pagina.extract_text() or "" for pagina in lezer.pages)
-
-
-_BINAIRE_LEZERS: dict[str, Callable[[bytes], str]] = {
-    DOCX_MIME: _tekst_uit_docx,
-    XLSX_MIME: _tekst_uit_xlsx,
-    PPTX_MIME: _tekst_uit_pptx,
-    "application/pdf": _tekst_uit_pdf,
-}
-"""Per binair formaat één lezer. De rest wordt als tekst gedecodeerd."""
-
-
 def _fetch_tekst(file_id: str, mime: str) -> str:
     """Haal de tekst-inhoud op voor een Drive-bestand op basis van MIME.
 
@@ -281,11 +172,10 @@ def _fetch_tekst(file_id: str, mime: str) -> str:
         # Als `.xlsx` en niet als CSV: een CSV-export van een Google Sheet bevat alleen het
         # **eerste** blad. Dat is precies de stille onvolledigheid die deze change weghaalt,
         # en de xlsx-lezer hierboven bestaat al.
-        tekst = _tekst_uit_xlsx(drive_exporteer_bytes(file_id, XLSX_MIME))
+        tekst = tekst_uit_xlsx(drive_exporteer_bytes(file_id, XLSX_MIME))
     else:
         inhoud = drive_download_bestand(file_id)
-        lezer = _BINAIRE_LEZERS.get(mime)
-        tekst = lezer(inhoud) if lezer else inhoud.decode("utf-8", errors="replace")
+        tekst = lees_bytes(inhoud, mime)
     if not tekst.strip():
         reden = (
             "mogelijk een scan of een leeg bestand"

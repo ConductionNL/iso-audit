@@ -6,6 +6,77 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-22 — Nextcloud als bron, en het bronprotocol is bewezen
+
+`NextcloudSource` leest documenten via WebDAV (`PROPFIND` met `Depth: 1`, `GET` voor de inhoud).
+WebDAV en niet de Nextcloud-eigen OCS-API: dezelfde adapter werkt tegen ownCloud, Seafile of een
+Apache met `mod_dav`.
+
+**Wat dit over de architectuur zegt.** `iso_audit.sources` bestaat om bronnen inwisselbaar te
+maken, en dat was onbewezen — Drive, Jira en Planning zijn alle drie Google- of
+Atlassian-specifiek. Uitkomst: **de pipeline hoefde niet te wijzigen.** Wat wél moest: de
+tekstlezers (PDF, docx, xlsx, pptx, tekstformaten) zijn uit `sources/drive.py` naar
+`sources/tekst.py` verhuisd. Dat zijn functies van bytes naar tekst; een tweede set per bron
+maakt van "leest het tool xlsx-tabellen?" een vraag met twee antwoorden. De 1176 bestaande tests
+bleven ongewijzigd draaien — dat is het bewijs dat de verhuizing niets veranderde.
+
+Daarmee is de deelbaarheidsgrens gevonden die het protocol zelf niet aangeeft: **hoe je bij de
+bytes komt is bronspecifiek, wat je met de bytes doet niet.**
+
+Gedraaid tegen `canary-accept/nextcloud` (32.0.13) in het cluster: **9 documenten** — pdf, docx
+(inclusief tabel), xlsx (inclusief tweede blad), pptx, md, csv en drie txt — dekking 10 gezien /
+9 gelezen. Die run vond twee fouten die de gestubde tests niet zagen:
+
+1. **Paden waren relatief aan de opgevraagde map** in plaats van aan de DAV-wortel, waardoor de
+   recursie in de verkeerde map zocht en submappen leeg leken.
+2. **Een lege `.txt` kreeg "mogelijk staat de inhoud in tekstvakken"** — over een bestand van nul
+   bytes. `leeg_reden()` onderscheidt nu drie gevallen: scan-formaten, platte tekst, en de rest.
+
+Plus een derde inconsistentie: `gezien` telde niet op met `gelezen + overgeslagen`, omdat wat de
+WebDAV-client al oversloeg (verborgen bestanden) alleen in `overgeslagen` belandde. Dat is de
+rekensom die een auditor maakt.
+
+Beveiliging: nagemeten met Python 3.12.13 en expat 2.7.3 weigert `xml.etree.ElementTree` een
+entity-expansie ("billion laughs") **niet** — een kleine invoer leverde 3000 tekens op. Een
+`PROPFIND`-antwoord met een DOCTYPE wordt daarom geweigerd vóór het parsen, plus een lengtegrens
+van 32 MB. Entiteiten vereisen een DTD en een WebDAV-antwoord heeft er nooit legitiem een; dat is
+twee regels in plaats van een `defusedxml`-afhankelijkheid.
+
+Authenticatie met een **app-specifiek wachtwoord**, niet met een gebruikerswachtwoord: apart
+intrekbaar, zonder toegang tot de webinterface. Zelfde argument als bij het
+Google-service-account.
+
+Prullenbak, versies, uploads en verborgen bestanden worden overgeslagen — **met melding**, want
+bij een nieuwe bron is de verleiding het grootst om "die map hoort er niet bij" ongezegd te laten.
+
+### Changed — 2026-08-22 — eigen output telt niet meer als bewijs (37% van de werklijst)
+
+Gemeten op de eerste volledige run: **462 van de 1241 bevindingen kwamen uit twaalf documenten
+die dit tool zelf schreef** — hetzelfde auditrapport in md, docx, html én pdf, dezelfde
+bevindingenlijst in csv en xlsx, plus drie eigen managementmemo's.
+
+`schrijf_rapport`, de CSV- en de xlsx-export zetten nu een zichtbaar merkteken in hun output, en
+de pipeline classificeert gemarkeerde documenten niet. Zichtbare tekst en geen comment of
+documenteigenschap: het rapport gaat naar docx, html en pdf, en alleen zichtbare tekst overleeft
+alle drie.
+
+Herkenning op het merkteken en **niet op de bestandsnaam**, want dat faalt twee kanten op: een
+naam wijzigt en het document telt stil weer mee, en `Auditrapport 2022.docx` is van de
+certificerende instantie en is juist bewijs. Voor de twaalf bestanden die er al stonden is er een
+eenmalige namenlijst, één voor één nagekeken — die hoort te krimpen, niet te groeien.
+
+De CSV-marker staat **onder** de data: een `#`-regel bovenaan leest `csv.DictReader` als
+kolomkoppen, en dan breekt elke lezer van die export om een merkteken toe te voegen.
+
+Uitsluiten is niet weggooien: de documenten blijven in het landschap, want een auditor mag
+navragen waarom iets niet is gewogen.
+
+**Gemeten resultaat: 1241 → 779 bevindingen. Clausules met meer dan tien bevindingen: 53 → 27.**
+
+En laag 1 van die change (exacte duplicaten samenvouwen) is daarmee **vervallen**: van de 264
+duplicaten blijft er ná laag 0 precies één over — ze zaten vrijwel allemaal ín de eigen output.
+Eén samenvouwmechanisme bouwen voor één rij is duurder dan het oplevert.
+
 ### Fixed — 2026-08-22 — de vraagassistent weigerde twee van drie eerlijke antwoorden
 
 Eerste test tegen het echte model op het echte corpus (`assistent_vragen` stond op nul; taak 8.1

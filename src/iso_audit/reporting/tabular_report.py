@@ -162,11 +162,19 @@ def schrijf_csv(
     pad = out_dir / _bestandsnaam("Bevindingen", norm, scherpte, "csv")
     rijen = _sorteer(_verrijk(bevindingen, llm_themas=llm_themas))
 
+    from iso_audit.eigen_output import MERKTEKEN
+
     with pad.open("w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_KOLOMMEN, extrasaction="ignore")
         writer.writeheader()
         for r in rijen:
             writer.writerow({k: r.get(k, "") for k in CSV_KOLOMMEN})
+        # Ná de data en niet ervóór. Een `#`-regel bovenaan is een gangbare CSV-conventie,
+        # maar `csv.DictReader` kent hem niet en leest hem als kolomkoppen — daarmee zou elke
+        # lezer van deze export breken om een merkteken toe te voegen. Onderaan blijft de
+        # header intact; de tekstextractie leest het bestand als platte tekst en vindt het
+        # merkteken ongeacht de positie.
+        f.write(f"# {MERKTEKEN}\n")
     logger.info("CSV geschreven: %s (%d rijen)", pad, len(rijen))
     return str(pad)
 
@@ -196,7 +204,13 @@ def schrijf_excel(
     pad = out_dir / _bestandsnaam("Bevindingen", norm, scherpte, "xlsx")
     rijen = _sorteer(_verrijk(bevindingen, llm_themas=llm_themas))
 
+    from iso_audit.eigen_output import MERKTEKEN
+
     wb = Workbook()
+    # Zowel in de documenteigenschappen als in een cel: `openpyxl` leest de eigenschappen niet
+    # terug bij tekstextractie, dus alleen daar zetten zou het merkteken onzichtbaar maken voor
+    # precies het pad dat het moet tegenhouden.
+    wb.properties.description = MERKTEKEN
     _tab_samenvatting(wb.active, rijen)
     _tab_bevindingen(wb.create_sheet("Bevindingen"), rijen)
     _tab_per_clausule(wb.create_sheet("Per clausule"), rijen)
@@ -206,7 +220,13 @@ def schrijf_excel(
 
 
 def _tab_samenvatting(ws: Any, rijen: list[dict[str, Any]]) -> None:
+    from iso_audit.eigen_output import MERKTEKEN
+
     ws.title = "Samenvatting"
+    # Als cel en niet alleen als documenteigenschap: de xlsx-lezer in `sources/tekst` leest
+    # celtekst, en het merkteken moet zichtbaar zijn voor precies dat pad.
+    ws.append([MERKTEKEN])
+    ws.append([])
     header_font = Font(bold=True)
 
     ws.append(["Totalen"])

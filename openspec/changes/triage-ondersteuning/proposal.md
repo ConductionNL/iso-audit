@@ -43,7 +43,12 @@ aanhoudt: deterministisch in code, geen LLM en geen gelijkenis-drempel.
 
 ### Wat er dan nog over is
 
-Na die twee: ongeveer **515 bevindingen** in plaats van 1241. Dan is de vraag pas of een agent
+**Nagemeten na het bouwen van laag 0: 1241 → 779.** De 264 duplicaten bleken vrijwel allemaal
+ín de eigen output te zitten — vier formaten van hetzelfde rapport geven vier keer dezelfde
+beschrijving — dus laag 1 levert er nog precies **één** op en is niet gebouwd. Clausules met
+meer dan tien bevindingen: 53 → 27.
+
+779 bevindingen over 27 zware clausules is nog steeds veel. Dáár is de vraag of een agent
 helpt, en waarmee.
 
 ## Wat er verandert

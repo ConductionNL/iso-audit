@@ -167,12 +167,31 @@ def test_schrijf_csv_basis(tmp_path: Path) -> None:
     p = Path(pad)
     assert p.is_file()
     assert p.parent == tmp_path
-    # Verifieer header + data.
+    # Verifieer header + data. De laatste regel is het merkteken (`# ...`) en hoort niet bij
+    # de data; hij staat er zodat een volgende run deze export niet als bewijs terugleest.
     with p.open(encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
+        rows = [r for r in csv.DictReader(f) if not str(r["norm"] or "").startswith("#")]
     assert len(rows) == 1
     assert rows[0]["clausule"] == "10.2"
     assert rows[0]["classificatie"] == "NC"
+
+
+def test_schrijf_csv_draagt_het_merkteken(tmp_path: Path) -> None:
+    """Zonder merkteken leest een volgende run deze export als bewijs.
+
+    Gemeten op 2026-08-22: `Bevindingen_beide_v3.3_2026-05-05.csv` leverde 63 bevindingen op —
+    bevindingen afgeleid uit onze eigen bevindingenlijst.
+
+    Onderaan en niet bovenaan: een `#`-regel bóven de kolomkoppen leest `csv.DictReader` als
+    header, en dan breekt elke lezer van deze export om een merkteken toe te voegen.
+    """
+    from iso_audit.eigen_output import MERKTEKEN, is_eigen_output
+
+    pad = tr.schrijf_csv(_voorbeeld_bevindingen(), norm="9001", output_dir=str(tmp_path))
+    tekst = Path(pad).read_text(encoding="utf-8")
+    assert MERKTEKEN in tekst
+    assert tekst.splitlines()[0].startswith("norm,clausule"), "de kolomkoppen staan bovenaan"
+    assert is_eigen_output(tekst=tekst)
 
 
 # ---------- schrijf_excel ----------

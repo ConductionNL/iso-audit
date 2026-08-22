@@ -150,7 +150,7 @@ def beschikbare_bronnen() -> list[str]:
     # Side-effect-imports: laat elke adapter zijn @register-decorator draaien.
     # importlib i.p.v. losse submodule-imports met F401-suppressie — uniform en
     # zonder de bijbehorende lint-quirks.
-    for _bron in ("drive", "jira", "planning"):
+    for _bron in ("drive", "jira", "nextcloud", "planning"):
         importlib.import_module(f"iso_audit.sources.{_bron}")
 
     return sorted(set(sources.available()) | set(_PSEUDO_SOURCES))

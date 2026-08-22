@@ -49,6 +49,11 @@ def _bron_url(herkomst: str, doc_id: str) -> str | None:
     h = (herkomst or "").lower()
     if h == "drive":
         return f"https://drive.google.com/open?id={doc_id}"
+    if h == "nextcloud":
+        basis = os.environ.get("NEXTCLOUD_BASE_URL", "").rstrip("/")
+        # Het pad is de identiteit van een WebDAV-document; de `f/<fileid>`-vorm die Nextcloud
+        # in zijn UI gebruikt vraagt een extra API-call en levert hetzelfde bestand op.
+        return f"{basis}/index.php/apps/files/?dir=/{doc_id.rsplit('/', 1)[0]}" if basis else None
     if h == "jira":
         base = os.environ.get("JIRA_BASE_URL", "").rstrip("/")
         return f"{base}/browse/{doc_id}" if base else None
