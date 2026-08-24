@@ -6,6 +6,45 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — een gekoppelde bron overleeft nu een herstart
+
+Na de uitrol van 0.2.0a25 weigerde de run-gate Nextcloud: "niet gekoppeld". De configuratie
+stond compleet op de PVC (`bron_config.json`, alle velden), maar de omgeving van de nieuwe pod
+was leeg. Oorzaak: `Settings.VELDEN` kende de Nextcloud-velden niet. `load_config()` schrijft
+bij het opstarten alleen díe velden naar `os.environ`, en de adapters lezen de omgeving bij
+`__init__`. Wat wél in `api/bron_catalogus.py` staat maar niet in `VELDEN`, is dus in het
+portaal in te vullen en verdwijnt bij de eerste herstart.
+
+Het werkte tot dat moment omdat `BronConfig.zet()` de waarde bij het opslaan direct in
+`os.environ` van het lopende proces schrijft: hetzelfde proces, dus dezelfde omgeving. Een
+configuratie die vier dagen werkt en dan bij een willekeurige node-drain wegvalt, is erger dan
+een die meteen faalt — je zoekt het bij de bron en niet bij de configuratie.
+
+**Vijf velden ontbraken, niet drie.** `JIRA_PROJECTS` en `NEXTCLOUD_PATHS` hadden hetzelfde gat,
+dus ook de Jira-scope en de Nextcloud-paden verdwenen bij een herstart. Dat is precies waarom de
+nieuwe test op de **catalogus** zit en niet op één bron: `tests/config/test_catalogus_settings_koppeling.py`
+faalt zodra een veld in het portaal in te vullen is zonder in `VELDEN` te staan, plus een tweede
+test dat "geheim" aan beide kanten hetzelfde is (gemaskeerd in de UI en leesbaar in de
+herkomst-uitvoer is een lek).
+
+Daarnaast `tests/config/test_herstart_behoudt_bronnen.py`, die het scenario zelf nabouwt:
+opslaan, de omgeving wissen zoals een herstart dat doet, opnieuw laden, en dan de adapter
+bouwen. Dat wissen is het hart van die test — zonder wissen slaagt hij op de omgeving van vóór
+de herstart en bewijst hij niets.
+
+**Wat hiermee ook is afgedekt:** `zet()` slaat velden over waarvan de waarde niet verandert
+(`if nieuw == huidig.get(naam, "")`). Na een herstart betekende dat dat opnieuw opslaan van
+dezelfde waarden de koppeling *niet* herstelde — de auditor drukt op opslaan, er verandert
+niets, en de bron blijft los. Gemeten op 2026-08-24: alleen het gewijzigde wachtwoord kwam in de
+omgeving, de ongewijzigde URL en gebruikersnaam niet. Het inlezen bij opstarten maakt dat pad
+onnodig; de overslag zelf blijft staan omdat hij de beheerderswaarde-precedentie bewaakt.
+
+**Nog niet opgelost, wel gemeten:** `secret_store.lees()` geeft in de pod **401 van de
+kube-API**. De Secret-backend werkt dus niet en alles valt terug op de PVC. Die terugval is er
+expres, maar hij is nu de enige weg terwijl de code de Secret beschrijft als de plek "waar een
+beheerder credentials verwacht, met RBAC en kube-API-auditlogging eromheen". De RBAC of het
+serviceaccount-token moet nagekeken worden.
+
 ### Fixed — 2026-08-24 — de PDF komt er weer, en de oorzaak was 2,2 KB CSS
 
 Aan het eind van elke run stond `PDF-conversie mislukt: Geen Chrome/Chromium gevonden`. Het

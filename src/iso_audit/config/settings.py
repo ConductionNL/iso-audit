@@ -94,11 +94,24 @@ class Veld:
 # De env-namen zijn wat de adapters daadwerkelijk lezen — `sources/jira.py`,
 # `auth.py`, `classification/findings.py`. Staat hier iets anders, dan koppelt de
 # bron niet. Daarom is dit één lijst en geen tweede administratie.
+#
+# Wat hier ontbreekt maar wél in `api/bron_catalogus.py` staat, is in het portaal in te
+# vullen en verdwijnt bij de eerste herstart: `load_config()` schrijft alleen deze velden
+# naar `os.environ`, en `BronConfig.zet()` doet dat verder alleen in het lopende proces.
+# Zo verloor Nextcloud op 2026-08-24 zijn koppeling bij een versie-uitrol terwijl
+# `bron_config.json` op de PVC nog compleet was. `JIRA_PROJECTS` en `NEXTCLOUD_PATHS`
+# hadden hetzelfde gat. `tests/config/test_catalogus_settings_koppeling.py` bindt de twee
+# lijsten aan elkaar, zodat de volgende adapter niet dezelfde weg gaat.
 VELDEN: tuple[Veld, ...] = (
     Veld("gws.impersonate_email", "GWS_IMPERSONATE_EMAIL"),
     Veld("jira.base_url", "JIRA_BASE_URL"),
     Veld("jira.account_email", "JIRA_USER_EMAIL"),
     Veld("jira.api_token", "JIRA_API_TOKEN", geheim=True),
+    Veld("jira.projects", "JIRA_PROJECTS"),
+    Veld("nextcloud.base_url", "NEXTCLOUD_BASE_URL"),
+    Veld("nextcloud.user", "NEXTCLOUD_USER"),
+    Veld("nextcloud.app_password", "NEXTCLOUD_APP_PASSWORD", geheim=True),
+    Veld("nextcloud.paths", "NEXTCLOUD_PATHS"),
     Veld("miro.api_token", "MIRO_API_TOKEN", geheim=True),
     Veld("drive.folder_id", "AUDIT_SOURCE_FOLDER_ID"),
     Veld("planning.sheets_id", "AUDIT_PLANNING_SHEETS_ID"),
