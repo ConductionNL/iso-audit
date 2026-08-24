@@ -34,6 +34,7 @@ __all__ = [
     "Source",
     "available",
     "get",
+    "laad_adapters",
     "register",
 ]
 
@@ -41,6 +42,32 @@ __all__ = [
 # Module-level registry. Bewust geen class — een registry is staat van het
 # proces, en class-instantie-juggling voegt complexiteit toe zonder waarde.
 _REGISTRY: dict[str, type[Source]] = {}
+
+_ADAPTERMODULES: tuple[str, ...] = ("drive", "jira", "nextcloud", "planning")
+"""Modules die bij `laad_adapters()` geïmporteerd worden zodat hun `@register` draait.
+
+Bewust een expliciete lijst en geen automatische ontdekking: welke adapters een installatie
+kent, hoort leesbaar te zijn en niet af te hangen van wat er toevallig in de map staat.
+`tests/sources/test_registry_bootstrap.py` vergelijkt de lijst met het pakket, zodat een nieuwe
+adapter niet stil buiten de boot valt."""
+
+
+def laad_adapters() -> None:
+    """Importeer de gebundelde adapters zodat ze in de registry staan. Idempotent.
+
+    De `@register`-decorator draait pas bij import. Stond die import nergens, dan bestaat de
+    adapter niet voor `get(naam)` — zonder melding bij het opstarten, alleen een `KeyError` op
+    het moment dat iemand hem gebruikt. Dat gebeurde op 2026-08-24 twee keer: de preflight
+    meldde Jira als niet beschikbaar, en een los proces kreeg "Source-adapter 'nextcloud' niet
+    geregistreerd. Beschikbaar: drive". In beide gevallen bestond de adapter gewoon.
+
+    Deze functie hoorde hier en niet in `ingest.beschikbare_bronnen()`: de registry vullen is
+    geen bijwerking van het opvragen van een lijst.
+    """
+    import importlib
+
+    for module in _ADAPTERMODULES:
+        importlib.import_module(f"iso_audit.sources.{module}")
 
 
 def register(adapter_class: type[Source]) -> type[Source]:
