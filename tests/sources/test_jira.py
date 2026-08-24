@@ -303,7 +303,11 @@ def test_list_findings_emit_findings_met_clausule_ids(
     assert findings[0].clausule_ids == ["5.30"]
     # 'compliance' wordt niet naar een clausule-id gemapt; lege lijst.
     assert findings[1].clausule_ids == []
-    assert findings[0].id.startswith("sessie-1:")
+    # Het id is de Jira-sleutel en niet `sessie-1:<key>`. Die prefix stond hier tot
+    # 2026-08-24 en maakte elk opvolgpunt per run uniek: drie runs op één database gaven 83
+    # sleutels 249 rijen, zonder ook maar één modelaanroep. Zie
+    # `tests/sources/test_jira_opvolgpunt_id.py` voor de meting.
+    assert findings[0].id == "AUD-1"
 
 
 def test_list_findings_iso9001_label(monkeypatch: pytest.MonkeyPatch) -> None:

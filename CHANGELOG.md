@@ -6,6 +6,34 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — elke run dupliceerde alle Jira-opvolgpunten
+
+Gemeten met drie runs op één verse database, om te zien of het tool eerdere audit-context bewaart
+en hergebruikt:
+
+| ronde | duur | documenten | classificatie-calls | opvolgpunten in `bevindingen` |
+|---|---|---|---|---|
+| 1 (koud) | 31 min | 709 | 118 | 83 |
+| 2 | 16,5 min | 709 (0 nieuw) | **0** | **166** |
+
+Het hergebruik van classificaties is perfect: ronde 2 deed geen enkele modelaanroep en voegde
+geen document of clausule-koppeling toe. Maar er kwamen 83 bevindingen bij — allemaal
+Jira-opvolgpunten, allemaal dezelfde als in ronde 1.
+
+`_issue_to_finding` bouwde het id als `f"{sessie_id}:{key}"`. Dat sessie-id verschilt per run, dus
+dezelfde issue kreeg elke run een nieuw id en werd als nieuw punt opgeslagen: 83 unieke
+Jira-sleutels stonden er na twee runs 166 keer in, onder twee `audit-<tijdstempel>`-prefixen.
+Het documentenpad in dezelfde module gebruikte al wél de kale sleutel; alleen het bevindingenpad
+week af.
+
+Opvolgpunten staan buiten de triage (`herkomst NOT LIKE '%-opvolging'`), dus de werkset bleef
+schoon en niemand merkte het. Wat scheefliep is elke telling van "hoeveel opvolging is er" — en
+dat is precies waar deze rijen voor bestaan: aantonen dát er opvolging plaatsvindt. Een teller die
+met elke run verdubbelt toont dat niet aan maar overdrijft het.
+
+Het id is nu de Jira-sleutel. `sessie_id` blijft in de signatuur: die hoort bij de context van het
+ophalen, niet bij de identiteit van de issue.
+
 ### Changed — 2026-08-24 — `norm` hoort in de sleutel van `clause_matches`
 
 De primaire sleutel was `(doc_id, herkomst, clausule_id, sub_punt)`. Achttien clausulenummers

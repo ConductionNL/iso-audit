@@ -303,13 +303,25 @@ def _issue_to_document(issue: dict[str, Any]) -> Document:
 
 
 def _issue_to_finding(issue: dict[str, Any], sessie_id: str) -> Finding:
-    """Map Jira-issue naar `Finding`. Labels worden clausule-id's."""
+    """Map Jira-issue naar `Finding`. Labels worden clausule-id's.
+
+    Het id is de **Jira-sleutel**, niet `f"{sessie_id}:{key}"`. Dat sessie-id verschilt per run,
+    dus dezelfde issue kreeg elke run een nieuw id en werd als nieuw opvolgpunt opgeslagen.
+    Gemeten op 2026-08-24 met drie runs op één database: 83 unieke sleutels stonden er na twee
+    runs 166 keer in, zonder ook maar één modelaanroep — het waren letterlijk dezelfde punten.
+
+    Opvolgpunten staan buiten de triage, dus de werkset bleef schoon. Wat scheefliep is elke
+    telling van "hoeveel opvolging is er", en dat is precies waar deze rijen voor bestaan.
+
+    `sessie_id` blijft in de signatuur: de aanroeper geeft hem mee en hij hoort bij de context
+    van het ophalen, niet bij de identiteit van de issue.
+    """
     fields = issue.get("fields", {})
     labels: list[str] = list(fields.get("labels", []) or [])
     clausule_ids = [_label_naar_clausule(label) for label in labels]
     clausule_ids = [c for c in clausule_ids if c]
     return Finding(
-        id=f"{sessie_id}:{issue.get('key', '')}",
+        id=str(issue.get("key", "")),
         bron="jira",
         clausule_ids=clausule_ids,
         omschrijving=str(fields.get("summary", "")),
