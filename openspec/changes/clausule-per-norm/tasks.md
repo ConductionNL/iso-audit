@@ -32,6 +32,21 @@
 - [ ] 4.3 `input_hash` moet de norm meenemen, anders deelt een botsend nummer zijn cache met de
       andere norm — dat zou een verkeerd oordeel bevriezen
 
+## 4b. Blast radius — gemeten op 2026-08-24
+
+Twaalf modules gaan uit van "een clausule is een nummer", 108 plekken noemen `clausule_id`
+zonder norm ernaast. Volgorde die het risico beperkt:
+
+- [ ] 4b.1 Eerst de **schrijfkant** (koppeling, opslag, classificatie), met `beide` als
+      overgangswaarde die blijft werken
+- [ ] 4b.2 Dan de **leeskant** (`memo/builder.py`, `memo/pattern_detection.py`,
+      `api/landschap.py`, `api/routes_triage.py`, `classification/thema.py`,
+      `interviewvoorstel.py`)
+- [ ] 4b.3 Pas als beide kanten om zijn: de overgangswaarde `beide` verbieden
+- [ ] 4b.4 **Niet in één keer.** Elke stap moet met een echte run te verifiëren zijn; een
+      halve verbouwing die groen test maar tegen echte data faalt is precies het patroon dat
+      dit project blijft raken
+
 ## 5. Werkset en UI
 
 - [ ] 5.1 Bevinding-id's uniek over normen heen
