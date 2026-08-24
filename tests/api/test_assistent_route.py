@@ -118,6 +118,39 @@ def test_onverifieerbaar_antwoord_is_502_en_staat_in_de_trail(
     assert "niet zijn meegegeven" in rijen[0]["storing"]
 
 
+def test_onverwachte_fout_laat_ook_een_spoor_na(
+    portaal: PortaalClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Een crash is precies het moment waarop de trail het meest waard is.
+
+    Op 2026-08-24 gaf deze route een 500 op elke vraag met een koppelteken erin
+    (`non-conformiteiten` → `sqlite3.OperationalError: no such column: conformiteiten`). De
+    laatste rij in `assistent_vragen` was toen van 22 augustus: de storing liet géén spoor na,
+    want alleen de twee bekende assistent-fouten werden opgevangen. Daardoor was achteraf niet
+    vast te stellen wát er gevraagd was toen het misging.
+
+    De fout wordt onveranderd doorgegeven en niet omgezet in een 502: dit is een fout in onze
+    eigen code en geen weigering van de verwijzingscontrole, en dat onderscheid hoort zichtbaar
+    te blijven — in de status, in de stacktrace én in de trail.
+    """
+
+    def _ontploft(*a: Any, **k: Any) -> Any:
+        raise sqlite3.OperationalError("no such column: conformiteiten")
+
+    monkeypatch.setattr("iso_audit.assistent.vraag.beantwoord", _ontploft)
+
+    # De fout wordt niet geslikt: de testclient laat hem opborrelen, en in productie is het een
+    # 500 met stacktrace in het serverlog. Wat verandert is dat er nu óók een trail-rij staat.
+    with pytest.raises(sqlite3.OperationalError):
+        portaal.post("/assistent/vraag", json={"vraag": "Hoeveel non-conformiteiten hebben wij?"})
+
+    rijen = _rijen(tmp_path)
+    assert len(rijen) == 1
+    assert rijen[0]["vraag"] == "Hoeveel non-conformiteiten hebben wij?"
+    assert rijen[0]["antwoord"] == ""
+    assert "OperationalError" in rijen[0]["storing"]
+
+
 def test_vraag_zonder_dekking_bevraagt_geen_model(
     portaal: PortaalClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

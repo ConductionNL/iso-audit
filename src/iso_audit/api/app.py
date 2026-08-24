@@ -469,6 +469,24 @@ def create_app(
                     gesteld_door=wie,
                 )
                 raise HTTPException(status_code=502, detail=veilig) from exc
+            except Exception as exc:
+                # Een onverwachte fout liet tot 2026-08-24 géén spoor na: alleen de twee
+                # bekende assistent-fouten werden opgevangen. Die dag gaf elke vraag met een
+                # koppelteken een 500 (FTS5 las `non-conformiteiten` als kolomnaam), en
+                # achteraf was niet vast te stellen wát er gevraagd was toen het misging —
+                # precies het moment waarop de trail het meest waard is.
+                #
+                # De fout wordt onveranderd doorgegeven: dit is een fout in onze eigen code en
+                # geen weigering van de verwijzingscontrole, en dat onderscheid hoort zichtbaar
+                # te blijven in de status én in de stacktrace.
+                bewaar_assistentvraag(
+                    conn,
+                    agent="bronbevrager",
+                    record={"vraag": tekst, "antwoord": "", "model": ""},
+                    storing=f"{type(exc).__name__}: {exc}"[:500],
+                    gesteld_door=wie,
+                )
+                raise
             record = uit.als_record()
             bewaar_assistentvraag(conn, agent="bronbevrager", record=record, gesteld_door=wie)
         finally:

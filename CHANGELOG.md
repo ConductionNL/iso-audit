@@ -6,6 +6,23 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — een crash op de assistent-route liet geen spoor na
+
+`POST /assistent/vraag` ving alleen de twee bekende assistent-fouten op en legde die in
+`assistent_vragen` vast. Elke andere exceptie ging als 500 naar buiten **zonder trail-rij**. Op
+2026-08-24 gaf elke vraag met een koppelteken erin zo'n 500 (FTS5 las `non-conformiteiten` als
+kolomnaam), en de laatste rij in de trail was van 22 augustus: achteraf was niet vast te stellen
+wát er gevraagd was toen het misging.
+
+Een onverwachte fout komt nu ook in de trail, met het exceptietype en de melding. De fout zelf
+wordt onveranderd doorgegeven en niet omgezet in een 502: dit is een fout in onze eigen code en
+geen weigering van de verwijzingscontrole, en dat onderscheid hoort zichtbaar te blijven — in de
+status, in de stacktrace én in de trail.
+
+Dit is een voorwaarde voor `triage-agents`: bij één handmatige vraag is een spoorloze storing
+vervelend, bij tientallen agent-aanroepen per run is niet meer vast te stellen wat een agent zag
+toen hij iets beweerde.
+
 ### Fixed — 2026-08-24 — de norm-DB was een handmatige export van 13 van de 121 clausules
 
 `examples/norms/*.yaml` is een export uit `iso_audit.data.normteksten` — dat staat in het bestand
