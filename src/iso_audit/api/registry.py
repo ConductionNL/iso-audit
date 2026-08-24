@@ -115,6 +115,19 @@ vier plekken in de pipeline hardcoded (`choices=["9001","27001","beide"]`); een 
 norm toevoegen aan de norm-DB maakt hem hier dus kiesbaar maar nog niet draaibaar. In
 plaats van dat stil mis te laten gaan, faalt het aanmaken met een leesbare fout."""
 
+STANDAARD_NORMEN: tuple[str, ...] = ("9001", "27001")
+"""Wat een audit standaard toetst: beide normen.
+
+Een gecombineerde audit is de bedoeling; één norm is de uitzondering en niet de norm."""
+
+VOORKEURSNORM = "27001"
+"""Welke norm het wordt als er tóch maar één wordt gekozen.
+
+Keuze van de auditor (2026-08-24). ISO 27001 draagt de informatiebeveiligingsaudit en kent 93
+clausules tegen 28 voor 9001; een audit die één norm doet en 9001 kiest, laat het grootste deel
+van de beheersmaatregelen liggen. Dit is een standaard en geen verbod — een auditor die bewust
+alleen 9001 wil toetsen kan dat."""
+
 
 def norm_code(norm: str) -> str:
     """Korte code voor een norm: ``iso-9001-2015`` → ``9001``; ``9001`` blijft ``9001``.

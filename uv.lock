@@ -835,7 +835,7 @@ wheels = [
 
 [[package]]
 name = "iso-audit"
-version = "0.2.0a30"
+version = "0.2.0a31"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

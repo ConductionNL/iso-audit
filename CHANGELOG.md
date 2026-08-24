@@ -6,6 +6,55 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-24 — beide normen als standaard, 27001 als de norm bij één keuze
+
+Vastgelegd in `api/registry.py` (`STANDAARD_NORMEN`, `VOORKEURSNORM`) met een test. Keuze van de
+auditor: ISO 27001 draagt de informatiebeveiligingsaudit en kent 93 clausules tegen 28 voor 9001,
+dus een audit die één norm doet en 9001 kiest laat het grootste deel van de beheersmaatregelen
+liggen. Het is een standaard en geen verbod — een auditor die bewust alleen 9001 wil toetsen kan
+dat.
+
+### Analyse — 2026-08-24 — 800 bevindingen: geen duplicatie, wel te veel om te wegen
+
+Nagerekend op de meetdatabase, naar aanleiding van de vraag of 1.049 bevindingen niet overkill
+was:
+
+| | |
+|---|---|
+| bevindingen (zonder Jira-opvolging) | 800 |
+| verdeeld over | 118 documenten, 85 clausules |
+| gemiddeld per document | 6,8 — met uitschieters van 52 en 50 |
+| **duplicaten** | **4 van de 800** |
+| classificatie | 387 NC, 270 OFI, 143 positief |
+
+**Het zijn geen duplicaten.** Slechts vier bevindingen hebben een herhaalde beschrijving; de rest
+is breedte — 42 documenten die iets zeggen over clausule 8.16, elk met een eigen oordeel. Dedup
+op tekst zou dus vrijwel niets opleveren.
+
+Wat er wél mis is: **55 OFI's hebben een lege beschrijving én een lege onderbouwing** — een
+oordeel zonder inhoud dat meetelt in het rapport. En 387 NC's is geen werklijst: in het
+handgemaakte Q2-memo hield de auditor er 2 over, en op 24 augustus werden 902 bevindingen in vier
+bulkacties op `valide` gezet omdat één voor één wegen bij dat aantal niet gebeurt.
+
+Vastgelegd als change `autonome-review`: eerst een vormcontrole zonder model (die haalt er meteen
+55 uit), dan een zwaarder model dat per bevinding beoordeelt of hij ergens op slaat — met een
+steekproef van 50 vóór de volledige run, want 800 bevindingen op Opus is een uitgave die je één
+keer met de juiste prompt wil doen.
+
+### Analyse — 2026-08-24 — waar de 16 minuten van een herhaalde run heen gaan
+
+| bron | listing | inhoud per document | totaal |
+|---|---|---|---|
+| Drive | 65 s voor 456 docs | 2,49 s | **1.202 s** |
+| Nextcloud | 3,2 s voor 121 docs | 0,55 s | 69 s |
+
+Het dure deel — de modelaanroepen — wordt al volledig hergebruikt (0 calls in ronde 2 en 3). De
+resterende tijd is bijna helemaal het opnieuw ophalen en uitpakken van documenten die niet
+veranderd zijn. Drive en Nextcloud leveren allebei een wijzigingstijd voor élk document (559 van
+de 709; de 150 zonder zijn Planning-rijen uit een sheet), en die staat al in
+`documents.modified_at` — hij wordt alleen nooit gebruikt om iets over te slaan. Vastgelegd als
+change `incrementele-ingest`.
+
 ### Fixed — 2026-08-24 — het schema wordt bij het opstarten klaargezet
 
 `initialiseer()` voert sinds vandaag ook een migratie uit (`norm` in de sleutel van
