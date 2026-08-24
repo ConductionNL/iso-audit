@@ -18,6 +18,7 @@ from pathlib import Path
 
 import yaml
 
+from iso_audit.api import werkset
 from iso_audit.memo.builder import build_memo
 from iso_audit.memo.models import Finding, MemoInput, Severity, TriageStatus
 from iso_audit.memo.norm_lookup import laad_norm_db
@@ -221,14 +222,10 @@ class AuditSession:
     # --- findings + triage ---------------------------------------------------
 
     def findings(self) -> list[Finding]:
-        data = json.loads(self.findings_path.read_text(encoding="utf-8"))
-        return [Finding(**item) for item in data]
+        return [Finding(**item) for item in werkset.lees(self.findings_path)]
 
     def _save(self, findings: list[Finding]) -> None:
-        self.findings_path.write_text(
-            json.dumps([f.model_dump() for f in findings], ensure_ascii=False, indent=1),
-            encoding="utf-8",
-        )
+        werkset.schrijf(self.findings_path, [f.model_dump() for f in findings])
 
     def _log(self, entries: list[dict[str, str]]) -> None:
         with self.triage_log.open("a", encoding="utf-8") as fh:
@@ -250,6 +247,38 @@ class AuditSession:
         now: datetime | None = None,
     ) -> Finding:
         """Reclassificeer/triage/redigeer één finding; legt elke wijziging append-only vast."""
+        # Lezen én schrijven binnen één slot. Zonder dat kon een run die tussen deze twee
+        # in zijn eigen snapshot terugschreef, de beslissing wegvagen — gemeten op
+        # 2026-08-24, één van 902 beslissingen verloren. Zie `api/werkset.py`.
+        with werkset.slot(self.findings_path):
+            return self._triage_onder_slot(
+                finding_id,
+                severity=severity,
+                triage_status=triage_status,
+                title=title,
+                deviation=deviation,
+                corrective_measure=corrective_measure,
+                suggestion=suggestion,
+                reason=reason,
+                actor=actor,
+                now=now,
+            )
+
+    def _triage_onder_slot(
+        self,
+        finding_id: str,
+        *,
+        severity: Severity | None = None,
+        triage_status: TriageStatus | None = None,
+        title: str | None = None,
+        deviation: str | None = None,
+        corrective_measure: str | None = None,
+        suggestion: str | None = None,
+        reason: str,
+        actor: str = "auditor",
+        now: datetime | None = None,
+    ) -> Finding:
+        """De eigenlijke triage. Alleen aanroepen met het werkset-slot vast."""
         findings = self.findings()
         doel = next((f for f in findings if f.id == finding_id), None)
         if doel is None:

@@ -27,11 +27,16 @@ bevinding die niet onder haar voeten is veranderd.
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from iso_audit.api import werkset
+
+logger = logging.getLogger(__name__)
 
 RUNS = "runs.jsonl"
 
@@ -128,28 +133,102 @@ def voeg_toe(
     auditor, niet aan een merge-functie.
     """
     pad = Path(audit_dir) / FINDINGS
-    bestaand: list[dict[str, Any]] = (
-        json.loads(pad.read_text(encoding="utf-8")) if pad.is_file() else []
-    )
-    bekend = {dedup_sleutel(f) for f in bestaand}
+    # Lezen en schrijven onder één slot: de auditor kan tijdens een run triageren, en zonder
+    # slot schreef deze functie zijn eigen snapshot terug over die beslissing heen. Zie
+    # `api/werkset.py` voor de meting die daaraan ten grondslag ligt.
+    with werkset.slot(pad):
+        bestaand = werkset.lees(pad)
+        bekend = {dedup_sleutel(f) for f in bestaand}
 
-    toegevoegd = 0
-    overgeslagen = 0
-    for k in kandidaten:
-        sleutel = dedup_sleutel(k)
-        if sleutel in bekend:
-            overgeslagen += 1
-            continue
-        bekend.add(sleutel)
-        bestaand.append(k)
-        toegevoegd += 1
+        toegevoegd = 0
+        overgeslagen = 0
+        for k in kandidaten:
+            sleutel = dedup_sleutel(k)
+            if sleutel in bekend:
+                overgeslagen += 1
+                continue
+            bekend.add(sleutel)
+            bestaand.append(_met_uniek_id(k, {str(f.get("id", "")) for f in bestaand}))
+            toegevoegd += 1
 
-    if toegevoegd:
-        pad.write_text(
-            json.dumps(bestaand, ensure_ascii=False, indent=1),
-            encoding="utf-8",
-        )
+        if toegevoegd:
+            werkset.schrijf(pad, bestaand)
     return toegevoegd, overgeslagen
+
+
+def _uniek_id(basis: str, gebruikt: set[str]) -> str:
+    """`nc-5.17` → `nc-5.17-2` als het al bestaat, dan `-3`, enzovoort."""
+    if basis not in gebruikt:
+        return basis
+    nummer = 2
+    while f"{basis}-{nummer}" in gebruikt:
+        nummer += 1
+    return f"{basis}-{nummer}"
+
+
+def _met_uniek_id(kandidaat: dict[str, Any], gebruikt: set[str]) -> dict[str, Any]:
+    """Geef de kandidaat een id dat nog niet in de werkset voorkomt.
+
+    Het id is `nc-<clausule>`, dus een tweede NC op dezelfde clausule botst met de eerste. Dat
+    gebeurde op 2026-08-24 in productie: twee bevindingen op 5.17 met verschillende titels, één
+    id. `apply_triage` zoekt met `next(...)` en muteerde dus altijd de eerste — de tweede was
+    niet te triageren en blokkeerde de memo-gate, terwijl de trail wél een beslissing vastlegde.
+
+    De dedup hiervoor beslist óf een kandidaat nieuw is; deze functie raakt dat niet aan. Twee
+    bevindingen met verschillende titels zijn twee bevindingen, en dat oordeel blijft bij de
+    auditor. Alleen de sleutel wordt uniek gemaakt, want daar verwijst de trail mee.
+    """
+    huidig = str(kandidaat.get("id", ""))
+    nieuw = _uniek_id(huidig, gebruikt)
+    if nieuw == huidig:
+        return kandidaat
+    logger.info("Dubbel bevinding-id %s; toegevoegd als %s", huidig, nieuw)
+    return {**kandidaat, "id": nieuw}
+
+
+def herstel_dubbele_ids(audit_dir: str | Path, *, door: str) -> int:
+    """Maak id's in een bestaande werkset uniek en leg elke hernoeming vast in de trail.
+
+    Voor werksets die de dubbele al bevatten. Stil laten liggen betekent dat die bevinding nooit
+    meer te triageren is; stil hernoemen betekent dat de trail naar een id verwijst dat niet
+    meer bestaat. Dus beide: hernoemen én de hernoeming append-only vastleggen, met dezelfde
+    vorm als een triage-wijziging (`field: "id"`).
+
+    De eerste regel met een id houdt dat id — daar verwijst de bestaande trail naar.
+
+    Retourneert het aantal hernoemde regels; nul betekent dat er niets dubbel was.
+    """
+    pad = Path(audit_dir) / FINDINGS
+    log_pad = Path(audit_dir) / "triage_log.jsonl"
+    stamp = _nu()
+    hernoemd: list[dict[str, str]] = []
+    with werkset.slot(pad):
+        rijen = werkset.lees(pad)
+        gebruikt: set[str] = set()
+        for rij in rijen:
+            huidig = str(rij.get("id", ""))
+            nieuw = _uniek_id(huidig, gebruikt)
+            gebruikt.add(nieuw)
+            if nieuw != huidig:
+                rij["id"] = nieuw
+                hernoemd.append(
+                    {
+                        "timestamp": stamp,
+                        "actor": door,
+                        "finding_id": nieuw,
+                        "field": "id",
+                        "from": huidig,
+                        "to": nieuw,
+                        "reason": "herstel: dubbel bevinding-id maakte deze bevinding onbereikbaar",
+                    }
+                )
+        if hernoemd:
+            werkset.schrijf(pad, rijen)
+    if hernoemd:
+        with log_pad.open("a", encoding="utf-8") as fh:
+            for regel in hernoemd:
+                fh.write(json.dumps(regel, ensure_ascii=False) + "\n")
+    return len(hernoemd)
 
 
 def registreer(
