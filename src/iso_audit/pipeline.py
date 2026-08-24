@@ -346,10 +346,17 @@ def _bewaar_ingest(documenten: list[dict[str, Any]], norm: str, bronnen: list[st
         for doc in documenten:
             herkomst = doc.get("herkomst", "Drive")
             upsert_document(conn, doc)
-            for clausule_id in doc.get("clausules", []):
-                upsert_clause_match(conn, doc["id"], herkomst, clausule_id, norm)
+            # `clausule_normen` draagt per match de norm waaruit hij komt; `norm` is de
+            # run-parameter en kan `beide` zijn, wat geen norm van een clausule is.
+            for clausule_id, match_norm in doc.get("clausule_normen", []):
+                upsert_clause_match(conn, doc["id"], herkomst, clausule_id, match_norm or norm)
             for clausule_id, sub_punt_id in doc.get("sub_punt_matches", []):
-                upsert_clause_match(conn, doc["id"], herkomst, clausule_id, norm, sub_punt_id)
+                match_norm = next(
+                    (n for c, n in doc.get("clausule_normen", []) if c == clausule_id), norm
+                )
+                upsert_clause_match(
+                    conn, doc["id"], herkomst, clausule_id, match_norm or norm, sub_punt_id
+                )
         conn.commit()
         log_ingest(conn, ",".join(bronnen), None, len(documenten))
         conn.commit()
@@ -403,8 +410,9 @@ def run_audit(
     from iso_audit import eigen_output
     from iso_audit.classification.clause_mapping import (
         filter_clause_map,
-        koppel_documenten,
+        koppel_alle_normen,
         laad_clause_map,
+        normen_van,
         ontbrekende_dekking,
     )
     from iso_audit.classification.findings import (
@@ -530,7 +538,12 @@ def run_audit(
         )
 
     cutoff = (date.today() - timedelta(days=2 * 365)).isoformat()
-    gekoppeld_alle, niet_geclassificeerd = koppel_documenten(documenten, clause_map)
+    # Per norm koppelen, niet op een samengevoegde map: `laad_clause_map("beide")` laat 27001
+    # de 9001-ingang overschrijven bij een botsend nummer, en dan worden 18 van de 28 ISO
+    # 9001-clausules in een gecombineerde audit nooit getoetst.
+    maps = {n: filter_clause_map(laad_clause_map(n), chapter) if chapter else laad_clause_map(n)
+            for n in normen_van(norm)}
+    gekoppeld_alle, niet_geclassificeerd = koppel_alle_normen(documenten, norm, maps)
     gearchiveerd = [d for d in gekoppeld_alle if (d.get("modified_at") or "") < cutoff]
     gekoppeld = [d for d in gekoppeld_alle if (d.get("modified_at") or "") >= cutoff]
     logger.info(

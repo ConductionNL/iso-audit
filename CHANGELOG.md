@@ -6,6 +6,48 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — de koppeling draait per norm; 18 ISO 9001-clausules komen terug
+
+`laad_clause_map("beide")` voegde de twee clause-maps samen met `{**map_9001, **map_27001}`.
+Achttien clausulenummers bestaan in beide normen, en bij een botsing won 27001 — 103 ingangen
+waar er 121 horen. In een gecombineerde audit werden daardoor 18 van de 28 ISO 9001-clausules
+**nooit getoetst**: §5.1 Leiderschap, §5.2 Beleid, §5.3 Rollen, §6.1 Risico's en kansen,
+§6.2 Kwaliteitsdoelstellingen, §6.3 Planning van wijzigingen, §7.1 t/m §7.5 en §8.1 t/m §8.7. Het
+rapport zei op pagina 1 "ISO 9001:2015 + ISO 27001:2022".
+
+De koppeling draait nu per norm (`koppel_alle_normen`). Elke match draagt de norm waaruit hij
+komt (`clausule_normen`), en de zoektermen van de ene norm kunnen die van de andere niet meer
+overschrijven. Een document dat beide §7.5-onderwerpen raakt — "Gedocumenteerde informatie" bij
+9001, "Bescherming tegen fysieke en omgevingsbedreigingen" bij 27001 — krijgt twee koppelingen en
+komt zelf één keer terug. `clausules` wordt uit `clausule_normen` afgeleid en niet apart
+bijgehouden.
+
+Samen met `norm` in de sleutel van `clause_matches` betekent dit dat de opslag die twee
+koppelingen nu ook echt kan bewaren; daarvoor gooide `INSERT OR IGNORE` de tweede stil weg.
+
+**Wat nog niet om is:** 23 plekken lezen nog de samengevoegde map (titels in het rapport,
+`ontbrekende_dekking`, de interviewvragen, de classificatie-prompt), en `bevindingen.norm` staat
+nog op de run-parameter in plaats van op de norm van de match. Bewust niet meegenomen: de
+classificatie oordeelt tegen die samengevoegde map, en een norm op de bevinding plakken zonder
+dat eerst te repareren levert een verkeerd oordeel mét een zelfverzekerd label — erger dan geen
+label. De `strict` xfail in `tests/data/test_norm_db_export.py` beschrijft nu precies die rest.
+
+### Fixed — 2026-08-24 — twee regressies uit de registry-bootstrap van vandaag
+
+De verhuizing van de adapter-imports naar `sources.laad_adapters()` brak twee dingen die pas
+opvielen door een test die los draaide:
+
+**`levert_opvolgpunten` vroeg het aan een lege registry.** Bij een `KeyError` valt die functie
+terug op `False`, dus Jira werd stilletjes een documentbron — elk ticket tegen elke clausule
+geclassificeerd, precies de rolwissel die de docstring van die functie uitsluit. In de volledige
+suite viel het niet op omdat een andere test de adapters al had geïmporteerd.
+
+**`laad_adapters()` herstelde een lege registry niet.** `importlib.import_module` op een module
+die al in `sys.modules` staat, draait de `@register`-decorator niet opnieuw. De functie deed dan
+niets, en het gedrag hing weer af van wie er eerder toevallig had geïmporteerd. Er is nu een
+lijst van wat er ooit is geregistreerd die dat herstelt — en die de laatste registratie bewaart,
+niet de eerste, want een test die een module herlaadt maakt een nieuw class-object.
+
 ### Added — 2026-08-24 — beide normen als standaard, 27001 als de norm bij één keuze
 
 Vastgelegd in `api/registry.py` (`STANDAARD_NORMEN`, `VOORKEURSNORM`) met een test. Keuze van de

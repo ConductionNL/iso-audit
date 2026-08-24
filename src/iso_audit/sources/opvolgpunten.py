@@ -56,6 +56,11 @@ def levert_opvolgpunten(naam: str) -> bool:
     """
     from iso_audit import sources
 
+    # De registry vullen vóór we hem bevragen. Zonder dit hangt het antwoord af van de vraag
+    # of iemand anders de adapters al had geïmporteerd: in een los proces gaf `sources.get`
+    # een `KeyError`, viel deze functie terug op `False`, en werd Jira stilletjes een
+    # documentbron — precies de rolwissel die de docstring hierboven uitsluit.
+    sources.laad_adapters()
     try:
         adapter = sources.get(naam)
     except KeyError:

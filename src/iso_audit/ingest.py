@@ -39,10 +39,7 @@ _PSEUDO_SOURCES: tuple[str, ...] = ("miro",)
 
 def ingest_drive(norm: str) -> None:
     """Lees Drive-documenten in, koppel aan clausules, schrijf naar DB."""
-    from iso_audit.classification.clause_mapping import (
-        koppel_documenten,
-        laad_clause_map,
-    )
+    from iso_audit.classification.clause_mapping import koppel_alle_normen
     from iso_audit.sources.drive import haal_documenten_op
     from iso_audit.store import (
         initialiseer,
@@ -58,8 +55,9 @@ def ingest_drive(norm: str) -> None:
     documenten, handmatige_review = haal_documenten_op()
 
     logger.info("Clausule-mapping laden...")
-    clause_map = laad_clause_map(norm)
-    gekoppeld, niet_geclassificeerd = koppel_documenten(documenten, clause_map)
+    # Per norm koppelen: `laad_clause_map("beide")` laat 27001 de 9001-ingang overschrijven
+    # bij een botsend nummer, en dan worden 18 van de 28 ISO 9001-clausules nooit getoetst.
+    gekoppeld, niet_geclassificeerd = koppel_alle_normen(documenten, norm)
 
     conn = verbinding()
     initialiseer(conn)
@@ -67,10 +65,15 @@ def ingest_drive(norm: str) -> None:
     alle_docs = gekoppeld + niet_geclassificeerd
     for doc in alle_docs:
         upsert_document(conn, doc)
-        for clausule_id in doc.get("clausules", []):
-            upsert_clause_match(conn, doc["id"], "Drive", clausule_id, norm)
+        for clausule_id, match_norm in doc.get("clausule_normen", []):
+            upsert_clause_match(conn, doc["id"], "Drive", clausule_id, match_norm or norm)
         for clausule_id, sub_punt_id in doc.get("sub_punt_matches", []):
-            upsert_clause_match(conn, doc["id"], "Drive", clausule_id, norm, sub_punt_id)
+            match_norm = next(
+                (n for c, n in doc.get("clausule_normen", []) if c == clausule_id), norm
+            )
+            upsert_clause_match(
+                conn, doc["id"], "Drive", clausule_id, match_norm or norm, sub_punt_id
+            )
 
     for item in handmatige_review:
         upsert_document(

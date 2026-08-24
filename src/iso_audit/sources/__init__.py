@@ -43,6 +43,13 @@ __all__ = [
 # proces, en class-instantie-juggling voegt complexiteit toe zonder waarde.
 _REGISTRY: dict[str, type[Source]] = {}
 
+_GEBUNDELD: dict[str, type[Source]] = {}
+"""Elke adapter die ooit is geregistreerd, en die lijst wordt nooit geleegd.
+
+`_REGISTRY` is de werkende registry en kan door tests worden leeggemaakt; deze bewaart wat er
+in het pakket zit, zodat `laad_adapters()` hem kan herstellen ook als de modules al
+geïmporteerd waren."""
+
 _ADAPTERMODULES: tuple[str, ...] = ("drive", "jira", "nextcloud", "planning")
 """Modules die bij `laad_adapters()` geïmporteerd worden zodat hun `@register` draait.
 
@@ -68,6 +75,12 @@ def laad_adapters() -> None:
 
     for module in _ADAPTERMODULES:
         importlib.import_module(f"iso_audit.sources.{module}")
+    # Een module die al in `sys.modules` staat, draait zijn `@register` niet opnieuw. Zonder
+    # deze herstelstap zou `laad_adapters()` na een lege registry níets doen — en dan hangt het
+    # gedrag af van de vraag wie er eerder toevallig heeft geïmporteerd. Precies de
+    # volgorde-afhankelijkheid die deze functie moest wegnemen.
+    for naam, adapter in _GEBUNDELD.items():
+        _REGISTRY.setdefault(naam, adapter)
 
 
 def register(adapter_class: type[Source]) -> type[Source]:
@@ -93,6 +106,10 @@ def register(adapter_class: type[Source]) -> type[Source]:
         )
         raise ValueError(msg)
     _REGISTRY[naam] = adapter_class
+    # Bewust overschrijven en niet `setdefault`: herlaadt een test de module, dan is er een
+    # nieuw class-object en moet dát het bewaarde zijn. Anders herstelt `laad_adapters()` de
+    # oude class en is `get("planning") is planning.PlanningSource` opeens onwaar.
+    _GEBUNDELD[naam] = adapter_class
     return adapter_class
 
 

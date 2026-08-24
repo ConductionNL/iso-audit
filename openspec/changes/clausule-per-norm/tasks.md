@@ -11,10 +11,10 @@
 
 ## 2. Koppeling per norm
 
-- [ ] 2.1 `koppel_documenten` per norm aanroepen in plaats van op een samengevoegde map
-- [ ] 2.2 Elke match draagt zijn norm; de samenvoeging in `laad_clause_map("beide")` verdwijnt
-      of wordt verliesloos
-- [ ] 2.3 Test: een document dat 9001 §8.4 raakt levert een 9001-match, niet 27001 §8.4
+- [x] 2.1 `koppel_documenten` per norm aanroepen in plaats van op een samengevoegde map
+- [x] 2.2 Elke match draagt zijn norm (`clausule_normen`). De samenvoeging in
+      `laad_clause_map("beide")` bestaat nog voor 23 leeskant-plekken — zie 4b.2
+- [x] 2.3 Test: een document dat 9001 §7.5 raakt levert een 9001-match, niet 27001 §7.5
 - [ ] 2.4 Test: de gecombineerde dekking noemt 121 clausules
 
 ## 3. Opslag
@@ -37,8 +37,9 @@
 Twaalf modules gaan uit van "een clausule is een nummer", 108 plekken noemen `clausule_id`
 zonder norm ernaast. Volgorde die het risico beperkt:
 
-- [ ] 4b.1 Eerst de **schrijfkant** (koppeling, opslag, classificatie), met `beide` als
-      overgangswaarde die blijft werken
+- [x] 4b.1 Schrijfkant: koppeling en opslag zijn om. **Classificatie nog niet** — die
+      oordeelt tegen de samengevoegde map, en een norm op de bevinding plakken zonder dat te
+      repareren geeft een verkeerd oordeel mét een zelfverzekerd label
 - [ ] 4b.2 Dan de **leeskant** (`memo/builder.py`, `memo/pattern_detection.py`,
       `api/landschap.py`, `api/routes_triage.py`, `classification/thema.py`,
       `interviewvoorstel.py`)

@@ -82,14 +82,17 @@ def test_elke_clausule_heeft_een_titel_en_een_tekst() -> None:
 @pytest.mark.xfail(
     strict=True,
     reason=(
-        "Bekend en gemeten defect (2026-08-24), nog niet gerepareerd: `laad_clause_map('beide')` "
-        "voegt de twee maps samen met `{**map_9001, **map_27001}`, waardoor 27001 de 9001-ingang "
-        "overschrijft bij een botsend nummer. In een gecombineerde audit worden daardoor 18 van "
-        "de 28 ISO 9001-clausules nooit getoetst — waaronder §5.1 Leiderschap, §6.1 Risico's en "
-        "kansen, §7.5 Gedocumenteerde informatie en §8.4 Externe processen. Repareren vraagt dat "
-        "een clausule door (norm, id) wordt geïdentificeerd in plaats van door id alleen, en dat "
-        "raakt de opslag, de classificatie-prompt en de UI. Zie de openstaande change. Deze test "
-        "is `strict`: zodra het gerepareerd is faalt hij, en moet de markering weg."
+        "Deels gerepareerd op 2026-08-24. De **koppeling** draait nu per norm "
+        "(`koppel_alle_normen`), dus een gecombineerde run verliest geen 9001-clausules meer en "
+        "elke match draagt zijn eigen norm. Wat hieronder wordt getoetst is `laad_clause_map"
+        "('beide')` zelf, en die voegt nog steeds samen met `{**map_9001, **map_27001}` — 103 "
+        "ingangen waar er 121 horen. Drieëntwintig plekken lezen die samengevoegde map nog "
+        "(titels in het rapport, `ontbrekende_dekking`, de interviewvragen, de "
+        "classificatie-prompt), en die zien dus nog de 27001-titel bij een botsend nummer. Ook "
+        "`bevindingen.norm` staat nog op de run-parameter en niet op de norm van de match. "
+        "Zie `openspec/changes/clausule-per-norm/` §4b: leeskant na schrijfkant, en elke stap "
+        "met een echte run te verifiëren. `strict`: zodra de samenvoeging verliesloos is faalt "
+        "deze test en moet de markering weg."
     ),
 )
 def test_een_gecombineerde_run_verliest_geen_9001_clausules() -> None:

@@ -34,13 +34,20 @@ def test_beschikbare_bronnen_gesorteerd() -> None:
 # ---------- ingest_drive ----------
 
 
-def _doc(idx: int, clausules: list[str]) -> dict[str, Any]:
+def _doc(idx: int, clausules: list[str], norm: str = "9001") -> dict[str, Any]:
+    """Een gekoppeld document zoals `koppel_documenten` het teruggeeft.
+
+    `clausule_normen` hoort erbij sinds 2026-08-24: een koppeling draagt de norm waaruit hij
+    komt, want achttien clausulenummers bestaan in beide normen. Een helper die alleen
+    `clausules` zet, laat een test slagen op een vorm die de echte functie niet produceert.
+    """
     return {
         "id": f"d{idx}",
         "naam": f"Doc {idx}",
         "tekst": "tekst",
         "herkomst": "Drive",
         "mime_type": "text/plain",
+        "clausule_normen": [(c, norm) for c in clausules],
         "clausules": clausules,
         "sub_punt_matches": [],
     }

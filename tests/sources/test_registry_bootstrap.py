@@ -53,3 +53,22 @@ def test_bootstrap_is_idempotent() -> None:
     eerste = sorted(iso_audit.sources.available())
     laad_adapters()
     assert sorted(iso_audit.sources.available()) == eerste
+
+
+def test_bootstrap_herstelt_een_lege_registry() -> None:
+    """Ook als de modules al geïmporteerd zijn.
+
+    `importlib.import_module` op een module die al in `sys.modules` staat, draait de
+    `@register`-decorator niet opnieuw. Zonder herstelstap deed `laad_adapters()` op een lege
+    registry dus níets — en dan hangt het gedrag af van wie er eerder toevallig heeft
+    geïmporteerd. Precies de volgorde-afhankelijkheid die deze functie moest wegnemen, en de
+    reden dat `tests/test_pipeline.py` los wél faalde en in de volledige suite niet.
+    """
+    laad_adapters()
+    verwacht = sorted(iso_audit.sources.available())
+    iso_audit.sources._reset_for_tests()
+    assert iso_audit.sources.available() == []
+
+    laad_adapters()
+
+    assert sorted(iso_audit.sources.available()) == verwacht
