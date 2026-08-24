@@ -2,30 +2,188 @@ metadata:
   standard: ISO 9001:2015
   slug: iso-9001-2015
   source: iso_audit.data.normteksten (verkorte NL-weergave, repo-bron) — geen officiële ISO-volledige
-    tekst
+    tekst. Gegenereerd door scripts/genereer-norm-db.py; niet met de hand bijwerken.
 clauses:
+  '4.1':
+    title_nl: Inzicht in de organisatie en haar context
+    title_en: ''
+    text_nl: De organisatie moet de externe en interne aangelegenheden bepalen die relevant zijn voor
+      haar doel en strategische richting en die van invloed zijn op haar vermogen om de beoogde resultaten
+      van het kwaliteitsmanagementsysteem te behalen.
+    text_en: ''
+  '4.2':
+    title_nl: Inzicht in de behoeften en verwachtingen van belanghebbenden
+    title_en: ''
+    text_nl: De organisatie moet de relevante belanghebbenden bepalen en hun relevante eisen voor het
+      kwaliteitsmanagementsysteem vaststellen. Deze informatie moet worden gemonitord en beoordeeld.
+    text_en: ''
+  '4.3':
+    title_nl: Bepalen van het toepassingsgebied van het kwaliteitsmanagementsysteem
+    title_en: ''
+    text_nl: De organisatie moet de grenzen en toepasselijkheid van het kwaliteitsmanagementsysteem
+      bepalen om de scope vast te stellen. De scope moet beschikbaar zijn als gedocumenteerde informatie.
+    text_en: ''
   '4.4':
     title_nl: Kwaliteitsmanagementsysteem en de processen ervan
     title_en: ''
-    text_nl: De organisatie moet de processen die nodig zijn voor het kwaliteitsmanagementsysteem
-      en hun onderlinge samenhang bepalen, implementeren, onderhouden en continu verbeteren.
+    text_nl: De organisatie moet de processen die nodig zijn voor het kwaliteitsmanagementsysteem en
+      hun onderlinge samenhang bepalen, implementeren, onderhouden en continu verbeteren.
+    text_en: ''
+  '5.1':
+    title_nl: Leiderschap en betrokkenheid
+    title_en: ''
+    text_nl: Het topmanagement moet blijk geven van leiderschap en betrokkenheid bij het kwaliteitsmanagementsysteem
+      door verantwoordelijkheid te nemen voor de effectiviteit ervan en kwaliteitsbeleid en -doelstellingen
+      vast te stellen.
+    text_en: ''
+  '5.2':
+    title_nl: Beleid
+    title_en: ''
+    text_nl: Het topmanagement moet een kwaliteitsbeleid vaststellen, implementeren en onderhouden dat
+      passend is voor de context van de organisatie en een kader biedt voor kwaliteitsdoelstellingen.
+    text_en: ''
+  '5.3':
+    title_nl: Organisatorische rollen, verantwoordelijkheden en bevoegdheden
+    title_en: ''
+    text_nl: Het topmanagement moet de verantwoordelijkheden en bevoegdheden voor relevante rollen toewijzen,
+      communiceren en begrijpelijk maken binnen de organisatie.
+    text_en: ''
+  '6.1':
+    title_nl: Acties om risico's en kansen te behandelen
+    title_en: ''
+    text_nl: De organisatie moet risico's en kansen bepalen die aangepakt moeten worden om te waarborgen
+      dat het KMS de beoogde resultaten kan behalen, ongewenste effecten voorkomt en continue verbetering
+      bewerkstelligt.
+    text_en: ''
+  '6.2':
+    title_nl: Kwaliteitsdoelstellingen en plannen om deze te bereiken
+    title_en: ''
+    text_nl: De organisatie moet kwaliteitsdoelstellingen vaststellen voor relevante functies, niveaus
+      en processen. Doelstellingen moeten meetbaar zijn, worden gemonitord en worden gecommuniceerd.
     text_en: ''
   '6.3':
     title_nl: Planning van wijzigingen
     title_en: ''
-    text_nl: Wanneer de organisatie bepaalt dat wijzigingen in het kwaliteitsmanagementsysteem
-      nodig zijn, moeten deze wijzigingen op een geplande manier worden doorgevoerd.
+    text_nl: Wanneer de organisatie bepaalt dat wijzigingen in het kwaliteitsmanagementsysteem nodig
+      zijn, moeten deze wijzigingen op een geplande manier worden doorgevoerd.
+    text_en: ''
+  '7.1':
+    title_nl: Middelen
+    title_en: ''
+    text_nl: De organisatie moet de benodigde middelen bepalen en beschikbaar stellen voor het opzetten,
+      implementeren, onderhouden en continu verbeteren van het kwaliteitsmanagementsysteem.
+    text_en: ''
+  '7.2':
+    title_nl: Competentie
+    title_en: ''
+    text_nl: De organisatie moet de benodigde competentie bepalen van personen die het kwaliteitsmanagementsysteem
+      beïnvloeden, en waarborgen dat deze competentie aanwezig is.
+    text_en: ''
+  '7.3':
+    title_nl: Bewustzijn
+    title_en: ''
+    text_nl: Personen die werkzaamheden verrichten onder aansturing van de organisatie moeten zich bewust
+      zijn van het kwaliteitsbeleid, de relevante doelstellingen en hun bijdrage aan de effectiviteit
+      van het KMS.
+    text_en: ''
+  '7.4':
+    title_nl: Communicatie
+    title_en: ''
+    text_nl: De organisatie moet de interne en externe communicatie bepalen die relevant is voor het
+      kwaliteitsmanagementsysteem, inclusief wat, wanneer, met wie en hoe wordt gecommuniceerd.
+    text_en: ''
+  '7.5':
+    title_nl: Gedocumenteerde informatie
+    title_en: ''
+    text_nl: Het kwaliteitsmanagementsysteem van de organisatie moet gedocumenteerde informatie bevatten
+      die door de norm vereist wordt en die de organisatie zelf noodzakelijk acht voor de effectiviteit
+      van het KMS. Gedocumenteerde informatie moet worden beheerd.
+    text_en: ''
+  '8.1':
+    title_nl: Operationele planning en beheersing
+    title_en: ''
+    text_nl: De organisatie moet de processen die nodig zijn voor de realisatie van producten en diensten
+      plannen, implementeren, beheersen en monitoren door criteria vast te stellen en gedocumenteerde
+      informatie bij te houden.
+    text_en: ''
+  '8.2':
+    title_nl: Eisen voor producten en diensten
+    title_en: ''
+    text_nl: De organisatie moet communiceren met klanten over informatie over producten en diensten,
+      behandeling van vragen en orders, feedback inclusief klachten, en noodgevallen. Klanteisen en
+      wettelijke eisen moeten worden bepaald en beoordeeld.
+    text_en: ''
+  '8.3':
+    title_nl: Ontwerp en ontwikkeling van producten en diensten
+    title_en: ''
+    text_nl: De organisatie moet een proces opzetten, implementeren en onderhouden voor het ontwerpen
+      en ontwikkelen van producten en diensten, inclusief planning, inputs, beheersmaatregelen, outputs
+      en wijzigingsbeheer.
+    text_en: ''
+  '8.4':
+    title_nl: Beheersing van extern geleverde processen, producten en diensten
+    title_en: ''
+    text_nl: De organisatie moet waarborgen dat extern geleverde processen, producten en diensten voldoen
+      aan de gestelde eisen. Zij moet criteria bepalen voor beoordeling, selectie en monitoring van
+      externe leveranciers.
+    text_en: ''
+  '8.5':
+    title_nl: Productie en dienstverleninguitvoering
+    title_en: ''
+    text_nl: De organisatie moet de productie en dienstverlening uitvoeren onder beheerste omstandigheden,
+      inclusief beschikbaarheid van informatie, geschikte infrastructuur, monitoring, en maatregelen
+      voor identificatie en traceerbaarheid.
+    text_en: ''
+  '8.6':
+    title_nl: Vrijgave van producten en diensten
+    title_en: ''
+    text_nl: De organisatie moet op geplande momenten verificaties uitvoeren om te waarborgen dat aan
+      de eisen voor producten en diensten is voldaan. Producten en diensten mogen pas worden vrijgegeven
+      als aan alle gestelde eisen is voldaan.
+    text_en: ''
+  '8.7':
+    title_nl: Beheersing van afwijkende procesuitvoer
+    title_en: ''
+    text_nl: De organisatie moet producten en diensten die niet voldoen aan de eisen identificeren en
+      beheersen om onbedoeld gebruik of levering te voorkomen. Afwijkingen moeten worden gedocumenteerd.
+    text_en: ''
+  '9.1':
+    title_nl: Bewaking, meting, analyse en evaluatie
+    title_en: ''
+    text_nl: De organisatie moet bepalen wat, hoe en wanneer wordt gemonitord, gemeten, geanalyseerd
+      en beoordeeld. Zij moet de prestaties en de effectiviteit van het kwaliteitsmanagementsysteem
+      evalueren.
+    text_en: ''
+  '9.2':
+    title_nl: Interne audit
+    title_en: ''
+    text_nl: De organisatie moet op geplande tijdstippen interne audits uitvoeren om vast te stellen
+      of het kwaliteitsmanagementsysteem voldoet aan de eisen en effectief is geïmplementeerd en onderhouden.
+    text_en: ''
+  '9.3':
+    title_nl: Directiebeoordeling
+    title_en: ''
+    text_nl: Het topmanagement moet het kwaliteitsmanagementsysteem op geplande tijdstippen beoordelen
+      om te waarborgen dat het passend, adequaat en effectief blijft. De beoordeling moet specifieke
+      inputs bevatten en outputs produceren.
     text_en: ''
   '10.1':
     title_nl: Algemeen (verbetering)
     title_en: ''
-    text_nl: De organisatie moet kansen voor verbetering bepalen en selecteren en de nodige
-      acties implementeren om aan klanteisen te voldoen en de klanttevredenheid te verhogen.
+    text_nl: De organisatie moet kansen voor verbetering bepalen en selecteren en de nodige acties implementeren
+      om aan klanteisen te voldoen en de klanttevredenheid te verhogen.
     text_en: ''
   '10.2':
     title_nl: Non-conformiteit en corrigerende maatregel
     title_en: ''
-    text_nl: Bij het optreden van een non-conformiteit moet de organisatie reageren, de oorzaak
-      bepalen, beoordelen of vergelijkbare situaties bestaan en correctieve maatregelen nemen.
-      Effectiviteit moet worden beoordeeld en gedocumenteerde informatie bewaard.
+    text_nl: Bij het optreden van een non-conformiteit moet de organisatie reageren, de oorzaak bepalen,
+      beoordelen of vergelijkbare situaties bestaan en correctieve maatregelen nemen. Effectiviteit
+      moet worden beoordeeld en gedocumenteerde informatie bewaard.
+    text_en: ''
+  '10.3':
+    title_nl: Continue verbetering
+    title_en: ''
+    text_nl: De organisatie moet de geschiktheid, adequaatheid en effectiviteit van het kwaliteitsmanagementsysteem
+      continu verbeteren. Zij moet resultaten van analyse en beoordeling gebruiken om verbetermogelijkheden
+      te bepalen.
     text_en: ''

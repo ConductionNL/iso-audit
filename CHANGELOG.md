@@ -6,6 +6,53 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — de norm-DB was een handmatige export van 13 van de 121 clausules
+
+`examples/norms/*.yaml` is een export uit `iso_audit.data.normteksten` — dat staat in het bestand
+zelf. Die export was met de hand gemaakt en bevatte **13 clausules** terwijl de repo-bron er
+**121** heeft (28 voor 9001, 93 voor 27001). Er was geen script dat hem maakte en geen test die
+hem bijhield.
+
+Dat gaf nergens een fout, alleen verkeerde antwoorden op twee plekken:
+
+1. **`iso-audit memo` weigerde** op de echte dataset ("Clausule '10.3' ontbreekt in
+   iso-9001-2015"). Die weigering is juist — een memo mag geen verzonnen citaat bevatten — maar
+   de oorzaak werd gelezen als een licentiekwestie, terwijl de tekst gewoon in de repo staat. Van
+   de 87 gebruikte clausules zitten er 87 in de bron; er ontbrak niets.
+2. **448 van de 903 bevindingen droegen de verkeerde norm.** `run_job._resolve_standard()`
+   bepaalt met deze DB bij welke norm een clausule hoort ("alleen in 27001 → 27001; anders →
+   9001"). Met 13 clausules zei de DB bijna altijd "niet in 27001", dus viel vrijwel alles terug
+   op de 9001-default. Clausule 8.24 — cryptografie, Annex A van 27001, bestaat niet in 9001 —
+   stond in de werkset als ISO 9001:2015. 800 van de 903 bevindingen droegen het 9001-label.
+
+Nieuw: `scripts/genereer-norm-db.py`, dat de export bouwt uit de normteksten (voor de tekst) en
+de clause-maps (voor de titel), plus `tests/data/test_norm_db_export.py` die byte-voor-byte
+faalt zodra de export achterloopt. Een export die met de hand wordt bijgehouden loopt achter, en
+hier was dat onzichtbaar.
+
+### Vastgelegd, niet gerepareerd — 18 ISO 9001-clausules worden in een gecombineerde audit nooit getoetst
+
+Bij het uitzoeken hierboven kwam een zwaarder defect boven. `laad_clause_map("beide")` voegt de
+twee clause-maps samen met `{**map_9001, **map_27001}`. Achttien clausulenummers bestaan in
+beide normen, en bij een botsing **overschrijft 27001 de 9001-ingang**. In een gecombineerde
+audit bestaan die 9001-clausules dus niet meer:
+
+§5.1 Leiderschap en betrokkenheid · §5.2 Beleid · §5.3 Rollen en verantwoordelijkheden ·
+§6.1 Acties om risico's en kansen te behandelen · §6.2 Kwaliteitsdoelstellingen · §6.3 Planning
+van wijzigingen · §7.1 t/m §7.5 (middelen, competentie, bewustzijn, communicatie,
+gedocumenteerde informatie) · §8.1 t/m §8.7 (operationele planning, eisen, ontwerp, externe
+processen, productie, vrijgave, afwijkende output)
+
+Dat is **18 van de 28** 9001-clausules. De samengevoegde map heeft 103 ingangen waar 121
+verwacht zou worden. Het rapport zegt op pagina 1 "ISO 9001:2015 + ISO 27001:2022".
+
+Nog niet gerepareerd omdat de fix vraagt dat een clausule door **(norm, id)** wordt
+geïdentificeerd in plaats van door id alleen, en dat raakt `clause_matches`, `bevindingen`, de
+classificatie-prompt, de werkset en de UI. De `norm`-kolom bestaat al in beide tabellen maar
+bevat `beide` in plaats van de norm van de match. Vastgelegd als `strict` xfail in
+`tests/data/test_norm_db_export.py`, zodat de test faalt zodra iemand het repareert en de
+markering moet weghalen.
+
 ### Fixed — 2026-08-24 — een bevinding die niet te triageren was
 
 De conclusie meldde "1 kandidaat-NC nog niet beoordeeld" terwijl de auditor alles op `valide`

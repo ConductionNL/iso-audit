@@ -2,21 +2,149 @@ metadata:
   standard: ISO 27001:2022
   slug: iso-27001-2022
   source: iso_audit.data.normteksten (verkorte NL-weergave, repo-bron) — geen officiële ISO-volledige
-    tekst
+    tekst. Gegenereerd door scripts/genereer-norm-db.py; niet met de hand bijwerken.
 clauses:
+  '5.1':
+    title_nl: Beleid voor informatiebeveiliging
+    title_en: ''
+    text_nl: Beleid voor informatiebeveiliging en themaspecifieke beleidslijnen moeten worden vastgesteld,
+      goedgekeurd door de directie, gepubliceerd, gecommuniceerd aan medewerkers en relevante belanghebbenden,
+      en op geplande tijdstippen worden beoordeeld.
+    text_en: ''
+  '5.2':
+    title_nl: Rollen en verantwoordelijkheden voor informatiebeveiliging
+    title_en: ''
+    text_nl: Rollen en verantwoordelijkheden voor informatiebeveiliging moeten worden gedefinieerd en
+      toegewezen overeenkomstig de behoeften van de organisatie.
+    text_en: ''
+  '5.3':
+    title_nl: Scheiding van taken
+    title_en: ''
+    text_nl: Conflicterende taken en conflicterende verantwoordelijkheden moeten worden gescheiden om
+      de kans op ongeautoriseerde of onbedoelde wijziging of misbruik van activa van de organisatie
+      te verkleinen.
+    text_en: ''
+  '5.4':
+    title_nl: Managementverantwoordelijkheden
+    title_en: ''
+    text_nl: Het management moet van alle medewerkers verlangen dat zij informatiebeveiliging toepassen
+      in overeenstemming met het beleid en de procedures van de organisatie.
+    text_en: ''
+  '5.5':
+    title_nl: Contact met autoriteiten
+    title_en: ''
+    text_nl: De organisatie moet contacten onderhouden met relevante overheids- en regelgevende autoriteiten
+      op het gebied van informatiebeveiliging.
+    text_en: ''
+  '5.6':
+    title_nl: Contact met speciale belangengroepen
+    title_en: ''
+    text_nl: De organisatie moet contacten onderhouden met speciale belangengroepen, beveiligingsforums
+      en professionele verenigingen op het gebied van informatiebeveiliging.
+    text_en: ''
+  '5.7':
+    title_nl: Dreigingsinformatie
+    title_en: ''
+    text_nl: Informatie over informatiebeveiligingsdreigingen moet worden verzameld en geanalyseerd
+      om dreigingsinformatie te produceren die kan worden gebruikt om beveiligingsbeslissingen te ondersteunen.
+    text_en: ''
+  '5.8':
+    title_nl: Informatiebeveiliging in projectbeheer
+    title_en: ''
+    text_nl: Informatiebeveiliging moet worden geïntegreerd in projectmanagement zodat informatiebeveiligingsrisico's
+      worden geïdentificeerd en aangepakt als onderdeel van projecten.
+    text_en: ''
+  '5.9':
+    title_nl: Inventarisatie van informatie en andere bijbehorende activa
+    title_en: ''
+    text_nl: Een inventaris van informatie en andere daarmee samenhangende activa, inclusief eigenaren,
+      moet worden opgesteld en onderhouden.
+    text_en: ''
+  '5.10':
+    title_nl: Aanvaardbaar gebruik van informatie en andere bijbehorende activa
+    title_en: ''
+    text_nl: Regels voor acceptabel gebruik en procedures voor de omgang met informatie en andere daarmee
+      samenhangende activa moeten worden geïdentificeerd, gedocumenteerd en geïmplementeerd.
+    text_en: ''
   '5.11':
     title_nl: Retournering van activa
     title_en: ''
-    text_nl: Procedures voor de teruggave of vernietiging van informatie en andere daarmee
-      samenhangende activa bij beëindiging of wijziging van het dienstverband of contract
-      moeten worden gedefinieerd en geïmplementeerd.
+    text_nl: Procedures voor de teruggave of vernietiging van informatie en andere daarmee samenhangende
+      activa bij beëindiging of wijziging van het dienstverband of contract moeten worden gedefinieerd
+      en geïmplementeerd.
+    text_en: ''
+  '5.12':
+    title_nl: Classificatie van informatie
+    title_en: ''
+    text_nl: Informatie moet worden geclassificeerd op basis van de informatiebeveiligingsbehoeften
+      van de organisatie, rekening houdend met vertrouwelijkheid, integriteit en beschikbaarheid.
+    text_en: ''
+  '5.13':
+    title_nl: Labeling van informatie
+    title_en: ''
+    text_nl: Een passende set procedures voor labeling van informatie moet worden ontwikkeld en geïmplementeerd
+      in overeenstemming met het informatieclassificatieschema.
+    text_en: ''
+  '5.14':
+    title_nl: Informatieoverdracht
+    title_en: ''
+    text_nl: Regels voor informatieoverdracht moeten worden gedefinieerd voor alle soorten overdrachtsvoorzieningen
+      en moeten overeenkomsten voor informatieoverdracht omvatten voor externe partijen.
+    text_en: ''
+  '5.15':
+    title_nl: Toegangsbeheersing
+    title_en: ''
+    text_nl: Regels voor toegangsbeheersing tot informatie en andere daarmee samenhangende activa moeten
+      worden vastgesteld en geïmplementeerd op basis van bedrijfs- en informatiebeveiligingseisen.
+    text_en: ''
+  '5.16':
+    title_nl: Identiteitsbeheer
+    title_en: ''
+    text_nl: De volledige levenscyclus van identiteiten moet worden beheerd in overeenstemming met het
+      toegangsbeheersingsbeleid.
+    text_en: ''
+  '5.17':
+    title_nl: Authenticatie-informatie
+    title_en: ''
+    text_nl: Beheer van authenticatie-informatie moet worden beheerst door middel van een formeel beheersproces,
+      inclusief advies aan gebruikers over het omgaan met authenticatie-informatie.
     text_en: ''
   '5.18':
     title_nl: Toegangsrechten
     title_en: ''
-    text_nl: Toegangsrechten tot informatie en andere daarmee samenhangende activa moeten
-      worden verstrekt, beoordeeld, gewijzigd en ingetrokken overeenkomstig het themaspecifieke
-      beleid en de regels van de organisatie.
+    text_nl: Toegangsrechten tot informatie en andere daarmee samenhangende activa moeten worden verstrekt,
+      beoordeeld, gewijzigd en ingetrokken overeenkomstig het themaspecifieke beleid en de regels van
+      de organisatie.
+    text_en: ''
+  '5.19':
+    title_nl: Informatiebeveiliging in leveranciersrelaties
+    title_en: ''
+    text_nl: Processen en procedures moeten worden gedefinieerd en geïmplementeerd om de informatiebeveiligingsrisico's
+      die verband houden met het gebruik van producten of diensten van leveranciers te beheersen.
+    text_en: ''
+  '5.20':
+    title_nl: Behandeling van informatiebeveiliging binnen leveranciersovereenkomsten
+    title_en: ''
+    text_nl: Informatiebeveiligingseisen moeten worden vastgesteld en overeengekomen met elke leverancier
+      op basis van het type leveranciersrelatie en het risiconiveau.
+    text_en: ''
+  '5.21':
+    title_nl: Beheer van informatiebeveiliging in de ICT-toeleveringsketen
+    title_en: ''
+    text_nl: Procedures en eisen voor het beheer van informatiebeveiligingsrisico's in verband met de
+      ICT-toeleveringsketen moeten worden vastgesteld en geïmplementeerd.
+    text_en: ''
+  '5.22':
+    title_nl: Bewaking, beoordeling en wijzigingsbeheer van leveranciersdiensten
+    title_en: ''
+    text_nl: De organisatie moet regelmatig de informatiebeveiligingspraktijken en dienstverlening van
+      leveranciers monitoren, beoordelen, evalueren en wijzigingen beheren.
+    text_en: ''
+  '5.23':
+    title_nl: Informatiebeveiliging bij gebruik van clouddiensten
+    title_en: ''
+    text_nl: Processen voor het verwerven, gebruiken, beheren en beëindigen van informatiebeveiligingsdiensten
+      in de cloud moeten worden vastgesteld overeenkomstig de informatiebeveiligingseisen van de organisatie.
     text_en: ''
   '5.24':
     title_nl: Planning en voorbereiding van het beheer van informatiebeveiligingsincidenten
@@ -24,42 +152,421 @@ clauses:
     text_nl: De organisatie moet plannen en zich voorbereiden op het beheren van informatiebeveiligingsincidenten
       door rollen, verantwoordelijkheden en procedures te definiëren voor incidentrespons.
     text_en: ''
+  '5.25':
+    title_nl: Beoordeling en besluitvorming over informatiebeveiligingsincidenten
+    title_en: ''
+    text_nl: De organisatie moet informatiebeveiligingsgebeurtenissen beoordelen en beslissen of ze
+      als informatiebeveiligingsincidenten moeten worden geclassificeerd.
+    text_en: ''
+  '5.26':
+    title_nl: Reactie op informatiebeveiligingsincidenten
+    title_en: ''
+    text_nl: Op informatiebeveiligingsincidenten moet worden gereageerd overeenkomstig de gedocumenteerde
+      procedures.
+    text_en: ''
   '5.27':
     title_nl: Leren van informatiebeveiligingsincidenten
     title_en: ''
-    text_nl: Kennis opgedaan uit informatiebeveiligingsincidenten moet worden gebruikt om
-      de kans op of gevolgen van toekomstige incidenten te verkleinen.
+    text_nl: Kennis opgedaan uit informatiebeveiligingsincidenten moet worden gebruikt om de kans op
+      of gevolgen van toekomstige incidenten te verkleinen.
+    text_en: ''
+  '5.28':
+    title_nl: Verzamelen van bewijs
+    title_en: ''
+    text_nl: De organisatie moet procedures vaststellen voor de identificatie, verzameling, verwerving
+      en bewaring van bewijsmateriaal dat gerelateerd is aan informatiebeveiligingsincidenten.
+    text_en: ''
+  '5.29':
+    title_nl: Informatiebeveiliging tijdens verstoring
+    title_en: ''
+    text_nl: De organisatie moet plannen en maatregelen implementeren voor het handhaven van informatiebeveiliging
+      tijdens verstoring.
+    text_en: ''
+  '5.30':
+    title_nl: ICT-gereedheid voor bedrijfscontinuïteit
+    title_en: ''
+    text_nl: ICT-gereedheid moet worden gepland, geïmplementeerd, onderhouden en getest op basis van
+      bedrijfscontinuïteitsdoelstellingen en ICT-continuïteitseisen.
+    text_en: ''
+  '5.31':
+    title_nl: Wettelijke, statutaire, regelgevende en contractuele eisen
+    title_en: ''
+    text_nl: Wettelijke, statutaire, regelgevende en contractuele eisen die relevant zijn voor informatiebeveiliging
+      moeten worden geïdentificeerd, gedocumenteerd en actueel gehouden.
+    text_en: ''
+  '5.32':
+    title_nl: Intellectuele eigendomsrechten
+    title_en: ''
+    text_nl: De organisatie moet procedures implementeren om intellectuele eigendomsrechten te beschermen
+      en het gebruik van propriëtaire software te beheren.
+    text_en: ''
+  '5.33':
+    title_nl: Bescherming van registraties
+    title_en: ''
+    text_nl: Registraties moeten worden beschermd tegen verlies, vernietiging, vervalsing en onbevoegde
+      toegang en vrijgave, overeenkomstig wettelijke, statutaire, regelgevende en contractuele eisen.
+    text_en: ''
+  '5.34':
+    title_nl: Privacy en bescherming van persoonsgegevens
+    title_en: ''
+    text_nl: De organisatie moet de privacy en bescherming van persoonsgegevens waarborgen zoals vereist
+      door relevante wet- en regelgeving.
+    text_en: ''
+  '5.35':
+    title_nl: Onafhankelijke beoordeling van informatiebeveiliging
+    title_en: ''
+    text_nl: Een onafhankelijke beoordeling van de aanpak van de organisatie voor het beheren van informatiebeveiliging
+      en de implementatie ervan moet op geplande tijdstippen of bij significante wijzigingen worden
+      uitgevoerd.
+    text_en: ''
+  '5.36':
+    title_nl: Naleving van beleid, regels en normen voor informatiebeveiliging
+    title_en: ''
+    text_nl: Naleving van het informatiebeveiligingsbeleid, themaspecifieke beleidslijnen en technische
+      normen van de organisatie moet regelmatig worden beoordeeld.
+    text_en: ''
+  '5.37':
+    title_nl: Gedocumenteerde bedieningsprocedures
+    title_en: ''
+    text_nl: Gedocumenteerde bedieningsprocedures voor informatie- verwerkingsfaciliteiten moeten beschikbaar
+      worden gesteld aan alle gebruikers die deze nodig hebben.
+    text_en: ''
+  '6.1':
+    title_nl: Screening
+    title_en: ''
+    text_nl: Achtergrondverificaties van alle kandidaten voor een dienstverband moeten worden uitgevoerd
+      voordat zij toetreden tot de organisatie en op doorlopende basis, rekening houdend met wet- en
+      regelgeving en ethische overwegingen.
+    text_en: ''
+  '6.2':
+    title_nl: Arbeidsvoorwaarden
+    title_en: ''
+    text_nl: Arbeidsovereenkomsten en contracten moeten de verantwoordelijkheden van de medewerkers
+      en de organisatie voor informatiebeveiliging vastleggen.
     text_en: ''
   '6.3':
     title_nl: Bewustzijn, opleiding en training op het gebied van informatiebeveiliging
     title_en: ''
-    text_nl: Medewerkers en relevante contractanten moeten passend bewustzijn, onderwijs en
-      opleiding ontvangen over informatiebeveiliging en regelmatige updates van het beleid.
+    text_nl: Medewerkers en relevante contractanten moeten passend bewustzijn, onderwijs en opleiding
+      ontvangen over informatiebeveiliging en regelmatige updates van het beleid.
+    text_en: ''
+  '6.4':
+    title_nl: Disciplinaire procedure
+    title_en: ''
+    text_nl: Er moet een formeel en gecommuniceerd disciplinair proces bestaan en worden geactiveerd
+      om actie te ondernemen tegen medewerkers en andere relevante betrokken partijen die een informatiebeveiligings-
+      overtreding begaan hebben.
     text_en: ''
   '6.5':
     title_nl: Verantwoordelijkheden na beëindiging of wijziging van het dienstverband
     title_en: ''
-    text_nl: Informatiebeveiligingsverantwoordelijkheden en -verplichtingen die van kracht
-      blijven na beëindiging of wijziging van het dienstverband moeten worden gedefinieerd,
-      gecommuniceerd en gehandhaafd.
+    text_nl: Informatiebeveiligingsverantwoordelijkheden en -verplichtingen die van kracht blijven na
+      beëindiging of wijziging van het dienstverband moeten worden gedefinieerd, gecommuniceerd en gehandhaafd.
+    text_en: ''
+  '6.6':
+    title_nl: Vertrouwelijkheids- of geheimhoudingsovereenkomsten
+    title_en: ''
+    text_nl: Informatiebeveiligingseisen moeten worden opgenomen in overeenkomsten met personeel en
+      contractanten.
+    text_en: ''
+  '6.7':
+    title_nl: Werken op afstand
+    title_en: ''
+    text_nl: Maatregelen voor informatiebeveiliging moeten worden geïmplementeerd wanneer medewerkers
+      op afstand werken om de informatie die buiten het terrein van de organisatie wordt benaderd, verwerkt
+      of opgeslagen te beschermen.
+    text_en: ''
+  '6.8':
+    title_nl: Melding van informatiebeveiligingsgebeurtenissen
+    title_en: ''
+    text_nl: De organisatie moet een mechanisme bieden waarmee medewerkers waargenomen of vermoede informatiebeveiligingsgebeurtenissen
+      kunnen rapporteren via passende kanalen.
+    text_en: ''
+  '7.1':
+    title_nl: Fysieke beveiligingsperimeters
+    title_en: ''
+    text_nl: Beveiligde fysieke perimeters moeten worden gedefinieerd en gebruikt om gebieden die informatie
+      en andere daarmee samenhangende activa bevatten te beschermen.
+    text_en: ''
+  '7.2':
+    title_nl: Fysieke toegang
+    title_en: ''
+    text_nl: Beveiligde zones moeten worden beschermd door passende toegangsbeheersmaatregelen en toegangspunten.
+    text_en: ''
+  '7.3':
+    title_nl: Beveiliging van kantoren, ruimten en faciliteiten
+    title_en: ''
+    text_nl: Fysieke beveiligingsmaatregelen voor kantoren, ruimtes en faciliteiten moeten worden ontworpen
+      en geïmplementeerd.
+    text_en: ''
+  '7.4':
+    title_nl: Bewaking van fysieke beveiliging
+    title_en: ''
+    text_nl: Fysieke locaties moeten continu worden gemonitord op onbevoegde fysieke toegang.
+    text_en: ''
+  '7.5':
+    title_nl: Bescherming tegen fysieke en omgevingsbedreigingen
+    title_en: ''
+    text_nl: Bescherming tegen fysieke en omgevingsdreigingen, zoals natuurrampen en andere opzettelijke
+      of onopzettelijke fysieke bedreigingen voor de infrastructuur, moet worden ontworpen en geïmplementeerd.
+    text_en: ''
+  '7.6':
+    title_nl: Werken in beveiligde zones
+    title_en: ''
+    text_nl: Maatregelen voor beveiliging in beveiligde zones of zones met een hoog risico moeten worden
+      ontworpen en toegepast.
+    text_en: ''
+  '7.7':
+    title_nl: Clear desk en clear screen
+    title_en: ''
+    text_nl: Medewerkers en externe partijen die gebruikmaken van of toegang hebben tot activa van de
+      organisatie moeten een clean desk beleid voor papieren documenten en verwijderbare opslagmedia
+      toepassen en een clean screen beleid voor informatiefaciliteiten.
+    text_en: ''
+  '7.8':
+    title_nl: Plaatsing en bescherming van apparatuur
+    title_en: ''
+    text_nl: Apparatuur moet op geschikte locaties worden geplaatst en beschermd om de risico's van
+      omgevingsdreigingen en -gevaren en de mogelijkheid van onbevoegde toegang te verminderen.
+    text_en: ''
+  '7.9':
+    title_nl: Beveiliging van activa buiten de gebouwen
+    title_en: ''
+    text_nl: Activa buiten het terrein moeten worden beschermd. Het risiconiveau van activa buiten het
+      terrein van de organisatie moet in acht worden genomen en passende maatregelen moeten worden toegepast.
+    text_en: ''
+  '7.10':
+    title_nl: Opslagmedia
+    title_en: ''
+    text_nl: Opslagmedia moeten worden beheerd gedurende hun levenscyclus van verwerving, gebruik, transport
+      en verwijdering in overeenstemming met het classificatieschema en de behandelingseisen van de
+      organisatie.
+    text_en: ''
+  '7.11':
+    title_nl: Nutsvoorzieningen
+    title_en: ''
+    text_nl: Informatiefaciliteiten moeten worden beschermd tegen stroomonderbrekingen en andere storingen
+      als gevolg van uitval van ondersteunende nutsvoorzieningen.
+    text_en: ''
+  '7.12':
+    title_nl: Kabelbeveiliging
+    title_en: ''
+    text_nl: Bekabeling voor elektriciteit en telecommunicatie die gegevens transporteert of ondersteunende
+      informatiediensten ondersteunt, moet worden beschermd tegen onderschepping, interferentie of schade.
+    text_en: ''
+  '7.13':
+    title_nl: Onderhoud van apparatuur
+    title_en: ''
+    text_nl: Apparatuur moet correct worden onderhouden om de continue beschikbaarheid en integriteit
+      te waarborgen.
+    text_en: ''
+  '7.14':
+    title_nl: Veilige verwijdering of hergebruik van apparatuur
+    title_en: ''
+    text_nl: Onderdelen van apparatuur die opslagmedia bevatten, moeten worden geverifieerd om te waarborgen
+      dat gevoelige gegevens en gelicentieerde software zijn gewist of veilig overschreven of vernietigd
+      voordat de apparatuur wordt afgestoten of hergebruikt.
+    text_en: ''
+  '8.1':
+    title_nl: Eindgebruikersapparaten
+    title_en: ''
+    text_nl: Informatie op gebruikerseindpuntapparaten moet worden beschermd. De organisatie moet beleid
+      en ondersteunende technische maatregelen vaststellen voor het veilig beheren van gebruikerseindpuntapparaten.
+    text_en: ''
+  '8.2':
+    title_nl: Bevoorrechte toegangsrechten
+    title_en: ''
+    text_nl: Privileged access rights moeten worden beperkt en beheerd overeenkomstig het toegangsbeheersingsbeleid
+      en de regels voor toegangsbeheersing.
+    text_en: ''
+  '8.3':
+    title_nl: Beperking van toegang tot informatie
+    title_en: ''
+    text_nl: Toegang tot informatie en andere daarmee samenhangende activa moet worden beperkt overeenkomstig
+      het vastgestelde themaspecifieke beleid voor toegangsbeheersing.
+    text_en: ''
+  '8.4':
+    title_nl: Toegang tot broncode
+    title_en: ''
+    text_nl: Toegang tot broncode, ontwikkelgereedschappen en software libraries moet op passende wijze
+      worden beheerd.
+    text_en: ''
+  '8.5':
+    title_nl: Veilige authenticatie
+    title_en: ''
+    text_nl: Veilige authenticatieprocedures en -technologieën moeten worden geïmplementeerd op basis
+      van beperkingen voor informatiebeheer en in overeenstemming met het themaspecifieke beleid voor
+      toegangsbeheersing.
+    text_en: ''
+  '8.6':
+    title_nl: Capaciteitsbeheer
+    title_en: ''
+    text_nl: Het gebruik van middelen moet worden gemonitord en aangepast overeenkomstig de actuele
+      en verwachte capaciteitseisen.
+    text_en: ''
+  '8.7':
+    title_nl: Bescherming tegen malware
+    title_en: ''
+    text_nl: Bescherming tegen malware moet worden geïmplementeerd en ondersteund door passend bewustzijn
+      van gebruikers.
+    text_en: ''
+  '8.8':
+    title_nl: Beheer van technische kwetsbaarheden
+    title_en: ''
+    text_nl: Informatie over technische kwetsbaarheden van gebruikte informatiesystemen moet tijdig
+      worden verkregen, de blootstelling van de organisatie aan dergelijke kwetsbaarheden moet worden
+      beoordeeld en passende maatregelen moeten worden genomen.
+    text_en: ''
+  '8.9':
+    title_nl: Configuratiebeheer
+    title_en: ''
+    text_nl: Configuraties, inclusief beveiligingsconfiguraties, van hardware, software, diensten en
+      netwerken moeten worden vastgesteld, gedocumenteerd, geïmplementeerd, gemonitord en beoordeeld.
+    text_en: ''
+  '8.10':
+    title_nl: Wissen van informatie
+    title_en: ''
+    text_nl: Informatie die is opgeslagen in informatiesystemen, apparaten of andere opslagmedia moet
+      worden verwijderd wanneer deze niet langer benodigd is.
+    text_en: ''
+  '8.11':
+    title_nl: Datamaskering
+    title_en: ''
+    text_nl: Maatregelen voor data masking moeten worden geïmplementeerd overeenkomstig het themaspecifieke
+      beleid voor toegangsbeheersing van de organisatie en andere gerelateerde themaspecifieke beleidslijnen
+      en bedrijfseisen, rekening houdend met toepasselijke wetgeving.
+    text_en: ''
+  '8.12':
+    title_nl: Preventie van gegevenslekken
+    title_en: ''
+    text_nl: Maatregelen voor preventie van datalekken moeten worden toegepast op systemen, netwerken
+      en andere apparaten die gevoelige informatie verwerken, opslaan of transporteren.
     text_en: ''
   '8.13':
     title_nl: Back-up van informatie
     title_en: ''
-    text_nl: Back-upkopieën van informatie, software en systemen moeten worden gemaakt en
-      regelmatig worden getest overeenkomstig het overeengekomen themaspecifieke beleid voor
-      back-up.
+    text_nl: Back-upkopieën van informatie, software en systemen moeten worden gemaakt en regelmatig
+      worden getest overeenkomstig het overeengekomen themaspecifieke beleid voor back-up.
+    text_en: ''
+  '8.14':
+    title_nl: Redundantie van informatieverwerkende faciliteiten
+    title_en: ''
+    text_nl: Informatiefaciliteiten moeten met voldoende redundantie worden geïmplementeerd om te voldoen
+      aan beschikbaarheidseisen.
     text_en: ''
   '8.15':
     title_nl: Logging
     title_en: ''
-    text_nl: Logboeken die activiteiten, uitzonderingen, fouten en andere relevante gebeurtenissen
-      vastleggen, moeten worden geproduceerd, opgeslagen, beschermd en geanalyseerd.
+    text_nl: Logboeken die activiteiten, uitzonderingen, fouten en andere relevante gebeurtenissen vastleggen,
+      moeten worden geproduceerd, opgeslagen, beschermd en geanalyseerd.
     text_en: ''
   '8.16':
     title_nl: Bewakingsactiviteiten
     title_en: ''
-    text_nl: Netwerken en systemen moeten worden gemonitord op afwijkend gedrag en passende
-      maatregelen moeten worden genomen om potentiële informatiebeveiligingsincidenten te
-      evalueren.
+    text_nl: Netwerken en systemen moeten worden gemonitord op afwijkend gedrag en passende maatregelen
+      moeten worden genomen om potentiële informatiebeveiligingsincidenten te evalueren.
+    text_en: ''
+  '8.17':
+    title_nl: Kloksynchronisatie
+    title_en: ''
+    text_nl: Klokken van informatieverwerkingssystemen die door de organisatie worden gebruikt, moeten
+      worden gesynchroniseerd met goedgekeurde tijdbronnen.
+    text_en: ''
+  '8.18':
+    title_nl: Gebruik van bevoorrechte hulpprogramma's
+    title_en: ''
+    text_nl: Het gebruik van programma's met speciale beheerdersrechten die systeembeheersing kunnen
+      omzeilen, moet worden beperkt en nauwkeurig worden bewaakt.
+    text_en: ''
+  '8.19':
+    title_nl: Installatie van software op operationele systemen
+    title_en: ''
+    text_nl: Procedures en maatregelen voor de installatie van software op operationele systemen moeten
+      worden geïmplementeerd.
+    text_en: ''
+  '8.20':
+    title_nl: Netwerkbeveiliging
+    title_en: ''
+    text_nl: Netwerken en netwerkapparaten moeten worden beveiligd, beheerd en bewaakt om informatie
+      en informatiefaciliteiten te beschermen.
+    text_en: ''
+  '8.21':
+    title_nl: Beveiliging van netwerkdiensten
+    title_en: ''
+    text_nl: Beveiligingsmechanismen, service niveaus en beheersvereisten voor alle netwerkdiensten
+      moeten worden geïdentificeerd, geïmplementeerd en gemonitord, of deze diensten nu intern worden
+      geleverd of uitbesteed zijn.
+    text_en: ''
+  '8.22':
+    title_nl: Scheiding van netwerken
+    title_en: ''
+    text_nl: Groepen van informatiediensten, gebruikers en informatiesystemen moeten in netwerken worden
+      gesegmenteerd.
+    text_en: ''
+  '8.23':
+    title_nl: Webfiltering
+    title_en: ''
+    text_nl: Toegang tot externe websites moet worden beheerd om blootstelling aan kwaadaardige content
+      te verminderen.
+    text_en: ''
+  '8.24':
+    title_nl: Gebruik van cryptografie
+    title_en: ''
+    text_nl: Regels voor het gebruik van cryptografie, inclusief beheer van cryptografische sleutels,
+      moeten worden vastgesteld en geïmplementeerd.
+    text_en: ''
+  '8.25':
+    title_nl: Veilige ontwikkelingslevenscyclus
+    title_en: ''
+    text_nl: Regels voor de veilige ontwikkeling van software en systemen moeten worden vastgesteld
+      en toegepast op ontwikkelingen binnen de organisatie.
+    text_en: ''
+  '8.26':
+    title_nl: Beveiligingseisen voor toepassingen
+    title_en: ''
+    text_nl: Informatiebeveiligingseisen moeten worden geïdentificeerd, gespecificeerd en goedgekeurd
+      bij het ontwikkelen of verwerven van applicaties.
+    text_en: ''
+  '8.27':
+    title_nl: Veilige systeemarchitectuur en technische principes
+    title_en: ''
+    text_nl: Principes voor het ontwerpen van veilige systemen moeten worden vastgesteld, gedocumenteerd,
+      onderhouden en toegepast op informatiecysteem-implementatiewerkzaamheden.
+    text_en: ''
+  '8.28':
+    title_nl: Veilig coderen
+    title_en: ''
+    text_nl: Veilige codeerpraktijken moeten worden toegepast op softwareontwikkeling.
+    text_en: ''
+  '8.29':
+    title_nl: Beveiligingstesten in ontwikkeling en acceptatie
+    title_en: ''
+    text_nl: Beveiligingstestprocessen moeten worden gedefinieerd en geïmplementeerd in de ontwikkellevenscyclus.
+    text_en: ''
+  '8.30':
+    title_nl: Uitbestede ontwikkeling
+    title_en: ''
+    text_nl: Uitbestede ontwikkeling moet worden gesuperviseerd en gemonitord door de organisatie.
+    text_en: ''
+  '8.31':
+    title_nl: Scheiding van ontwikkel-, test- en productieomgevingen
+    title_en: ''
+    text_nl: Ontwikkel-, test- en productieomgevingen moeten van elkaar worden gescheiden en beveiligd.
+    text_en: ''
+  '8.32':
+    title_nl: Wijzigingsbeheer
+    title_en: ''
+    text_nl: Wijzigingen in informatiefaciliteiten en informatiesystemen moeten worden beheerst door
+      middel van wijzigingsbeheer procedures.
+    text_en: ''
+  '8.33':
+    title_nl: Testinformatie
+    title_en: ''
+    text_nl: Testinformatie moet worden geselecteerd, beschermd en beheerd.
+    text_en: ''
+  '8.34':
+    title_nl: Bescherming van informatiesystemen tijdens audittesten
+    title_en: ''
+    text_nl: Informatiesystemen moeten worden beschermd tijdens audittests om verstoring van bedrijfsprocessen
+      en gebruikte auditgereedschappen te minimaliseren.
     text_en: ''
