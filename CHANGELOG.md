@@ -6,6 +6,37 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — een bevinding die niet te triageren was
+
+De conclusie meldde "1 kandidaat-NC nog niet beoordeeld" terwijl de auditor alles op `valide`
+had gezet, en de trail die beslissing ook bevatte. De werkset had 903 regels en **902 unieke
+id's**: `nc-5.17` kwam twee keer voor, met verschillende titels ("… ontbreekt" en dezelfde
+zonder dat woord), verschillende `deviation` en verschillende `corrective_measure`.
+
+Twee echte bevindingen dus, en de dedup-sleutel zag dat goed — die bevat de genormaliseerde
+titel. Het **id** zag het niet: dat is `nc-<clausule>`, dus elke tweede NC op dezelfde clausule
+botst met de eerste. En `apply_triage` zoekt met `next(...)`, dus elke klik landde op de eerste
+regel. De auditor zette de tweede op valide, de trail legde dat vast, de lijst bleef `open`, en
+de memo-gate bleef geblokkeerd. Niet op te lossen door harder te klikken.
+
+Een botsend id krijgt nu een suffix (`nc-5.17-2`). De dedup blijft ongemoeid: twee bevindingen
+met verschillende titels zijn twee bevindingen, en dat oordeel hoort bij de auditor. Voor
+werksets die de dubbele al hebben is er `runs.herstel_dubbele_ids()`, dat elke hernoeming
+append-only vastlegt met `field: "id"` — stil hernoemen zou de trail naar een id laten wijzen
+dat niet meer bestaat.
+
+**Apart en ook gemeten: `findings.json` werd niet veilig geschreven.** `Path.write_text` kapt
+het bestand eerst af, dus een lezer die er precies dan bij is krijgt een `JSONDecodeError` of
+een te korte werkset — reproduceerbaar met vier triage-threads naast een run-thread. En twee
+schrijvers (`runs.voeg_toe` uit de run, `session.apply_triage` uit het verzoek) deden lees-alles
+→ wijzig → schrijf-alles zonder enige coördinatie.
+
+Nieuw `api/werkset.py`: atomair schrijven (tijdelijk bestand in dezelfde map + `os.replace`) en
+één exclusief `fcntl.flock` om lees-wijzig-schrijf. Atomair schrijven beschermt ook de lezers
+die géén slot nemen — dat is elke `GET /findings`. Bewust een bestandsslot en geen
+`threading.Lock`: flock werkt tussen threads én processen, en dit project gaat richting losse
+componenten.
+
 ### Fixed — 2026-08-24 — zoeken op "non-conformiteiten" gaf een 500
 
 De vraagassistent viel om met `sqlite3.OperationalError: no such column: conformiteiten`. FTS5
