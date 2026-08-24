@@ -201,10 +201,13 @@ spec:
               memory: 256Mi
             limits:
               cpu: "1"
-              # 1Gi: WeasyPrint houdt bij het renderen van de memo de hele
-              # pagina-boom in geheugen. 512Mi was bij openwoo al te krap voor
-              # zwaarder werk.
-              memory: 1Gi
+              # 2Gi: WeasyPrint houdt de hele pagina-boom in geheugen, en sinds
+              # 2026-08-24 rendert ook het auditrapport zo (niet meer via Chrome).
+              # Gemeten op het rapport van die dag: 345 pagina's, piek 384 MiB —
+              # bovenop de run die op dat moment nog in hetzelfde proces zit. Onder
+              # 1Gi is dat krap genoeg dat de OOM-killer juist de laatste stap van
+              # een geslaagde run treft.
+              memory: 2Gi
           volumeMounts:
             - name: data
               mountPath: /var/lib/iso-audit

@@ -29,9 +29,38 @@ niet aan de sessie van een medewerker te hangen. Op de commandoregel:
 ## Wat er gelezen wordt
 
 Dezelfde lezers als Drive, uit `sources/tekst.py`: PDF (`pypdf`, geen OCR), `.docx` inclusief
-tabellen, `.xlsx` per blad, `.pptx` per dia, en `text/plain`, markdown, HTML en CSV.
+tabellen, `.xlsx` per blad, `.pptx` per dia, OpenDocument (`.odt`, `.ods`, `.odp`, `.odg`), en
+`text/plain`, markdown, HTML en CSV.
 
 Geen Google-native types — die bestaan hier niet.
+
+### OpenDocument
+
+Op de eerste echte run tegen de canary (2026-08-24) waren **32 van de 168 bestanden** ODF, en
+alle 32 werden gemeld als "onbekend type": elf `.odt`, elf `.odp`, zes `.ods` en vier `.odg`.
+Op een schijf van een organisatie die LibreOffice gebruikt is dat de hoofdmoot en geen
+uitzondering — een bron die een vijfde van zijn schijf niet leest, dekt die schijf niet.
+
+Een ODF-bestand is een zip met `content.xml`. De lezer is `zipfile` plus
+`xml.etree.ElementTree` uit de standaardbibliotheek; geen `odfpy` erbij, want de wandeling is
+twintig regels en een dependency is een dependency om te volgen in een repo onder 27001-scope.
+
+Alle vier formaten gaan door dezelfde lezer: het verschil tussen odt en odp zit in de omhulling
+(`office:text` tegen `draw:page`), niet in waar de tekst staat. Een tabelrij blijft één regel
+met tabs ertussen, net als bij `.xlsx` — cel-per-regel maakt van "A.5.1 | CISO" twee losse
+feiten die niet meer bij elkaar horen.
+
+Twee weigeringen, dezelfde als bij de PROPFIND-parser en om dezelfde reden — het bestand komt
+van een schijf waar iedereen kan uploaden:
+
+| geval | wat er gebeurt |
+|---|---|
+| `content.xml` bevat een `DOCTYPE` | geweigerd; `ElementTree` blokkeert entity-expansie niet |
+| uitgepakte `content.xml` boven 32 MB | geweigerd; de grens staat op de **uitgepakte** grootte, want juist een zip-bom is klein |
+
+Een geweigerd of kapot bestand is nooit fataal: `protocol_ingest` vangt per document en meldt
+het met de reden. Een `.odg`-tekening levert vaak niets op, en dat is een uitkomst en geen
+fout — hij wordt gemeld als leeg, net als een gescande PDF.
 
 **Waarom gedeelde lezers:** het zijn functies van bytes naar tekst en ze raken Drive niet. Een
 tweede set per bron maakt van "leest het tool xlsx-tabellen?" een vraag met twee antwoorden, die

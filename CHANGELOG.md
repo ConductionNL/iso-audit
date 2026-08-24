@@ -6,6 +6,89 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — de PDF komt er weer, en de oorzaak was 2,2 KB CSS
+
+Aan het eind van elke run stond `PDF-conversie mislukt: Geen Chrome/Chromium gevonden`. Het
+rapport werd geschreven als md, html, docx, csv en xlsx; de PDF ontbrak stil, want de melding was
+een `logger.warning` en niet een fout. Voor een auditor is de PDF juist het stuk dat de deur uit
+gaat.
+
+`reporting/html_to_pdf.py` gebruikt nu **WeasyPrint** in plaats van Chrome headless. De docstring
+gaf als reden voor Chrome dat WeasyPrint "traag was op lange rapporten met complex grid-layout".
+Die observatie was juist en de oorzaak bleek één declaratie. Gemeten op het rapport van vandaag
+(767 KB HTML, 301 pagina's):
+
+| stylesheet | rendertijd |
+|---|---|
+| ongewijzigd (`.page { display: grid }` geldt ook in print) | > 8 minuten, niet afgemaakt |
+| CSS volledig weggehaald | 16,8 s |
+| alleen `.page { display: block }` in `@media print` | 16,1 s |
+
+WeasyPrint legt een grid-container niet over paginagrenzen uiteen en probeert het hele rapport
+als één grid-item te plaatsen. Het print-blok verborg de TOC en zette al één kolom; alleen
+`display` bleef staan. End-to-end md → html → pdf duurt nu 16,6 s met een piek van 356 MiB.
+
+**Waarom geen Chromium in het image:** 338 MB aan libs plus fonts, en een netwerk-capabele
+renderer in een container die onder 27001-scope valt. WeasyPrint was al een dependency (de
+memo-render gebruikt hem) en `libpango`/`libcairo` staan al in het Dockerfile — `uv sync` en
+`docker build` garanderen samen dat de renderer aanwezig is. Dat was bij Chrome precies wat
+ontbrak.
+
+**De tests renderen nu echt.** Elke test in `test_html_to_pdf.py` mockte de renderer weg, dus de
+suite bleef groen terwijl PDF-generatie in productie onmogelijk was — hetzelfde patroon als de
+stille MIME-skips en de verweesde runs. Nieuw: een test die een PDF produceert en met `pypdf`
+teruglezt, een gate dat er geen binary buiten het image bij komt (`subprocess`, `shutil.which`),
+en een regressietest op `display: block` in het print-blok. Die laatste toetst de declaratie en
+niet de rendertijd: een tijdslimiet in een test hangt van de machine af, dit is de oorzaak zelf.
+
+Ook `@page { size: A4 }` vastgelegd — de standaard is Letter, en het rapport gaat naar
+Nederlandse auditors en printers.
+
+**Eén font erbij (`fonts-noto-core`, +64 MB).** Het rapport zet een gekleurde cirkel voor elke
+bevinding (U+1F7E0 en verwanten) en DejaVu heeft die glyph niet: op alle 310 pagina's stond een
+leeg blokje. Chrome rendeerde hem wel, dus zonder dit font zou de renderer-wissel een regressie
+zijn in precies het stuk dat de deur uit gaat. `fonts-noto-color-emoji` is eerst geprobeerd en
+afgewezen: +31 MB, en WeasyPrint plaatst een kleurenemoji als een paar pixels in de kantlijn —
+duurder én slechter dan geen glyph. Gecontroleerd door pagina's uit het gebouwde image te
+rasteren en te bekijken, niet door de tekst terug te lezen: `pypdf` gaf op dezelfde PDF
+`A u d i t r a p p o r t` terug terwijl de pagina er goed uitzag, dus tekstextractie is hier
+geen bewijs van vorm.
+
+Geheugenlimiet van de pod van 1Gi naar **2Gi**. Niet omdat de meting eronder zat (piek 356 MiB),
+maar omdat de renderer nu in hetzelfde proces zit als de run: onder 1Gi is de marge klein genoeg
+dat de OOM-killer juist de laatste stap van een geslaagde run treft.
+
+### Added — 2026-08-24 — OpenDocument lezen: 32 bestanden die "onbekend type" heetten
+
+De eerste echte run tegen de Nextcloud-canary meldde 79 van de 168 bestanden als niet gelezen,
+waarvan **32 OpenDocument**: elf `.odt`, elf `.odp`, zes `.ods` en vier `.odg`. Op de schijf van
+een organisatie die LibreOffice gebruikt is dat de hoofdmoot en geen uitzondering — een bron die
+een vijfde van zijn schijf niet leest, dekt die schijf niet, en de melding "onbekend type" leest
+als een randgeval.
+
+`sources/tekst.tekst_uit_odf()` leest alle vier formaten met `zipfile` en
+`xml.etree.ElementTree` uit de standaardbibliotheek. **Geen `odfpy`:** de wandeling is twintig
+regels, en een dependency erbij is een dependency om te volgen in een repo onder 27001-scope.
+
+Eén lezer voor vier formaten, want het verschil tussen odt en odp zit in de omhulling
+(`office:text` tegen `draw:page`) en niet in waar de tekst staat. Een tabelrij blijft één regel
+met tabs ertussen, zoals bij `.xlsx`: cel-per-regel maakt van "A.5.1 | CISO" twee losse feiten
+die niet meer bij elkaar horen. De namespace wordt afgekapt in plaats van uitgeschreven, omdat
+ODF 1.2 en 1.3 dezelfde lokale namen onder verschillende URI's gebruiken en een bestand uit een
+oudere LibreOffice anders stil nul regels oplevert.
+
+Twee weigeringen, dezelfde regel als bij de PROPFIND-parser omdat het bestand van een schijf komt
+waar iedereen kan uploaden: een `DOCTYPE` in `content.xml` wordt geweigerd (`ElementTree`
+blokkeert entity-expansie niet), en er staat een grens van 32 MB op de **uitgepakte**
+`content.xml` — op de zip meten laat een zip-bom door, want die kant is juist het probleem.
+Nieuwe fout `OnleesbaarDocumentError`, apart van `LeegDocumentError`: "niet gelezen" en "gelezen,
+niets gevonden" zijn verschillende dingen in de dekkingsmelding aan de auditor.
+
+Ook aan Drive toegevoegd — een `.odt` op een Google Drive was tot nu toe net zo onleesbaar.
+
+**Wat nog niet gelezen wordt:** tien `.excalidraw`-bestanden. Dat is JSON met tekstelementen, een
+eigen lezer, en geen ODF-probleem.
+
 ### Added — 2026-08-22 — de clausule-agent: voorbereiden, niet oordelen
 
 Per clausule zet hij de `bewijslast` uit de norm naast wat er in het landschap zit: welk verwacht

@@ -40,6 +40,7 @@ from iso_audit.sources.base import Document, Finding
 from iso_audit.sources.tekst import (
     DOCX_MIME,
     GESCANDE_FORMATEN,
+    ODF_MIMES,
     PPTX_MIME,
     XLSX_MIME,
     LeegDocumentError,
@@ -76,6 +77,7 @@ ONDERSTEUNDE_MIME_TYPES: dict[str, str] = {
     "text/markdown": "md",
     "text/html": "html",
     "text/csv": "csv",
+    **ODF_MIMES,
 }
 """Wat gelezen kan worden, en onder welk `Document.type` het binnenkomt.
 

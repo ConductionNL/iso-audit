@@ -35,6 +35,14 @@ RUN uv sync --frozen --no-dev
 FROM python@sha256:4766d8b510c428e595d74b9cc5bbb2fae8e26316fffb4adc89908d79aacd58a2 AS runtime
 
 # WeasyPrint-runtime + fonts. `--no-install-recommends` houdt het oppervlak klein.
+#
+# `fonts-noto-core` (+64 MB) staat er sinds 2026-08-24, toen het auditrapport zelf via
+# WeasyPrint gerendeerd ging worden in plaats van via Chrome. Het rapport zet een gekleurde
+# cirkel voor elke bevinding (U+1F7E0 en verwanten) en DejaVu heeft die glyph niet: dat gaf
+# op alle 310 pagina's een leeg blokje. Chrome rendeerde hem wel, dus zonder dit font is de
+# renderer-wissel een regressie in het stuk dat de auditor de deur uit doet.
+# `fonts-noto-color-emoji` is geprobeerd en afgewezen: +31 MB, en WeasyPrint plaatst een
+# kleurenemoji als een paar pixels in de kantlijn — duurder én slechter dan geen glyph.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libpango-1.0-0 \
         libpangoft2-1.0-0 \
@@ -43,6 +51,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libffi8 \
         shared-mime-info \
         fonts-dejavu-core \
+        fonts-noto-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Anthropic-CLI, alleen nodig voor de `sso`-auth-modus (inloggen met een

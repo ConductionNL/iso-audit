@@ -11,7 +11,7 @@ Pluggable ISO 9001 + 27001 audit-pipeline met drie protocol-lagen
 
 ## Wat het doet
 
-**Bewijs verzamelen.** Documenten uit Google Drive of Nextcloud (PDF, Office,
+**Bewijs verzamelen.** Documenten uit Google Drive of Nextcloud (PDF, Office, OpenDocument,
 tekstformaten — met de dekking per run in de audit-trail: gezien, gelezen, en per reden
 overgeslagen), planning uit Sheets, opvolgpunten uit Jira.
 

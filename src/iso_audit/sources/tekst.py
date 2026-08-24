@@ -22,6 +22,9 @@ oordeel over iets wat niemand heeft gelezen, op een clausule waar het bewijs bes
 from __future__ import annotations
 
 import io
+import re
+import xml.etree.ElementTree as ET  # nosec B405 — zie OnleesbaarDocumentError
+import zipfile
 from collections.abc import Callable
 
 import docx
@@ -33,6 +36,21 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
+ODF_MIMES: dict[str, str] = {
+    "application/vnd.oasis.opendocument.text": "odt",
+    "application/vnd.oasis.opendocument.spreadsheet": "ods",
+    "application/vnd.oasis.opendocument.presentation": "odp",
+    "application/vnd.oasis.opendocument.graphics": "odg",
+}
+"""De vier OpenDocument-formaten die op een gedeelde schijf voorkomen.
+
+Alle vier gaan door dezelfde lezer: het verschil tussen odt en odp zit in de omhulling
+(`office:text` tegen `draw:page`), niet in waar de tekst staat. Een aparte lezer per formaat
+zou drie keer dezelfde wandeling zijn met drie keer een eigen kans op afwijken.
+
+`odg` is een tekening. Die levert vaak niets op, en dat is een uitkomst en geen fout — de
+caller meldt hem dan als onleesbaar, net als een gescande pdf."""
+
 GESCANDE_FORMATEN: frozenset[str] = frozenset({"application/pdf"})
 """Formaten waarbij "geen tekst" op een scan kan duiden.
 
@@ -40,6 +58,27 @@ Voor de rest kan het dat niet. Een `.docx` zonder tekst is geen scan maar een do
 waarvan de inhoud buiten het bereik van de lezer valt — tot 2026-08-21 stond in de melding
 "mogelijk een scan of een leeg bestand" voor élk formaat, en dat wees de auditor de verkeerde
 kant op bij precies het bestand dat wél te repareren was."""
+
+
+MAX_ODF_INHOUD = 32 * 1024 * 1024
+"""Bovengrens op de **uitgepakte** `content.xml`.
+
+Op de zip meten heeft geen zin: die kant is juist het probleem. 40 MB nullen comprimeert tot
+enkele kilobytes, dus een grens op het bestand laat een zip-bom door. Zelfde grootte als
+`MAX_ANTWOORD` in de WebDAV-client, om dezelfde reden: één getal om te verantwoorden."""
+
+_ODF_DOCTYPE = re.compile(r"<!DOCTYPE", re.IGNORECASE)
+_DOCTYPE_VENSTER = 2048
+"""Zie `clients/nextcloud.py`: een DTD staat in de prolog, verderop is dit gewoon tekst."""
+
+
+class OnleesbaarDocumentError(Exception):
+    """Het bestand kon niet worden uitgelezen — kapot, of geweigerd om veiligheidsredenen.
+
+    Bewust onderscheiden van `LeegDocumentError`: leeg betekent "gelezen, niets gevonden" en
+    onleesbaar betekent "niet gelezen". Dat verschil staat in de dekkingsmelding aan de auditor,
+    en één fout voor beide zou die melding onbruikbaar maken.
+    """
 
 
 class LeegDocumentError(Exception):
@@ -134,11 +173,75 @@ def tekst_uit_pdf(inhoud: bytes) -> str:
     return "\n".join(pagina.extract_text() or "" for pagina in lezer.pages)
 
 
+def _odf_regels(element: ET.Element) -> list[str]:
+    """Wandel de boom in documentorde en maak per alinea, kop of tabelrij één regel.
+
+    De namespace wordt afgekapt (`{...}p` → `p`) in plaats van uitgeschreven: ODF 1.2 en 1.3
+    gebruiken dezelfde lokale namen onder verschillende namespace-URI's, en een bestand van een
+    oudere LibreOffice zou dan stil nul regels opleveren.
+    """
+    regels: list[str] = []
+    for kind in element:
+        naam = kind.tag.rsplit("}", 1)[-1]
+        if naam in ("p", "h"):
+            regel = "".join(kind.itertext()).strip()
+            if regel:
+                regels.append(regel)
+        elif naam == "table-row":
+            cellen = [c.strip() for c in ("".join(k.itertext()) for k in kind) if c.strip()]
+            if cellen:
+                regels.append("\t".join(cellen))
+        else:
+            regels.extend(_odf_regels(kind))
+    return regels
+
+
+def tekst_uit_odf(inhoud: bytes) -> str:
+    """Tekst uit een OpenDocument-bestand (odt, ods, odp, odg) — stdlib, geen extra pakket.
+
+    Een ODF-bestand is een zip met `content.xml`. Op de Nextcloud-canary lagen 32 van deze
+    bestanden (2026-08-24), gemeld als "onbekend type": elf odt, elf odp, zes ods en vier odg.
+    Dat is bijna een vijfde van die schijf, en op een schijf van een organisatie die LibreOffice
+    gebruikt is het de hoofdmoot in plaats van een uitzondering.
+
+    Geen `odfpy`: de wandeling hieronder is twintig regels, en een dependency erbij is een
+    dependency om te volgen in een repo die onder 27001-scope valt.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(inhoud)) as archief:
+            try:
+                gegevens = archief.getinfo("content.xml")
+            except KeyError as fout:
+                raise OnleesbaarDocumentError(
+                    "geen content.xml in het bestand; dit is geen OpenDocument-bestand"
+                ) from fout
+            if gegevens.file_size > MAX_ODF_INHOUD:
+                raise OnleesbaarDocumentError(
+                    f"content.xml van {gegevens.file_size} bytes overschrijdt de grens van "
+                    f"{MAX_ODF_INHOUD}"
+                )
+            ruw = archief.read("content.xml")
+    except zipfile.BadZipFile as fout:
+        raise OnleesbaarDocumentError(f"geen leesbare zip: {fout}") from fout
+
+    xml = ruw.decode("utf-8", errors="replace")
+    if _ODF_DOCTYPE.search(xml[:_DOCTYPE_VENSTER]):
+        raise OnleesbaarDocumentError(
+            "content.xml bevat een DOCTYPE; geweigerd wegens entity-expansie"
+        )
+    try:
+        wortel = ET.fromstring(xml)  # nosec B314 — DOCTYPE geweigerd en grootte begrensd, zie boven
+    except ET.ParseError as fout:
+        raise OnleesbaarDocumentError(f"content.xml is geen geldige XML: {fout}") from fout
+    return "\n".join(_odf_regels(wortel))
+
+
 _BINAIRE_LEZERS: dict[str, Callable[[bytes], str]] = {
     DOCX_MIME: tekst_uit_docx,
     XLSX_MIME: tekst_uit_xlsx,
     PPTX_MIME: tekst_uit_pptx,
     "application/pdf": tekst_uit_pdf,
+    **dict.fromkeys(ODF_MIMES, tekst_uit_odf),
 }
 """Per binair formaat één lezer. De rest wordt als tekst gedecodeerd."""
 

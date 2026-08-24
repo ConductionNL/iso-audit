@@ -1,11 +1,18 @@
-"""HTML → PDF converter via Chrome headless.
+"""HTML → PDF converter via WeasyPrint.
 
-Chrome rendert de volledige CSS (grid, sticky TOC, conditional formatting)
-snel en betrouwbaar. WeasyPrint (Python-native alternatief) bleek traag op
-lange rapporten met complex grid-layout — Chrome headless is boring &
-auditable.
+Tot 2026-08-24 liep dit via Chrome headless, met in de docstring de reden dat WeasyPrint
+"traag was op lange rapporten met complex grid-layout". Die observatie was juist, en de
+oorzaak bleek één CSS-declaratie: WeasyPrint legt een grid-container niet over paginagrenzen
+uiteen, dus `.page { display: grid }` liet hem het hele rapport als één grid-item plaatsen.
+Gemeten op het rapport van die dag (767 KB HTML, 345 pagina's): langer dan acht minuten met
+grid, 16 seconden met `display: block` in het print-blok. Zie `md_to_html.CSS`.
 
-Vereist: `google-chrome` of `chromium` in `PATH`.
+Waarom dat Chrome vervangt en niet aanvult: Chrome stond niet in het image, en de enige plek
+waar dat bleek was een `logger.warning` aan het eind van een run — de PDF ontbrak stil terwijl
+de rest van het rapport er wel stond. Chromium erbij zetten kost 338 MB aan libs plus fonts en
+zet een netwerk-capabele renderer in een container die onder 27001-scope valt. WeasyPrint is al
+een dependency (de memo-render gebruikt hem) en zijn systeembibliotheken staan al in het
+Dockerfile, dus `uv sync` en `docker build` garanderen samen dat de renderer aanwezig is.
 
 Gemigreerd uit `Ops_to_Biz/audit/html_to_pdf.py` per milestone B §2.5.2.
 
@@ -17,31 +24,18 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
-import subprocess  # nosec B404 — Chrome headless aanroepen is de bedoelde flow
 import sys
 from pathlib import Path
-
-CHROME_CANDIDATES = ("google-chrome", "chromium", "chrome")
-
-
-def _vind_chrome() -> str:
-    """Zoek Chrome/Chromium-binary in PATH; raise als ontbrekend."""
-    for cmd in CHROME_CANDIDATES:
-        pad = shutil.which(cmd)
-        if pad:
-            return pad
-    raise FileNotFoundError("Geen Chrome/Chromium gevonden. Installeer google-chrome of chromium.")
 
 
 def converteer(
     html_pad: str | os.PathLike[str],
     pdf_pad: str | os.PathLike[str] | None = None,
 ) -> str:
-    """Render HTML naar PDF via Chrome headless.
+    """Render HTML naar PDF.
 
-    Retourneert het PDF-pad. Bij `pdf_pad=None` wordt het naast het HTML
-    geschreven met `.pdf`-extensie.
+    Retourneert het PDF-pad. Bij `pdf_pad=None` wordt het naast het HTML geschreven met
+    `.pdf`-extensie.
     """
     html_path = Path(html_pad)
     if not html_path.is_file():
@@ -49,39 +43,28 @@ def converteer(
 
     out_path = Path(pdf_pad) if pdf_pad is not None else html_path.with_suffix(".pdf")
 
-    chrome = _vind_chrome()
-    abs_html = html_path.resolve()
-    abs_pdf = out_path.resolve()
+    # Import binnen de functie: WeasyPrint trekt bij import cairo en pango aan, en dat is
+    # verspild werk in elk proces dat deze module alleen importeert om `converteer` te kunnen
+    # noemen. Zelfde reden als de late imports in `pipeline._converteer_md_naar_html_docx_pdf`.
+    from weasyprint import HTML
 
-    # Chrome-binary uit shutil.which, alle andere args zijn vaste vlaggen of
-    # door de caller-aangeleverde paden; geen shell-injectie-risico.
-    subprocess.run(  # nosec B603
-        [
-            chrome,
-            "--headless=new",
-            "--disable-gpu",
-            "--no-sandbox",
-            "--no-pdf-header-footer",
-            f"--print-to-pdf={abs_pdf}",
-            f"file://{abs_html}",
-        ],
-        check=True,
-        capture_output=True,
-        timeout=60,
-    )
+    HTML(filename=str(html_path.resolve())).write_pdf(str(out_path.resolve()))
     return str(out_path)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="HTML → PDF via Chrome headless")
-    parser.add_argument("html_pad")
-    parser.add_argument("--output", "-o", default=None)
+    parser = argparse.ArgumentParser(description="HTML → PDF via WeasyPrint")
+    parser.add_argument("html", help="pad naar het HTML-bestand")
+    parser.add_argument("--output", help="pad voor de PDF (standaard: naast het HTML)")
     args = parser.parse_args()
-    pad = converteer(args.html_pad, args.output)
-    size_kb = os.path.getsize(pad) / 1024
-    print(f"PDF geschreven: {pad} ({size_kb:.0f} KB)")
+    try:
+        pad = converteer(args.html, args.output)
+    except FileNotFoundError as fout:
+        print(f"fout: bestand niet gevonden: {fout}", file=sys.stderr)
+        return 1
+    print(pad)
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

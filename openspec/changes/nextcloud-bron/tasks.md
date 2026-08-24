@@ -20,6 +20,10 @@ daarna samengevoegd moet worden, en dat is precies de duplicatie die deze change
 - [x] 2.4 Prullenbak, versies en systeembestanden overslaan **met melding**
 - [x] 2.5 Dekkingtelling zoals bij Drive: gezien, gelezen, per reden overgeslagen
 - [x] 2.6 Basic auth met app-wachtwoord over TLS
+- [x] 2.7 OpenDocument lezen (`odt`, `ods`, `odp`, `odg`) — stdlib `zipfile` + `content.xml`,
+      geen `odfpy`. Toegevoegd 2026-08-24 nadat de eerste echte run 32 van de 168 bestanden op
+      de canary als "onbekend type" meldde; op een LibreOffice-schijf is dat de hoofdmoot.
+      DOCTYPE geweigerd en een grens op de **uitgepakte** `content.xml` (zip-bom)
 
 ## 3. Configuratie
 

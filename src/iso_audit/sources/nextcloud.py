@@ -27,7 +27,12 @@ from iso_audit.clients import nextcloud as dav
 from iso_audit.config.verbinding import normaliseer
 from iso_audit.sources import register
 from iso_audit.sources.base import Document, Finding
-from iso_audit.sources.tekst import LeegDocumentError, leeg_reden, lees_bytes
+from iso_audit.sources.tekst import (
+    ODF_MIMES,
+    LeegDocumentError,
+    leeg_reden,
+    lees_bytes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +54,7 @@ ONDERSTEUNDE_MIME_TYPES: dict[str, str] = {
     "text/markdown": "md",
     "text/html": "html",
     "text/csv": "csv",
+    **ODF_MIMES,
 }
 """Dezelfde formaten als Drive, minus de Google-native types die hier niet bestaan.
 

@@ -102,9 +102,17 @@ hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
   .page { grid-template-columns: 1fr; gap: 1em; }
   .toc { position: static; max-height: none; order: -1; }
 }
+@page {
+  size: A4;
+  margin: 1.5cm 1.2cm;
+}
 @media print {
   .toc { display: none; }
-  .page { grid-template-columns: 1fr; max-width: none; padding: 0; }
+  /* `display: block` is hier geen opmaakvoorkeur maar de rendertijd. WeasyPrint legt een
+     grid-container niet over paginagrenzen uiteen en probeert het hele rapport als één
+     grid-item te plaatsen: gemeten op 2026-08-24 op het rapport van die dag (345 pagina's)
+     ruim acht minuten met grid tegen 16 seconden met block. Zie `reporting/html_to_pdf.py`. */
+  .page { display: block; grid-template-columns: 1fr; max-width: none; padding: 0; }
 }
 """
 
