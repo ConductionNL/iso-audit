@@ -6,6 +6,51 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-24 — NC en OFI krijgen hun formele definitie, en de prompts gaan naar schijf
+
+De scherpe prompt — de standaard, dus wat elke portaal-run gebruikte — zei:
+
+> "NC: er is geen of onvoldoende bewijs; de eis is niet aantoonbaar gedekt."
+
+Dat is het omgekeerde van de norm. Een non-conformiteit is een **bewezen** tekortkoming, en geen
+bewijs in één document toont niets aan: het betekent dat dít document er niets over zegt. Zo
+werden het er **387** in de run van 2026-08-24, waar de auditor in het handgemaakte Q2-memo op
+**2** uitkwam.
+
+Even scheef stond OFI. Die was "de eis is gedeeltelijk gedekt" — maar gedeeltelijk gedekt is een
+**kleine non-conformiteit**, geen verbeterkans. Een OFI betekent dat de eis wél voldoet en
+slimmer, veiliger of efficiënter kan; opvolging is vrijblijvend en de organisatie blijft conform.
+Dat verschil bepaalt of iemand iets moet corrigeren of mag negeren.
+
+De nieuwe prompts (`v2-scherp`, `v2-genuanceerd`, `v2-miro`) leggen vast:
+
+- **NC** = bewezen tekortkoming, met **major** (proces afwezig of gebroken) tegen **minor**
+  (op zichzelf staande misser in een werkend proces).
+- **OFI** = de eis voldoet, het kan beter, opvolging is vrijblijvend.
+- **`null` is een geldige uitkomst.** Een document dat over iets anders gaat, toont geen
+  tekortkoming aan. Zonder die uitweg moest het model voor élk document-clausulepaar uit de
+  zoektermen een oordeel kiezen — de mechaniek achter 6,8 bevindingen per document.
+- **Een NC moet zijn onderbouwing invullen**: welke eis niet wordt gehaald, waaruit dat blijkt in
+  dit document, en waarom het het managementsysteem raakt. Kun je die drie niet invullen, dan is
+  het geen NC. De norm vraagt om correctie, root-cause-analyse en formele verificatie, en dat kan
+  niemand op een oordeel zonder inhoud — 55 bevindingen hadden een lege beschrijving én lege
+  onderbouwing.
+
+**De prompts staan nu op schijf**, in `classification/prompts/<versie>.md`. `CLAUDE.md` belooft
+dat al ("Geheime classificatie-logica bestaat niet"), maar die map bestond niet en de prompts
+stonden als tripelquoted strings in `findings.py`. `memo/prompts/` en `reporting/prompts/` deden
+het allang goed; de classificatie was de enige die zijn prompt in code hield — uitgerekend de
+plek waar het oordeel valt. `classifications.prompt_versie` bewaarde alleen een sha256, dus
+achteraf was te zien **dát** de prompt veranderde, niet wat er stond.
+
+Een gate-test weigert dat een systeemprompt terugkruipt in de code, en per promptbestand wordt
+de definitie zelf getoetst — inclusief dat de oude NC-formulering er niet meer in staat.
+
+**Nog te doen:** de klantspecifieke jurisprudentie in `v2-genuanceerd` (BYOD, "memo is
+sluitingsbewijs", 5.12 intern/extern) hoort in het profiel en niet in een gedeelde prompt; bij de
+volgende klant is die gewoon onjuist. En het oordeel valt nog per document; per clausule over al
+het bewijs heen is `openspec/changes/autonome-review/`.
+
 ### Fixed — 2026-08-24 — de koppeling draait per norm; 18 ISO 9001-clausules komen terug
 
 `laad_clause_map("beide")` voegde de twee clause-maps samen met `{**map_9001, **map_27001}`.

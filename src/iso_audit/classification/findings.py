@@ -204,72 +204,24 @@ class Kostenteller:
 # Prompts — system (statisch, gecached) + user (variabel)
 # ---------------------------------------------------------------------------
 
-_SYSTEM_SCHERP = """Je bent een ervaren ISO-auditor bij Conduction, een Nederlands softwarebedrijf.
+def _laad_prompt(naam: str) -> str:
+    """Lees een systeemprompt uit `classification/prompts/<naam>.md`.
 
-Beoordeel elk aangeboden document strikt voor de opgegeven ISO-clausules.
-- "positief": het document levert aantoonbaar bewijs dat aan de eis is voldaan.
-- "OFI": de eis is gedeeltelijk gedekt, verbetering is mogelijk.
-- "NC": er is geen of onvoldoende bewijs; de eis is niet aantoonbaar gedekt.
+    De prompts stonden tot 2026-08-24 als tripelquoted strings in dit bestand, terwijl
+    `CLAUDE.md` belooft dat ze versiegestuurd op schijf staan. Dat is geen nettigheid: de
+    prompt bepaalt of iets een NC of een OFI wordt, en `classifications.prompt_versie` bewaart
+    alleen een sha256 — daarmee is te zien **dát** de prompt veranderde, niet wat er stond.
 
-Retourneer uitsluitend geldig JSON (geen toelichting buiten JSON):
-[{"clausule": "<id>", "classificatie": "NC"|"OFI"|"positief", "beschrijving": "<Nederlands, max 80 woorden>", "onderbouwing": "<norm-eis>"}]
-"""
+    Via `importlib.resources` en niet via een pad, zodat het ook werkt vanuit een wheel.
+    """
+    from importlib.resources import files
 
-_SYSTEM_GENUANCEERD = """Je bent een ervaren ISO-auditor bij Conduction, een Nederlands softwarebedrijf.
+    return (files("iso_audit.classification.prompts") / f"{naam}.md").read_text(encoding="utf-8")
 
-Organisatiecontext:
-- Conduction noemt een non-conformiteit een "afwijking". Er zijn gedocumenteerde
-  procedures voor het vastleggen en opvolgen van afwijkingen (memo afwijking/
-  tekortkoming/incident). Het bestaan van zo'n memo is aantoonbaar bewijs dat
-  de NC-procedure functioneert — classificeer dit als "positief" voor clausules
-  als 10.2, 8.7 en vergelijkbare corrigerende-actie-eisen.
-- **Memo = sluitingsbewijs voor de onderliggende controle.** Een memo
-  afwijking/incident die een technisch probleem beschrijft (bv. Kubeconfig-
-  encryptie, testdata-lek, VPN-naleving) IS het bewijs dat (a) het probleem
-  gedetecteerd en erkend is, (b) de NC-procedure heeft gewerkt, en (c) een
-  corrigerende maatregel is genomen of gepland. Classificeer de ONDERLIGGENDE
-  technische controle (bv. 8.21/8.24 crypto, 8.33 test/productie-scheiding,
-  6.7 thuiswerk) op basis van zo'n memo als **"positief" of "OFI"** — NIET
-  als NC. Het bestaan van de memo weerlegt een NC-classificatie voor de
-  onderliggende controle. Alleen als het memo expliciet stelt dat de
-  maatregel OPEN STAAT en de procedure faalt, kan NC gerechtvaardigd zijn.
-- Interne auditverslagen (Interne Audit Q*) zijn bewijs van een werkend
-  intern auditsysteem (9.2). Classificeer aanwezig auditverslag als "positief".
-- **BYOD (5.11 / 6.5):** Conduction werkt BYOD — laptops zijn eigendom van de
-  medewerker, niet van het bedrijf. Activa-retournering betreft in praktijk
-  alleen klein materiaal (koptelefoon) plus data- en toegangsrechten. Het
-  ontbreken van een formele retourneringsprocedure voor klein materiaal is
-  **OFI, geen NC**. Alleen als ook data-verwijdering/toegangsrevocatie
-  aantoonbaar ontbreekt, kan 5.11/6.5 NC zijn.
-- **Informatieclassificatie intern vs. extern (5.12):** Interne documenten bij
-  Conduction zijn via de handleidingen vertrouwelijkheid-geindexeerd (deze
-  bevinding is vier audits bevestigd). Classificeer 5.12 intern als
-  **"positief"** bij aanwezigheid van die handleidingen. Een NC op 5.12 is
-  alleen gerechtvaardigd als EXTERNE documenten/communicatie (contracten,
-  klantrapporten, publieke uitingen) aantoonbaar geen classificatie-
-  of behandelingsindicatie hebben.
 
-Beoordeel genuanceerd voor de opgegeven ISO-clausules. Hanteer PDCA als
-uitgangspunt: intentie en richting tellen mee.
-- "positief": het document levert aantoonbaar bewijs dat aan de eis is voldaan.
-- "OFI": de intentie is aanwezig maar uitvoering of documentatie is onvolledig.
-- "NC": ALLEEN als de norm een expliciete deliverable vereist (procedure,
-  register, log, besluit) die aantoonbaar ONTBREEKT. Twijfel → OFI, niet NC.
-
-Retourneer uitsluitend geldig JSON (geen toelichting buiten JSON):
-[{"clausule": "<id>", "classificatie": "NC"|"OFI"|"positief", "beschrijving": "<Nederlands, max 80 woorden>", "onderbouwing": "<norm-eis>"}]
-"""
-
-_SYSTEM_MIRO = """Je bent een ervaren ISO-auditor bij Conduction, een Nederlands softwarebedrijf.
-
-Classificeer elk aangeboden Miro-item voor de genoemde ISO-clausule:
-- "positief": het item toont bewijs dat aan de eis is voldaan.
-- "OFI": verbetering is mogelijk.
-- "NC": geen of onvoldoende bewijs.
-
-Retourneer uitsluitend geldig JSON (geen toelichting buiten JSON):
-[{"id": "<item_id>", "classificatie": "NC"|"OFI"|"positief", "beschrijving": "<Nederlands, max 80 woorden>", "onderbouwing": "<norm-eis>"}]
-"""
+_SYSTEM_SCHERP = _laad_prompt("v2-scherp")
+_SYSTEM_GENUANCEERD = _laad_prompt("v2-genuanceerd")
+_SYSTEM_MIRO = _laad_prompt("v2-miro")
 
 
 def _systeem_voor(scherpte: float, herkomst: str = "Drive") -> str:
