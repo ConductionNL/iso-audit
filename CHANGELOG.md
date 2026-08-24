@@ -6,6 +6,22 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — het schema wordt bij het opstarten klaargezet
+
+`initialiseer()` voert sinds vandaag ook een migratie uit (`norm` in de sleutel van
+`clause_matches`), maar hij werd alleen aangeroepen vanuit de assistent-route en vanuit de
+pipeline. Gevolg: na de uitrol van 0.2.0a30 stond de productie-database nog op het oude schema —
+gecontroleerd, de sleutel was ongewijzigd — en zou de migratie pas draaien zodra iemand toevallig
+een vraag stelde of een run startte.
+
+Voor een migratie is dat de verkeerde plek. Een tabel die halverwege een run van twintig minuten
+wordt herbouwd, is een verrassing tijdens werk dat niet onderbroken mag worden. Nu gebeurt het
+bij het opstarten: één keer, zichtbaar, en vóórdat er iemand mee werkt. Faalt het, dan start het
+portaal niet — een kapot schema is niets om verkeer op te serveren.
+
+De migratie zelf is geverifieerd op een kopie van de echte database (4.985 koppelingen): sleutel
+om, geen rij verloren, tweede keer draaien verandert niets.
+
 ### Fixed — 2026-08-24 — elke run dupliceerde alle Jira-opvolgpunten
 
 Gemeten met drie runs op één verse database, om te zien of het tool eerdere audit-context bewaart

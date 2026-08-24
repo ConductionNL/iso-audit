@@ -136,6 +136,20 @@ def create_app(
     # zelfreferentieel — zie `BronConfig.basis` en `load_config(omgeving=...)`.
     basis_omgeving = dict(os.environ)
 
+    # Schema klaarzetten bij het opstarten, niet bij het eerste gebruik. `initialiseer`
+    # voert ook migraties uit, en die hoorden niet halverwege een run van twintig minuten
+    # te gebeuren omdat dat toevallig het eerste pad was dat hem aanriep. Faalt dit, dan
+    # start het portaal niet — een kapot schema is niets om verkeer op te serveren.
+    from iso_audit.store import initialiseer as _init_schema
+    from iso_audit.store import verbinding as _db
+
+    _schema_conn = _db()
+    try:
+        _init_schema(_schema_conn)
+        _schema_conn.commit()
+    finally:
+        _schema_conn.close()
+
     # Bron-configuratie naast de audits op de PVC, en meteen in de omgeving zodat de
     # adapters hem zien. Waarden uit het manifest of een Secret blijven voorgaan, tenzij
     # een auditor expliciet voor overschrijven heeft gekozen.
