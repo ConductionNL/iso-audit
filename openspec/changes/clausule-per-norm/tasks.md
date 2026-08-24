@@ -19,10 +19,10 @@
 
 ## 3. Opslag
 
-- [ ] 3.1 `clause_matches`: `norm` in de primaire sleutel
-- [ ] 3.2 Migratie voor bestaande databases — tabel opnieuw opbouwen, geen rij verliezen
+- [x] 3.1 `clause_matches`: `norm` in de primaire sleutel
+- [x] 3.2 Migratie voor bestaande databases — tabel opnieuw opbouwen, geen rij verliezen
 - [ ] 3.3 `bevindingen.norm` bevat `9001` of `27001`, nooit `beide`
-- [ ] 3.4 Test: twee normen met hetzelfde nummer op hetzelfde document geven twee rijen
+- [x] 3.4 Test: twee normen met hetzelfde nummer op hetzelfde document geven twee rijen
 - [ ] 3.5 Test: de migratie op een kopie van een echte database behoudt het aantal rijen
 
 ## 4. Classificatie

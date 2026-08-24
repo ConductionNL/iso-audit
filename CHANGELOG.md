@@ -6,6 +6,24 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-24 — `norm` hoort in de sleutel van `clause_matches`
+
+De primaire sleutel was `(doc_id, herkomst, clausule_id, sub_punt)`. Achttien clausulenummers
+bestaan in beide normen, dus een document dat zowel ISO 9001 §7.5 (Gedocumenteerde informatie)
+als ISO 27001 §7.5 (Beveiligd ontwikkelen) raakt, levert twee koppelingen op die onder die
+sleutel op elkaar vallen — en `INSERT OR IGNORE` gooit de tweede stil weg.
+
+Dat is de opslagkant van het probleem dat `laad_clause_map("beide")` aan de laadkant heeft. Deze
+change repareert alleen de opslag: `norm` staat nu in de sleutel, met een migratie voor bestaande
+databases, want `CREATE TABLE IF NOT EXISTS` raakt een bestaande tabel niet aan. De migratie
+bouwt de tabel opnieuw op binnen één transactie en behoudt elke rij.
+
+**Op zichzelf verandert dit nog niets aan het gedrag**: de koppeling schrijft nog steeds `beide`
+als norm. Het is de voorwaarde voor `openspec/changes/clausule-per-norm/`, waarin de koppeling
+per norm gaat draaien. Die kant is bewust niet meegenomen — hij raakt de classificatie-prompt,
+de cache-sleutel en het id-formaat van een bevinding, en dat is niet te verifiëren zonder een
+echte run.
+
 ### Fixed — 2026-08-24 — een crash op de assistent-route liet geen spoor na
 
 `POST /assistent/vraag` ving alleen de twee bekende assistent-fouten op en legde die in

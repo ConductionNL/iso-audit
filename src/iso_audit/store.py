@@ -88,8 +88,45 @@ def verbinding(pad: str | None = None) -> sqlite3.Connection:
     return conn
 
 
+def _migreer_clause_matches_norm(conn: sqlite3.Connection) -> None:
+    """Zet `norm` in de primaire sleutel van een bestaande `clause_matches`.
+
+    `CREATE TABLE IF NOT EXISTS` raakt een bestaande tabel niet aan, dus zonder deze migratie
+    zou de sleutelwijziging alleen voor nieuwe databases gelden en zou elke bestaande
+    installatie de tweede koppeling op een botsend clausulenummer blijven weggooien.
+
+    SQLite kan een primaire sleutel niet wijzigen; de tabel wordt daarom opnieuw opgebouwd,
+    binnen één transactie — een half gemigreerde tabel is erger dan een oude.
+    """
+    kolommen = conn.execute("PRAGMA table_info(clause_matches)").fetchall()
+    if not kolommen:
+        return  # tabel bestaat nog niet; `initialiseer` maakt hem hieronder meteen goed aan
+    if any(naam == "norm" and pk for _, naam, _, _, _, pk in kolommen):
+        return
+    conn.executescript(
+        """
+        BEGIN;
+        CREATE TABLE clause_matches_migratie (
+            doc_id      TEXT NOT NULL,
+            herkomst    TEXT NOT NULL,
+            clausule_id TEXT NOT NULL,
+            norm        TEXT NOT NULL,
+            sub_punt    TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (doc_id, herkomst, clausule_id, norm, sub_punt)
+        );
+        INSERT OR IGNORE INTO clause_matches_migratie
+            SELECT doc_id, herkomst, clausule_id, norm, sub_punt FROM clause_matches;
+        DROP TABLE clause_matches;
+        ALTER TABLE clause_matches_migratie RENAME TO clause_matches;
+        COMMIT;
+        """
+    )
+    logger.info("clause_matches gemigreerd: norm toegevoegd aan de primaire sleutel")
+
+
 def initialiseer(conn: sqlite3.Connection) -> None:
-    """Maak alle tabellen aan als ze nog niet bestaan."""
+    """Maak alle tabellen aan als ze nog niet bestaan, en voer schema-migraties uit."""
+    _migreer_clause_matches_norm(conn)
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS documents (
             id          TEXT PRIMARY KEY,
@@ -116,7 +153,10 @@ def initialiseer(conn: sqlite3.Connection) -> None:
             clausule_id TEXT NOT NULL,
             norm        TEXT NOT NULL,
             sub_punt    TEXT NOT NULL DEFAULT '',  -- '' = clausule-niveau, 'a'/'b'/... = sub-punt
-            PRIMARY KEY (doc_id, herkomst, clausule_id, sub_punt)
+            -- `norm` hoort in de sleutel: achttien clausulenummers bestaan in beide normen
+            -- (§5.1, §6.1, §7.5, §8.4 …) en betekenen daar iets anders. Zonder norm in de
+            -- sleutel gooide `INSERT OR IGNORE` de tweede koppeling stil weg.
+            PRIMARY KEY (doc_id, herkomst, clausule_id, norm, sub_punt)
         );
 
         CREATE TABLE IF NOT EXISTS ingest_log (
