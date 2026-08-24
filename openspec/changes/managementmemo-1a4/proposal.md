@@ -16,10 +16,10 @@ Er is wél een commando: `iso-audit memo`. Dat weigert op de huidige dataset:
 > `fout: Clausule '10.3' ontbreekt in iso-9001-2015. Vul de norm-DB aan; een memo mag geen
 > verzonnen citaat bevatten.`
 
-Die weigering is terecht en blijft. Maar hij legt bloot dat de norm-DB waar het commando naar
-wijst **13 clausules** bevat (4 voor 9001, 9 voor 27001) terwijl de bevindingen er **87** raken.
-De repo bevat bewust geen normtekst; dat is een licentiekeuze en geen omissie. Het gevolg is wel
-dat de memo-stap in de praktijk nooit gedraaid is.
+Die weigering is terecht en blijft. De oorzaak bleek geen licentiekwestie: `examples/norms/` was
+een handmatige export uit `iso_audit.data.normteksten` met 13 van de 121 clausules, en alle 87
+gebruikte clausules zitten gewoon in die bron. Opgelost op 2026-08-24 met een generator plus een
+test. Wat overblijft is dat de memo-stap in de praktijk nog nooit gedraaid heeft.
 
 ## Het doelbeeld ligt er al
 
@@ -77,6 +77,8 @@ te controleren is en een agent-uitvoer zonder sjabloon niet.
 
 ## Wat dit blokkeert
 
-De norm-DB. Zonder clausuleteksten voor de gebruikte clausules komt er geen memo uit, en dat is
-opzet. Dit is een inhoudelijke en licentie-afweging die buiten deze change valt en die eerst
-gemaakt moet worden — anders levert deze change een sjabloon op dat op de echte dataset weigert.
+De normregel onder elke NC (`Norm: ISO 27001:2022 §8.14`) kan pas kloppen als een clausule door
+**(norm, id)** wordt geïdentificeerd. Vandaag overschrijft 27001 de 9001-ingang bij een botsend
+nummer, waardoor 18 van de 28 ISO 9001-clausules in een gecombineerde audit nooit getoetst
+worden — vastgelegd als strict xfail in `tests/data/test_norm_db_export.py`. Een memo die
+"ISO 9001:2015 §7.5" claimt terwijl §7.5 nooit is beoordeeld, is erger dan geen memo.

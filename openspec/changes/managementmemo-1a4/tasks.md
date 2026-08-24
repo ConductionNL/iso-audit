@@ -1,13 +1,17 @@
 # Taken — managementmemo-1a4
 
-## 0. Blokkade eerst
+## 0. Blokkade — opgelost op 2026-08-24
 
-- [ ] 0.1 **Norm-DB besluit.** 75 van de 87 gebruikte clausules ontbreken in `examples/norms/`.
-      Zonder clausuleteksten weigert de memo op de echte dataset. Dit is een inhoudelijke en
-      licentie-afweging (de repo bevat bewust geen normtekst) en hoort vóór de rest — anders
-      levert deze change een sjabloon dat in productie weigert
+- [x] 0.1 **Geen licentie-afweging nodig; het was een achterlopende export.**
+      `examples/norms/*.yaml` bleek een handmatige export uit `iso_audit.data.normteksten` met
+      13 van de 121 clausules. Alle 87 gebruikte clausules zitten in de repo-bron. Opgelost met
+      `scripts/genereer-norm-db.py` plus een test die faalt zodra de export achterloopt
 - [ ] 0.2 Melding bij ontbrekende normtekst: alle ontbrekende clausules noemen met het totaal,
-      niet alleen de eerste. Kleine fix, maakt 0.1 werkbaar
+      niet alleen de eerste. Nu minder dringend, nog steeds juist
+- [ ] 0.3 **Let op bij de normregel onder een NC.** 18 clausulenummers bestaan in beide normen,
+      en in een gecombineerde audit overschrijft 27001 de 9001-ingang — die 18 9001-clausules
+      worden nooit getoetst (strict xfail in `tests/data/test_norm_db_export.py`). Zolang dat
+      niet gerepareerd is, kan `Norm: ISO 9001:2015 §7.5` in een memo niet kloppen
 
 ## 1. Datamodel
 
