@@ -36,7 +36,7 @@ def documenten(*, zoek: str = "", bron: str = "", limiet: int = 200) -> list[dic
     `zoek` gebruikt de bestaande full-text-index (`documents_fts`), die al door triggers
     wordt bijgehouden. Geen tweede index, geen eigen zoeklogica.
     """
-    from iso_audit.store import verbinding
+    from iso_audit.store import fts_query, verbinding
 
     conn = verbinding()
     try:
@@ -48,7 +48,9 @@ def documenten(*, zoek: str = "", bron: str = "", limiet: int = 200) -> list[dic
                 "FROM documents d JOIN documents_fts f ON f.rowid = d.rowid "
                 "WHERE documents_fts MATCH ?"
             )
-            params.append(zoek.strip())
+            # Niet de invoer zelf: FTS5 leest `non-conformiteiten` als een kolomnaam en
+            # geeft dan een 500 in plaats van nul treffers. Zie `store.fts_query`.
+            params.append(fts_query(zoek))
         else:
             basis = "SELECT d.id, d.naam, d.herkomst, d.mime_type, d.modified_at FROM documents d"
         if bron:

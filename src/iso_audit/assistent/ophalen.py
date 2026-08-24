@@ -106,14 +106,10 @@ def clausules_uit(vraag: str) -> tuple[str, ...]:
 
 
 def _fts_query(vraag: str) -> str:
-    """Bouw een FTS5-query uit de vraag.
+    """Zie `store.fts_query` — één implementatie voor alle MATCH-plekken."""
+    from iso_audit.store import fts_query
 
-    Alleen woorden van drie letters of meer, als OR-reeks. Bewust geen FTS5-operatoren
-    doorlaten: een vraagteken of aanhalingsteken uit een gebruikersvraag maakt anders een
-    syntaxfout van de query, en dat leest in de UI als "geen resultaten".
-    """
-    woorden = [w for w in re.findall(r"[\w-]{3,}", vraag.lower()) if not w.isdigit()]
-    return " OR ".join(woorden)
+    return fts_query(vraag)
 
 
 def _documenten_via_clausule(

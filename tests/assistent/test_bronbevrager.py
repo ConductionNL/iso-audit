@@ -135,6 +135,64 @@ def test_vraagteken_en_aanhalingstekens_breken_de_fts_query_niet(
     assert [b.id for b in corpus.bronnen if b.soort == "document"] == ["d2"]
 
 
+def test_koppelteken_breekt_de_fts_query_niet(conn: sqlite3.Connection) -> None:
+    """`non-conformiteiten` liet de route crashen met een 500.
+
+    Gemeten in het portaal op 2026-08-24: `sqlite3.OperationalError: no such column:
+    conformiteiten`. FTS5 leest het deel na het koppelteken als kolomnaam, en de vorige
+    versie van `_fts_query` liet koppeltekens juist staan — de test hierboven dekte alleen
+    tekens die de regex tóch al wegstript.
+
+    Dat dit precies het kernwoord van een ISO-auditor is, is geen toeval maar de reden dat
+    het opviel: elke vraag over non-conformiteiten faalde.
+    """
+    _document(conn, "d2", "Afwijkingen.docx", tekst="non-conformiteiten en afwijkingen")
+
+    corpus = ophalen.haal_bronnen_op(conn, "Hoeveel non-conformiteiten hebben wij?")
+
+    assert [b.id for b in corpus.bronnen if b.soort == "document"] == ["d2"]
+
+
+@pytest.mark.parametrize(
+    "vraag",
+    [
+        "Hoeveel non-conformiteiten zijn er?",
+        "Wat staat er over multi-factor-authenticatie?",
+        'Is er iets over "back-ups"?',
+        "Wat zegt de norm over A.5.15 - toegangscontrole?",
+        "Waar staat het beleid: encryptie?",
+        "Zoek op wachtwoord* en (MFA)",
+        "Wat staat er over ^toegang en NEAR-beleid?",
+    ],
+)
+def test_geen_enkele_vraagvorm_levert_een_syntaxfout(conn: sqlite3.Connection, vraag: str) -> None:
+    """Elk FTS5-operatorteken uit een mensenvraag moet onschadelijk zijn.
+
+    Niet omdat deze vormen vaak voorkomen, maar omdat een syntaxfout hier een 500 is en geen
+    leeg antwoord: de auditor ziet een kapot scherm in plaats van "niets gevonden". Het
+    onderscheid tussen die twee is de hele reden dat `_documenten_via_tekst` de fout
+    doorgeeft in plaats van hem als nul treffers te melden.
+    """
+    _document(conn, "d2", "Beleid.docx", tekst="toegangsbeleid en wachtwoorden")
+
+    ophalen.haal_bronnen_op(conn, vraag)  # mag niet werpen
+
+
+def test_operatoren_uit_de_vraag_werken_niet_als_operator(conn: sqlite3.Connection) -> None:
+    """`AND` in een vraag is een woord, geen FTS5-operator.
+
+    Zonder aanhalingstekens rond elk woord zou "beleid AND encryptie" iets anders zoeken dan
+    de gebruiker vroeg — stiller dan een syntaxfout en daarom erger.
+    """
+    _document(conn, "d2", "Beleid.docx", tekst="encryptie")
+    _document(conn, "d3", "Ander.docx", tekst="beleid")
+
+    corpus = ophalen.haal_bronnen_op(conn, "beleid AND encryptie")
+
+    gevonden = sorted(b.id for b in corpus.bronnen if b.soort == "document")
+    assert gevonden == ["d2", "d3"], "AND werd als operator gelezen in plaats van als woord"
+
+
 def test_opvolgpunten_komen_als_eigen_soort_en_niet_dubbel(conn: sqlite3.Connection) -> None:
     """Opvolgpunten staan in `bevindingen` met herkomst `<bron>-opvolging`."""
     _bevinding(conn, "ISO-709", "8.24", "OFI", herkomst="Jira-opvolging", naam="ISO-709")

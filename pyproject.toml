@@ -1,6 +1,6 @@
 [project]
 name = "iso-audit"
-version = "0.2.0a26"
+version = "0.2.0a27"
 description = "ISO 9001 + 27001 audit pipeline with pluggable source-adapters and human-in-the-loop modes"
 readme = "README.md"
 authors = [

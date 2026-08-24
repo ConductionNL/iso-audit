@@ -33,6 +33,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -367,6 +368,29 @@ def bewaar_assistentvraag(
     )
     conn.commit()
     return int(cur.lastrowid or 0)
+
+
+def fts_query(vraag: str) -> str:
+    """Bouw een veilige FTS5-query uit vrije tekst: elk woord als geciteerde term.
+
+    Eén implementatie voor alle drie de MATCH-plekken (`assistent/ophalen.py`,
+    `api/landschap.py`, `zoek()` hieronder). Tot 2026-08-24 had elke plek zijn eigen aanpak
+    en twee ervan waren stuk: de zoekbalk gaf de invoer onbewerkt door, en de assistent
+    filterde tekens weg maar liet koppeltekens staan. `non-conformiteiten` gaf daardoor
+    `sqlite3.OperationalError: no such column: conformiteiten` — een 500 op het kernwoord van
+    een ISO-auditor.
+
+    Aanhalingstekens maken van elk woord een letterlijke term, dus geen enkel FTS5-teken
+    heeft nog betekenis. Dat dekt ook het stillere geval: `AND` of `NEAR` in een mensenvraag
+    is een woord en geen operator, en ongeciteerd zoekt de query iets anders dan er staat.
+
+    Woorden van minder dan drie tekens en losse cijferreeksen vallen weg; een lege uitkomst
+    betekent "hier valt niet op te zoeken" en niet "geen resultaten".
+    """
+    woorden = [w for w in re.findall(r"[\w-]{3,}", vraag.lower()) if not w.isdigit()]
+    # Een aanhalingsteken binnen een term verdubbelen is in FTS5 de ontsnapping — dezelfde
+    # regel als in SQL-strings.
+    return " OR ".join(f'"{w.replace(chr(34), chr(34) * 2)}"' for w in woorden)
 
 
 def zoek(conn: sqlite3.Connection, query: str, limit: int = 20) -> list[sqlite3.Row]:

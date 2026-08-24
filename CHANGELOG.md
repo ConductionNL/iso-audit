@@ -6,6 +6,33 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — zoeken op "non-conformiteiten" gaf een 500
+
+De vraagassistent viel om met `sqlite3.OperationalError: no such column: conformiteiten`. FTS5
+leest het deel na een koppelteken als kolomnaam, en `_fts_query` filterde wél vraagtekens en
+aanhalingstekens weg maar liet koppeltekens staan. Het kernwoord van een ISO-auditor brak dus
+elke vraag erover — en de bestaande test dekte precies de tekens die de regex tóch al wegstreepte.
+
+Elk woord gaat nu **tussen aanhalingstekens** de query in. Dan is het een letterlijke term en
+heeft geen enkel FTS5-teken nog betekenis. Dat dekt ook het stillere geval: `AND` of `NEAR` in
+een mensenvraag is een woord en geen operator, en ongeciteerd zoekt de query iets anders dan er
+staat zonder dat iemand dat merkt.
+
+**Dezelfde fout stond op twee plekken meer.** `api/landschap.py` gaf de zoekbalk-invoer
+onbewerkt aan `MATCH` door, dus het documentenzoekscherm crashte op hetzelfde woord. Er is nu
+één implementatie — `store.fts_query()` — voor alle drie de MATCH-plekken, in plaats van drie
+eigen aanpakken waarvan twee stuk waren.
+
+Nieuwe tests: het koppelteken-geval zelf, een parametrische test over zeven vraagvormen met
+FTS5-operatortekens (`*`, `^`, `"`, `:`, `(`, `-`, `NEAR`), en een test dat `AND` uit een vraag
+als woord wordt gezocht en niet als operator.
+
+**Nog niet opgelost, wel gemeten:** een 500 op deze route laat **geen spoor** in
+`assistent_vragen`. De laatste rij is van 2026-08-22, terwijl de storing van vandaag daar had
+moeten staan — de documentatie zegt "ook een storing wordt vastgelegd, met de reden en zonder
+antwoord", en dat geldt nu alleen voor storingen die de code zelf constateert, niet voor een
+exceptie. Precies bij een crash is dat spoor het meest waard.
+
 ### Fixed — 2026-08-24 — een gekoppelde bron overleeft nu een herstart
 
 Na de uitrol van 0.2.0a25 weigerde de run-gate Nextcloud: "niet gekoppeld". De configuratie
