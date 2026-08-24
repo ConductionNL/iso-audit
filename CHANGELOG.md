@@ -6,6 +6,27 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — geen oordeel is geen OFI
+
+De nieuwe prompts bieden `null` aan voor "dit document gaat hier niet over". Dat had geen effect
+gehad: `(res_map.get(cid, {}) or {}).get("classificatie", "OFI")` maakte van élk ontbrekend
+antwoord een OFI. Twee gevallen vielen daaronder — het model zweeg over een clausule, of het zei
+expliciet `null` — en beide werden een OFI met een lege beschrijving en een lege onderbouwing.
+
+Dat is de mechaniek achter de 55 lege OFI's van 2026-08-24, en achter 6,8 bevindingen per
+document: elk document-clausulepaar dat de zoektermen opleverden moest een oordeel worden, ook
+als er niets over te zeggen viel.
+
+`bouw_bevindingen()` slaat een paar zonder oordeel nu over. Een NC zonder beschrijving én zonder
+onderbouwing wordt niet weggegooid maar gemarkeerd als `onbruikbaar` — dát het model hem zo
+teruggaf is zelf een gegeven over de classificatie, en de norm vraagt bij een NC om correctie,
+root-cause-analyse en formele verificatie, wat op een leeg oordeel niet kan.
+
+Nieuwe kolommen `bevindingen.ernst` (`major` / `minor`, alleen bij een NC) en
+`bevindingen.onbruikbaar`, met een migratie via `ALTER TABLE` voor bestaande databases. Zonder
+die kolommen was de prompt wel aangepast en viel het resultaat bij het opslaan weg — een
+verbetering die alleen in de logs bestaat.
+
 ### Changed — 2026-08-24 — NC en OFI krijgen hun formele definitie, en de prompts gaan naar schijf
 
 De scherpe prompt — de standaard, dus wat elke portaal-run gebruikte — zei:

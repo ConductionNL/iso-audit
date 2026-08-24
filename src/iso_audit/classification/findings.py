@@ -547,13 +547,15 @@ def _upsert_bevindingen(
         conn.execute(
             """
             INSERT INTO bevindingen
-                (doc_id, herkomst, clausule_id, norm, classificatie, beschrijving,
-                 onderbouwing, pre_classificatie, document_naam, classified_at)
-            VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))
+                (doc_id, herkomst, clausule_id, norm, classificatie, ernst, beschrijving,
+                 onderbouwing, onbruikbaar, pre_classificatie, document_naam, classified_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
             ON CONFLICT(doc_id, herkomst, clausule_id, norm) DO UPDATE SET
                 classificatie    = excluded.classificatie,
+                ernst            = excluded.ernst,
                 beschrijving     = excluded.beschrijving,
                 onderbouwing     = excluded.onderbouwing,
+                onbruikbaar      = excluded.onbruikbaar,
                 pre_classificatie= excluded.pre_classificatie,
                 document_naam    = excluded.document_naam,
                 classified_at    = excluded.classified_at
@@ -564,8 +566,10 @@ def _upsert_bevindingen(
                 bev["clausule"],
                 norm,
                 bev["classificatie"],
+                bev.get("ernst"),
                 bev.get("beschrijving", ""),
                 bev.get("onderbouwing", ""),
+                1 if bev.get("onbruikbaar") else 0,
                 bev.get("pre_classificatie"),
                 bev["document_naam"],
             ),
@@ -798,6 +802,57 @@ def classificeer_alle_bevindingen(
     return alle
 
 
+def bouw_bevindingen(
+    *,
+    doc: dict[str, Any],
+    clausules: list[str],
+    resultaten: list[dict[str, Any]],
+    clausule_titels: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Zet modelantwoorden om in bevindingen — zonder oordeel geen bevinding.
+
+    De vorige versie deed `.get("classificatie", "OFI")`, en daarmee werd elk ontbrekend
+    antwoord een OFI met een lege beschrijving en lege onderbouwing. Twee gevallen vielen
+    daaronder: het model zweeg over een clausule, of het zei expliciet `null` — de uitweg die
+    de prompts sinds 2026-08-24 aanbieden voor "dit document gaat hier niet over".
+
+    In de run van 2026-08-24 waren dat er 55: een oordeel zonder inhoud dat wél meetelde in het
+    rapport. En het is de mechaniek achter 6,8 bevindingen per document: elk paar dat de
+    zoektermen opleverden moest een oordeel worden, ook als er niets over te zeggen viel.
+
+    Een NC zonder onderbouwing wordt niet weggegooid maar gemarkeerd als `onbruikbaar`. Dát het
+    model een NC zonder onderbouwing teruggaf, is zelf een gegeven over de classificatie — en de
+    norm vraagt bij een NC om correctie, root-cause-analyse en formele verificatie, wat op een
+    leeg oordeel niet kan.
+    """
+    per_clausule = {r.get("clausule"): r for r in resultaten if isinstance(r, dict)}
+    bevindingen: list[dict[str, Any]] = []
+    for cid in clausules:
+        res = per_clausule.get(cid) or {}
+        classificatie = res.get("classificatie")
+        if not classificatie:
+            continue  # geen oordeel is geen bevinding
+        beschrijving = res.get("beschrijving") or ""
+        onderbouwing = res.get("onderbouwing") or ""
+        bevindingen.append(
+            {
+                "_doc_id": doc["id"],
+                # Bron van de bevinding (Drive/Jira/Planning/…) — terugvoerbaar.
+                "herkomst": doc.get("herkomst") or "Drive",
+                "clausule": cid,
+                "clausule_titel": clausule_titels.get(cid, {}).get("titel", cid),
+                "document_naam": doc["naam"],
+                "classificatie": classificatie,
+                "ernst": res.get("ernst"),
+                "beschrijving": beschrijving,
+                "onderbouwing": onderbouwing,
+                "onbruikbaar": not beschrijving.strip() and not onderbouwing.strip(),
+                "pre_classificatie": None,
+            }
+        )
+    return bevindingen
+
+
 def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:
     clausules_per_doc: dict[str, list[str]] = defaultdict(list)
     doc_map: dict[str, dict[str, Any]] = {}
@@ -835,22 +890,12 @@ def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:
             conn=ctx.conn,
             audit_id=ctx.audit_id,
         )
-        res_map = {r["clausule"]: r for r in resultaten}
-        bevs = [
-            {
-                "_doc_id": doc_id,
-                # Bron van de bevinding (Drive/Jira/Planning/…) — terugvoerbaar.
-                "herkomst": doc.get("herkomst") or "Drive",
-                "clausule": cid,
-                "clausule_titel": ctx.clausules.get(cid, {}).get("titel", cid),
-                "document_naam": doc["naam"],
-                "classificatie": (res_map.get(cid, {}) or {}).get("classificatie", "OFI"),
-                "beschrijving": (res_map.get(cid, {}) or {}).get("beschrijving", ""),
-                "onderbouwing": (res_map.get(cid, {}) or {}).get("onderbouwing", ""),
-                "pre_classificatie": None,
-            }
-            for cid in cids
-        ]
+        bevs = bouw_bevindingen(
+            doc={"id": doc_id, "naam": doc["naam"], "herkomst": doc.get("herkomst") or "Drive"},
+            clausules=cids,
+            resultaten=resultaten,
+            clausule_titels=ctx.clausules,
+        )
         _upsert_bevindingen(ctx.conn, bevs, ctx.norm)
 
 

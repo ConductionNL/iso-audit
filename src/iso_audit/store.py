@@ -124,9 +124,32 @@ def _migreer_clause_matches_norm(conn: sqlite3.Connection) -> None:
     logger.info("clause_matches gemigreerd: norm toegevoegd aan de primaire sleutel")
 
 
+def _migreer_bevindingen_kolommen(conn: sqlite3.Connection) -> None:
+    """Voeg `ernst` en `onbruikbaar` toe aan een bestaande `bevindingen`.
+
+    `CREATE TABLE IF NOT EXISTS` raakt een bestaande tabel niet aan, dus zonder deze migratie
+    zouden de nieuwe velden alleen in een verse database bestaan — en dan is de prompt wel
+    aangepast maar valt het resultaat bij het opslaan weg.
+
+    `ALTER TABLE ... ADD COLUMN` volstaat hier: er verandert niets aan de sleutel, en bestaande
+    rijen krijgen `NULL` respectievelijk `0`. Dat is precies wat ze zijn — van vóór dit
+    onderscheid.
+    """
+    kolommen = {r[1] for r in conn.execute("PRAGMA table_info(bevindingen)")}
+    if not kolommen:
+        return
+    if "ernst" not in kolommen:
+        conn.execute("ALTER TABLE bevindingen ADD COLUMN ernst TEXT")
+        logger.info("bevindingen gemigreerd: kolom ernst toegevoegd")
+    if "onbruikbaar" not in kolommen:
+        conn.execute("ALTER TABLE bevindingen ADD COLUMN onbruikbaar INTEGER NOT NULL DEFAULT 0")
+        logger.info("bevindingen gemigreerd: kolom onbruikbaar toegevoegd")
+
+
 def initialiseer(conn: sqlite3.Connection) -> None:
     """Maak alle tabellen aan als ze nog niet bestaan, en voer schema-migraties uit."""
     _migreer_clause_matches_norm(conn)
+    _migreer_bevindingen_kolommen(conn)
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS documents (
             id          TEXT PRIMARY KEY,
@@ -173,8 +196,14 @@ def initialiseer(conn: sqlite3.Connection) -> None:
             clausule_id      TEXT NOT NULL,
             norm             TEXT NOT NULL,
             classificatie    TEXT NOT NULL,
+            -- 'major' | 'minor' | NULL. Alleen bij een NC: major betekent dat het proces als
+            -- geheel afwezig of gebroken is en certificering in gevaar komt.
+            ernst            TEXT,
             beschrijving     TEXT,
             onderbouwing     TEXT,
+            -- Oordeel zonder beschrijving én zonder onderbouwing. Niet weggegooid — dát het
+            -- model het zo teruggaf is een gegeven — maar telt niet mee als bevinding.
+            onbruikbaar      INTEGER NOT NULL DEFAULT 0,
             pre_classificatie TEXT,
             document_naam    TEXT,
             classified_at    TEXT NOT NULL,
