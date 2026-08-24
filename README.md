@@ -40,6 +40,21 @@ Per component één keer het echte pad aflopen, tegen de echte bronnen. Dat vult
 testsuite niet kan vullen: op 21 augustus 2026 zijn vijf defecten in productie gevonden die
 alle 1159 tests groen lieten, omdat ze pas optreden tegen echte data of in de echte procesvorm.
 
+## Gegenereerde bestanden
+
+De norm-DB die de memo-bouwer leest is een **export** uit `iso_audit.data.normteksten` en wordt
+niet met de hand bijgehouden:
+
+```bash
+uv run python scripts/genereer-norm-db.py            # schrijf examples/norms/*.yaml
+uv run python scripts/genereer-norm-db.py --check    # faal als de export achterloopt
+```
+
+De `--check`-variant staat in de testsuite. Tot 24 augustus 2026 werd deze export met de hand
+overgetypt en bevatte hij 13 van de 121 clausules — zonder foutmelding, met twee verkeerde
+antwoorden tot gevolg: de memo weigerde, en de norm van bijna de helft van de bevindingen werd
+verkeerd afgeleid.
+
 ## Quick start
 
 ```bash
