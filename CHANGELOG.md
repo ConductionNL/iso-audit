@@ -6,6 +6,42 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-24 — minor is de standaard, major de uitzondering
+
+De eerste run met de nieuwe definitie gaf **71 major tegen 8 minor**. Dat kan niet: major
+betekent dat het proces organisatiebreed afwezig of gebroken is. Wat er stond was "Minor — een op
+zichzelf staande misser", geformuleerd als de uitzondering, en dan kiest een model bij twijfel de
+andere. Dezelfde vorm-fout als bij OFI: de zeldzame uitkomst als de norm neerzetten.
+
+Wat eronder zit is dieper: het oordeel valt **per document**. Bekeken voorbeeld uit de run —
+"Classificatie van informatie ontbreekt", major, op grond van één tool-ontwerpdocument. Daaruit
+volgt niet dat de organisatie geen classificatieschema heeft; het volgt dat dít document het niet
+regelt. Zolang het oordeel per document valt, kan major daar niet uit volgen.
+
+De prompts zeggen nu: minor is de standaardkeuze, major alleen als dít document zelf laat zien
+dat het proces organisatiebreed gebroken is, en bij twijfel altijd minor. Eén oordeel per
+clausule over al het bewijs heen is `openspec/changes/autonome-review/`.
+
+### Measured — 2026-08-24 — wat de formele definitie met de aantallen doet
+
+Twee volledige runs op dezelfde bronnen, met dezelfde 709 documenten:
+
+| | oude definitie | formele definitie |
+|---|---|---|
+| bevindingen (zonder Jira-opvolging) | 800 | **347** |
+| NC | 387 (48%) | **79 (23%)** |
+| OFI | 270 | 86 |
+| positief | 143 | 142 |
+| documenten met bevindingen | 118 | 91 |
+| clausule-koppelingen | 2.695 | **4.399** |
+
+Minder dan de helft aan bevindingen en een vijfde van de NC's, terwijl er **63% méér
+clausule-koppelingen** zijn doordat de 18 ISO 9001-clausules terug zijn. Strenger op het oordeel,
+breder op de dekking.
+
+Kanttekening bij dit getal: 40 van de 347 stonden nog op de string `'null'` — die run liep op de
+versie vóór `_geldig_oordeel()`. Zonder die 40 is de verhouding 79 NC op 307 bevindingen (26%).
+
 ### Fixed — 2026-08-24 — alleen NC, OFI en positief tellen als oordeel
 
 In de eerste run met de nieuwe definitie kwamen twee bevindingen binnen met classificatie

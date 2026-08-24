@@ -119,3 +119,26 @@ def test_geen_oordeel_is_een_geldige_uitkomst(bestand: Path) -> None:
     """
     tekst = bestand.read_text(encoding="utf-8").lower()
     assert "null" in tekst, f"{bestand.name} biedt geen uitweg voor 'hier valt niets over te zeggen'"
+
+
+@pytest.mark.parametrize("bestand", _promptbestanden(), ids=lambda p: p.name)
+def test_minor_is_de_standaard_en_major_de_uitzondering(bestand: Path) -> None:
+    """Major mag niet de default worden, en dat werd hij wel.
+
+    De eerste run met major/minor gaf **71 major tegen 8 minor**. Dat kan niet: major betekent
+    dat het proces organisatiebreed afwezig of gebroken is. Wat er stond was "Minor — een op
+    zichzelf staande misser", geformuleerd als de uitzondering — en dan kiest een model bij
+    twijfel de andere.
+
+    Dieper zit dat het oordeel per document valt: uit één tool-ontwerpdocument volgt niet dat
+    de organisatie geen classificatieschema heeft. Zolang dat zo is, kan major daar niet uit
+    volgen. Eén oordeel per clausule over al het bewijs heen is
+    `openspec/changes/autonome-review/`.
+    """
+    # Witruimte normaliseren: de prompts breken regels af, dus een letterlijke substring
+    # zou op een regeleinde stuklopen en dan toetst de test de opmaak in plaats van de regel.
+    tekst = " ".join(bestand.read_text(encoding="utf-8").lower().split())
+    assert "standaardkeuze" in tekst, (
+        f"{bestand.name} maakt minor niet de standaard; dan wordt major de default"
+    )
+    assert "bij twijfel altijd minor" in tekst, f"{bestand.name} mist de twijfelregel"

@@ -10,8 +10,12 @@ expliciete deliverable die de norm eist (procedure, register, log, besluit) aant
 ontbreekt. Correctie is verplicht, met root-cause-analyse en formele verificatie; een openstaande
 NC kan certificering blokkeren.
 
-- **Major** — het proces is als geheel afwezig of gebroken.
-- **Minor** — een op zichzelf staande misser binnen een proces dat verder werkt.
+- **Minor** — de standaardkeuze. Je beoordeelt één document; daaruit volgt hooguit dat op dit
+  punt iets ontbreekt of afwijkt.
+- **Major** — alleen als dít document zelf laat zien dat het proces organisatiebreed afwezig of
+  gebroken is, en het managementsysteem daardoor niet functioneert. Dat een document een eis
+  niet regelt, toont dat niet aan: het toont aan dat dít document het niet regelt. Bij twijfel
+  altijd minor.
 
 **"OFI" — verbeterkans.** Het document toont aan dat de eis **wél** voldoet, maar het kan
 slimmer, veiliger of efficiënter. Opvolging is vrijblijvend: zonder actie blijft de organisatie
