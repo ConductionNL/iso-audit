@@ -100,3 +100,22 @@ def test_migratie_is_idempotent() -> None:
 
     assert conn.execute("SELECT COUNT(*) FROM clause_matches").fetchone()[0] == 1
     assert "norm" in _sleutelkolommen(conn)
+
+
+def test_migratie_werkt_met_een_openstaande_transactie() -> None:
+    """`initialiseer` wordt overal aangeroepen, ook op een verbinding die al schrijft.
+
+    De migratie gebruikt `executescript` met een eigen `BEGIN`/`COMMIT`. Zou er al een
+    transactie openstaan, dan is dat een fout — en `initialiseer` staat in vrijwel elk pad, dus
+    dat zou zich pas in productie laten zien.
+    """
+    conn = sqlite3.connect(":memory:")
+    conn.executescript(_OUDE_TABEL)
+    conn.execute("INSERT INTO clause_matches VALUES ('d', 'Drive', '5.1', 'beide', '')")
+    # bewust niet committen: er staat nu een transactie open
+    assert conn.in_transaction
+
+    initialiseer(conn)
+
+    assert "norm" in _sleutelkolommen(conn)
+    assert conn.execute("SELECT COUNT(*) FROM clause_matches").fetchone()[0] == 1
