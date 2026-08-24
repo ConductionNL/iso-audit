@@ -93,3 +93,40 @@ def test_een_nc_zonder_onderbouwing_wordt_gemeld() -> None:
     )
     assert len(bevindingen) == 1
     assert bevindingen[0]["onbruikbaar"] is True
+
+
+def test_de_string_null_is_ook_geen_oordeel() -> None:
+    """Het model schrijft soms `"null"` in plaats van JSON-`null`.
+
+    Gemeten in de run van 2026-08-24: twee bevindingen kwamen met classificatie `'null'` de
+    database in. De controle keek alleen of de waarde leeg was, en een niet-lege string is dat
+    niet. Gevolg: een bevinding met een classificatie die nergens op slaat — hij telt mee, hij
+    is niet te triageren als NC of OFI, en in het rapport staat er een lege categorie.
+
+    Ook `"none"` en `"geen"` afvangen: het zijn alle drie manieren waarop een model "hier valt
+    niets over te zeggen" opschrijft als het de JSON-vorm niet haalt.
+    """
+    for waarde in ("null", "NULL", "none", "geen", "  null  "):
+        bevindingen = bouw_bevindingen(
+            doc={"id": "d1", "naam": "Onboarding.docx", "herkomst": "Drive"},
+            clausules=["8.24"],
+            resultaten=[_antwoord(classificatie=waarde)],
+            clausule_titels={},
+        )
+        assert bevindingen == [], f"{waarde!r} werd als oordeel geaccepteerd"
+
+
+def test_een_onbekende_classificatie_wordt_geweigerd() -> None:
+    """Alleen de drie afgesproken waarden tellen als oordeel.
+
+    Een model dat "gedeeltelijk" of "onduidelijk" teruggeeft, levert een bevinding op die geen
+    van de UI-filters kent en die in de memo tussen wal en schip valt. Liever geen bevinding dan
+    een categorie die niemand kan verwerken.
+    """
+    bevindingen = bouw_bevindingen(
+        doc={"id": "d1", "naam": "Beleid.docx", "herkomst": "Drive"},
+        clausules=["8.24"],
+        resultaten=[_antwoord(classificatie="gedeeltelijk")],
+        clausule_titels={},
+    )
+    assert bevindingen == []

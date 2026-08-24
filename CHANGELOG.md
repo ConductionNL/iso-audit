@@ -6,6 +6,20 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-24 — alleen NC, OFI en positief tellen als oordeel
+
+In de eerste run met de nieuwe definitie kwamen twee bevindingen binnen met classificatie
+`'null'` — de **string**, niet JSON-`null`. De controle keek of de waarde leeg was, en een
+niet-lege string is dat niet. Gevolg: een bevinding met een classificatie die nergens op slaat,
+die wél meetelt, die niet als NC of OFI te triageren is, en die in het rapport een lege categorie
+oplevert.
+
+`_geldig_oordeel()` accepteert nu alleen `NC`, `OFI` en `positief`. `null`, `none`, `geen` en
+`nvt` zijn manieren waarop een model "hier valt niets over te zeggen" opschrijft als het de
+JSON-vorm niet haalt; die leveren geen bevinding op. Een onbekende waarde als "gedeeltelijk"
+wordt gelogd en genegeerd — liever geen bevinding dan een categorie die geen enkel filter kent
+en die in de memo tussen wal en schip valt.
+
 ### Fixed — 2026-08-24 — geen oordeel is geen OFI
 
 De nieuwe prompts bieden `null` aan voor "dit document gaat hier niet over". Dat had geen effect

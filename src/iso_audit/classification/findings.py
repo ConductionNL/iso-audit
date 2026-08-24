@@ -802,6 +802,31 @@ def classificeer_alle_bevindingen(
     return alle
 
 
+GELDIGE_OORDELEN = frozenset({"NC", "OFI", "positief"})
+"""De enige drie waarden die als oordeel tellen.
+
+Wat er nog meer binnenkomt is geen oordeel: het model schrijft "hier valt niets over te zeggen"
+soms als de **string** `"null"` in plaats van JSON-`null` (twee keer gemeten op 2026-08-24), en
+een variant als "gedeeltelijk" levert een bevinding op die geen UI-filter kent en die in de memo
+tussen wal en schip valt."""
+
+_GEEN_OORDEEL = frozenset({"null", "none", "geen", "nvt", "n.v.t."})
+
+
+def _geldig_oordeel(waarde: Any) -> str | None:
+    """Normaliseer een classificatie; `None` betekent: geen oordeel, geen bevinding."""
+    if not isinstance(waarde, str):
+        return None
+    schoon = waarde.strip()
+    if not schoon or schoon.lower() in _GEEN_OORDEEL:
+        return None
+    for geldig in GELDIGE_OORDELEN:
+        if schoon.lower() == geldig.lower():
+            return geldig
+    logger.warning("Onbekende classificatie %r genegeerd; geen bevinding aangemaakt", schoon)
+    return None
+
+
 def bouw_bevindingen(
     *,
     doc: dict[str, Any],
@@ -829,8 +854,8 @@ def bouw_bevindingen(
     bevindingen: list[dict[str, Any]] = []
     for cid in clausules:
         res = per_clausule.get(cid) or {}
-        classificatie = res.get("classificatie")
-        if not classificatie:
+        classificatie = _geldig_oordeel(res.get("classificatie"))
+        if classificatie is None:
             continue  # geen oordeel is geen bevinding
         beschrijving = res.get("beschrijving") or ""
         onderbouwing = res.get("onderbouwing") or ""
