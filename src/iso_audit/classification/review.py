@@ -52,7 +52,7 @@ class ReviewInstelling:
     herkomst: str  # "vlag" | "omgeving" | "standaard"
 
     @classmethod
-    def bepaal(cls, vlag: bool | None) -> ReviewInstelling:
+    def bepaal(cls, vlag: bool | None, env_var: str = ENV_VAR) -> ReviewInstelling:
         """Bepaal de instelling: expliciete vlag > env-var > uit.
 
         De vlag wint van de omgeving. Andersom zou een cron-instelling een handmatige run stil
@@ -60,14 +60,14 @@ class ReviewInstelling:
         """
         if vlag is not None:
             return cls(aan=vlag, herkomst="vlag")
-        ruw = os.environ.get(ENV_VAR)
+        ruw = os.environ.get(env_var)
         if ruw is None:
             return cls(aan=False, herkomst="standaard")
         aan = ruw.strip().lower() in _AAN
         logger.info(
             "Autonome review %s via %s=%r (env-var-fallback)",
             "aan" if aan else "uit",
-            ENV_VAR,
+            env_var,
             ruw,
         )
         return cls(aan=aan, herkomst="omgeving")

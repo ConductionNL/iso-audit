@@ -35,3 +35,23 @@ def test_het_vinkje_legt_uit_dat_het_geld_kost() -> None:
     html = _html()
     kop = html[html.index('id="review-mode"') - 300 : html.index('id="review-mode"')]
     assert "token" in kop.lower()
+
+
+def test_er_is_een_vinkje_voor_auto_triage() -> None:
+    assert 'id="auto-triage"' in _html()
+
+
+def test_auto_triage_gaat_mee_met_de_run() -> None:
+    assert "auto_triage:document.getElementById" in _html()
+
+
+def test_het_vinkje_zegt_wat_er_niet_automatisch_gaat() -> None:
+    """De auditor moet weten waar de grens ligt vóór hij aanvinkt.
+
+    Zonder die zin lijkt "auto-triage" alsof het hele werk wordt overgenomen, en dan is de
+    verrassing dat er nog 37 clausules liggen — of erger, denkt iemand dat de NC's al gewogen
+    zijn.
+    """
+    html = _html()
+    kop = html[html.index('id="auto-triage"') - 300 : html.index('id="auto-triage"')]
+    assert "NC" in kop

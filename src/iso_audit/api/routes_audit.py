@@ -67,6 +67,8 @@ class RunStartRequest(BaseModel):
     Zie `classification/review.ReviewInstelling`."""
     review_steekproef: int = 0
     """Beoordeel alleen de N zwaarste clausules; 0 is alles."""
+    auto_triage: bool | None = None
+    """Het onbetwiste deel automatisch afdoen. Zonder review gebeurt er niets."""
 
 
 def maak_router(audits: Audits) -> APIRouter:
@@ -175,6 +177,7 @@ def maak_router(audits: Audits) -> APIRouter:
                 pace_s=r.pace,
                 review=r.review,
                 review_steekproef=r.review_steekproef,
+                auto_triage=r.auto_triage,
                 run_id=run_id,
             )
         except RunLooptError as exc:

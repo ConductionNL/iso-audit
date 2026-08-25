@@ -218,6 +218,10 @@
         <input id="review-steekproef" type="number" min="0" step="1" value="0" style="width:64px">
         clausules <span class="note">(0 = alle)</span>
       </label>
+      <br>
+      <label title="Bevestigde positieve bevindingen automatisch op valide. NC's en verlagingen blijven bij jou.">
+        <input type="checkbox" id="auto-triage"> Auto-triage van het onbetwiste deel
+      </label>
       <br><br><button onclick="startRun()">Start run</button>
     </div>
     <div id="bar-wrap" hidden><div id="bar"></div></div>
@@ -1089,7 +1093,8 @@ async function startRun(){
     // cron-instelling bepalen wat er gebeurt als iemand hier op Start klikt.
     body:JSON.stringify({mode:live?"live":"sim",sources:cfg.sources,chapter,
       review:document.getElementById("review-mode").checked,
-      review_steekproef:parseInt(document.getElementById("review-steekproef").value||"0",10)})});
+      review_steekproef:parseInt(document.getElementById("review-steekproef").value||"0",10),
+      auto_triage:document.getElementById("auto-triage").checked})});
   if(!r.ok){
     const d = await r.json().catch(()=>({detail:"onbekende fout"}));
     const prog=document.getElementById("run-progress"); prog.hidden=false;

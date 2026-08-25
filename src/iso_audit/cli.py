@@ -214,6 +214,7 @@ def _run_pipeline(args: argparse.Namespace) -> int:
         scherpte=args.scherpte,
         review=args.review,
         review_steekproef=args.review_steekproef,
+        auto_triage=args.auto_triage,
         thema_llm=args.thema_llm,
         rehash=args.rehash,
         dry_run_cost=args.dry_run_cost,
@@ -372,6 +373,25 @@ def _voeg_pipeline_args_toe(parser: argparse.ArgumentParser) -> None:
         help="Autonome review uit, ook als ISO_AUDIT_REVIEW aan staat",
     )
     parser.set_defaults(review=None)
+    auto = parser.add_mutually_exclusive_group()
+    auto.add_argument(
+        "--auto-triage",
+        dest="auto_triage",
+        action="store_const",
+        const=True,
+        help=(
+            "Doe het onbetwiste deel automatisch af: bevestigde positieve bevindingen. "
+            "Nooit een NC en nooit een verlaging — die blijven bij de auditor"
+        ),
+    )
+    auto.add_argument(
+        "--geen-auto-triage",
+        dest="auto_triage",
+        action="store_const",
+        const=False,
+        help="Auto-triage uit, ook als ISO_AUDIT_AUTO_TRIAGE aan staat",
+    )
+    parser.set_defaults(auto_triage=None)
     parser.add_argument(
         "--review-steekproef",
         type=int,

@@ -354,6 +354,7 @@ class AuditSession:
         pace_s: float = 0.05,
         review: bool | None = None,
         review_steekproef: int = 0,
+        auto_triage: bool | None = None,
         run_id: str | None = None,
     ) -> dict[str, object]:
         """Stap 2: start de run. ``mode='live'`` = echte pipeline (Drive+LLM);
@@ -379,7 +380,16 @@ class AuditSession:
             self._run = _RunState(status="running", total=7, start=time.monotonic(), mode="live")
             threading.Thread(
                 target=self._run_live_worker,
-                args=(norm, gekozen, chapter, top_n, run_id, review, review_steekproef),
+                args=(
+                    norm,
+                    gekozen,
+                    chapter,
+                    top_n,
+                    run_id,
+                    review,
+                    review_steekproef,
+                    auto_triage,
+                ),
                 daemon=True,
             ).start()
             return {"mode": "live", "status": "running"}
@@ -407,6 +417,27 @@ class AuditSession:
         if run_id:
             afsluiten(self.dir, run_id)
 
+    def _pas_auto_triage_toe(self) -> int:
+        """Pas de voorstellen uit de review toe op de werkset — ná het toevoegen.
+
+        Volgorde is niet vrijblijvend: de bevindingen moeten in `findings.json` staan voordat
+        er iets aan te triageren valt. En via `apply_triage`, niet met een directe schrijfactie:
+        dan gelden dezelfde controles, hetzelfde slot en dezelfde append-only regel als bij een
+        mens. Een automatische beslissing buiten het spoor om is er geen die je kunt
+        verantwoorden.
+        """
+        from iso_audit.classification.auto_triage import pas_toe
+        from iso_audit.pipeline import _auto_triage_voorstellen
+
+        if not _auto_triage_voorstellen:
+            return 0
+        gedaan = pas_toe(self, list(_auto_triage_voorstellen))
+        self._run.log.append(
+            f"Auto-triage: {gedaan} positieve bevinding(en) automatisch op valide; "
+            "NC's en verlagingen blijven bij de auditor."
+        )
+        return gedaan
+
     def _run_live_worker(
         self,
         norm: str,
@@ -416,6 +447,7 @@ class AuditSession:
         run_id: str | None = None,
         review: bool | None = None,
         review_steekproef: int = 0,
+        auto_triage: bool | None = None,
     ) -> None:
         from iso_audit.api.run_job import draft_from_db, run_live_pipeline
         from iso_audit.api.runs import afsluiten
@@ -435,6 +467,7 @@ class AuditSession:
                 on_log=_on_log,
                 review=review,
                 review_steekproef=review_steekproef,
+                auto_triage=auto_triage,
             )
             self._run.log.append("Findings exporteren + kop-NC's draften…")
             drafted = draft_from_db(
@@ -447,6 +480,7 @@ class AuditSession:
             from iso_audit.api.runs import voeg_toe
 
             self.laatste_merge = voeg_toe(self.dir, [f.model_dump() for f in drafted])
+            self._pas_auto_triage_toe()
             # De memo-context bijwerken is cosmetiek ná het echte werk: de bevindingen
             # staan op dit punt al in `findings.json`. Op 2026-08-16 liet een ontbrekende
             # `memo-input.yaml` een run die alle zeven stappen én alle rapporten had

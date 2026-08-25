@@ -6,6 +6,37 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — auto-triage: het onbetwiste deel, en niet meer
+
+Wat er op 2026-08-24 gebeurde — 902 bevindingen in vier bulkacties op `valide` — is geen
+menselijk oordeel maar capitulatie voor het aantal. Een lijst die te lang is om te wegen, wordt
+niet gewogen. Tegelijk is "de agent beslist" precies wat de auditor-spiegel uitsluit.
+
+De uitweg is de agent het **onbetwiste voorwerk** laten doen, expliciet gemarkeerd:
+
+| geval | wat er gebeurt |
+|---|---|
+| review bevestigt een **positieve** bevinding | automatisch op `valide` |
+| review bevestigt een **NC** | blijft bij de auditor |
+| review **verlaagt** (NC → OFI) | blijft bij de auditor |
+| review zegt **onvoldoende bewijs** | blijft bij de auditor |
+| review **faalt** | blijft bij de auditor — geen advies is geen groen licht |
+
+Een NC vraagt om correctie, root-cause-analyse en formele verificatie; dat raakt de
+certificering. Verlagen is juist wél een oordeel: de review vindt het bewijs onvoldoende voor de
+zwaarste klasse. Beide horen bij een mens. Wat overblijft is de bulk waar niets op het spel
+staat.
+
+**Alles met een spoor.** De voorstellen gaan via `apply_triage` en niet met een directe
+schrijfactie op de werkset: dan gelden dezelfde controles, hetzelfde slot en dezelfde
+append-only regel als bij een mens. De actor is `auto-triage` — bewust geen mens-achtige naam,
+zodat een auditor in één blik ziet wat een mens heeft besloten en wat niet.
+
+Eigen schakelaar (`--auto-triage` / `--geen-auto-triage` / `ISO_AUDIT_AUTO_TRIAGE`, plus een
+vinkje in het runscherm): je kunt de tweede zeef willen zonder dat er iets automatisch wordt
+afgedaan. Andersom heeft geen zin — zonder review is er geen advies om op te varen — dus zonder
+review gebeurt er niets.
+
 ### Added — 2026-08-25 — de review is aan te zetten in het portaal
 
 Een modus die alleen via een env-var of de opdrachtregel aan te zetten is, is voor de auditor

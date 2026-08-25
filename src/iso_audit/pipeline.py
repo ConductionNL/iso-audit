@@ -376,6 +376,7 @@ def run_audit(
     rehash: bool = False,
     review: bool | None = None,
     review_steekproef: int = 0,
+    auto_triage: bool | None = None,
     dry_run_cost: bool = False,
     mode: Mode | None = None,
     audit_id: str | None = None,
@@ -641,7 +642,13 @@ def run_audit(
         op_kosten=op_kosten,
     )
 
-    _autonome_review(bevindingen, review=review, review_steekproef=review_steekproef)
+    _auto_triage_voorstellen.clear()
+    _autonome_review(
+        bevindingen,
+        review=review,
+        review_steekproef=review_steekproef,
+        auto_triage=auto_triage,
+    )
 
     logger.info("Stap 6/7: Menselijke review...")
     bevestigde_bevindingen = review_en_bevestig(bevindingen, auto_accept=no_review)
@@ -775,8 +782,20 @@ def _converteer_md_naar_html_docx_pdf(md_pad: str) -> None:
         logger.warning("PDF-conversie mislukt: %s", e)
 
 
+AUTO_TRIAGE_ENV = "ISO_AUDIT_AUTO_TRIAGE"
+
+_auto_triage_voorstellen: list[Any] = []
+"""Voorstellen uit de laatste run, zodat de aanroeper (het portaal) ze kan toepassen op zijn
+eigen werkset. De pipeline kent die werkset niet — hij schrijft in de database, het portaal
+beheert `findings.json`."""
+
+
 def _autonome_review(
-    bevindingen: list[dict[str, Any]], *, review: bool | None, review_steekproef: int
+    bevindingen: list[dict[str, Any]],
+    *,
+    review: bool | None,
+    review_steekproef: int,
+    auto_triage: bool | None = None,
 ) -> None:
     """Tweede zeef per clausule — alleen als de modus aan staat.
 
@@ -830,6 +849,36 @@ def _autonome_review(
 
     adviezen = Counter(a.advies if a else "storing" for _, a, _ in uitkomsten)
     logger.info("Review-adviezen: %s", dict(adviezen))
+    _auto_triage(uitkomsten, aan=auto_triage)
+
+
+def _auto_triage(uitkomsten: list[Any], *, aan: bool | None) -> None:
+    """Het onbetwiste deel automatisch afdoen — als die modus aan staat.
+
+    Alleen bevestigde positieve bevindingen. Nooit een NC en nooit een verlaging: dat zijn de
+    oordelen waarvoor de auditor-spiegel bestaat. Zie `classification/auto_triage`.
+
+    Aparte schakelaar van de review: je kunt de tweede zeef willen zonder dat er iets
+    automatisch wordt afgedaan. Andersom heeft geen zin — zonder review is er geen advies om op
+    te varen — dus zonder review gebeurt hier niets.
+    """
+    from iso_audit.classification.auto_triage import voorstellen
+    from iso_audit.classification.review import ReviewInstelling
+
+    instelling = ReviewInstelling.bepaal(aan, env_var=AUTO_TRIAGE_ENV)
+    if not instelling.aan:
+        logger.info("Auto-triage staat uit (%s).", instelling.herkomst)
+        return
+    lijst = voorstellen(uitkomsten)
+    if not lijst:
+        logger.info("Auto-triage: geen enkel voorstel; alles blijft bij de auditor.")
+        return
+    logger.info(
+        "Auto-triage (%s): %d voorstel(len) — pas toe via de werkset van deze audit",
+        instelling.herkomst,
+        len(lijst),
+    )
+    _auto_triage_voorstellen.extend(lijst)
 
 
 def run_report_only(norm: str, scherpte: float = 1.0, thema_llm: bool = False) -> None:

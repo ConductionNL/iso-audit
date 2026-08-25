@@ -190,6 +190,7 @@ def run_live_pipeline(
     alleen_ingest: bool = False,
     review: bool | None = None,
     review_steekproef: int = 0,
+    auto_triage: bool | None = None,
 ) -> RunUitkomst:
     """Draai de echte audit-pipeline met opgevangen voortgang (geen review-prompt).
 
@@ -255,6 +256,7 @@ def run_live_pipeline(
             alleen_ingest=alleen_ingest,
             review=review,
             review_steekproef=review_steekproef,
+            auto_triage=auto_triage,
             op_kosten=_bewaar_kosten,
             op_dekking=_bewaar_dekking,
         )
