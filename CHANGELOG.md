@@ -6,6 +6,19 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — de synthese-zin uit de review komt in de memo
+
+Het handgemaakte Q2-memo heeft per NC één zin die zegt wat het gemeenschappelijke gebrek is:
+*"Drie clausules, één hoofdgebrek: er is geen gedocumenteerd en getest continuïteitsbeheer."*
+Dat is wat drie A4 leesbaar houdt — zonder die zin is een NC-blok een opsomming van citaten.
+
+De autonome review produceert precies zo'n zin per clausule (`kern`), en die reisde tot nu toe
+niet verder dan de trail. Nu draagt een bevinding hem mee tot in het NC-blok, en staat hij in de
+render **vóór** de details: eerst de conclusie, dan de onderbouwing.
+
+Leeg als er geen review heeft gedraaid, en dan valt het blok terug op de afwijking zelf. Geen
+placeholder: een verzonnen synthese is erger dan geen synthese.
+
 ### Added — 2026-08-25 — de memo telt zijn pagina's
 
 De klant stelt "één tot drie A4" als harde eis. Er was niets dat die eis controleerde, dus een

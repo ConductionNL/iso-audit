@@ -42,6 +42,7 @@ def _nc_block(
     return NCBlock(
         title=f.title,
         citations=_citations(f, norm_db, language),
+        kern=f.kern,
         deviation=f.deviation or f.description,
         pattern_note=detector.pattern_note(f.clause, findings),
         corrective_measure=f.corrective_measure or "(corrigerende maatregel in te vullen)",

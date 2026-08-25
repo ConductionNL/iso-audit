@@ -14,6 +14,13 @@
 <div class="norm-quote">"{{ c.text }}"</div>
 {% endfor %}
 
+{# De synthese vóór de details: één zin die zegt wat het gemeenschappelijke gebrek is. Zo
+   leest het handgemaakte Q2-memo, en dat is wat drie A4 leesbaar houdt. Ontbreekt hij (geen
+   review gedraaid), dan valt het blok stil terug op de afwijking zelf. #}
+{% if nc.kern %}
+<p class="kern"><strong>{{ nc.kern }}</strong></p>
+{% endif %}
+
 <h4>Waar de praktijk afwijkt</h4>
 <div>{{ nc.deviation | safe }}</div>
 {% if nc.bronnen %}

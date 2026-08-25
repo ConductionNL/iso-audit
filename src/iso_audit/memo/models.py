@@ -69,6 +69,8 @@ class Finding(BaseModel):
     # NC: concrete voorbeelden van hoe de tool het bewijs idealiter had gezien —
     # helpt de auditor bij de triage (LLM-gedraft, auditor-spiegel).
     examples: list[str] = Field(default_factory=list)
+    kern: str = ""
+    """Synthese-zin uit de autonome review; zie `NCBlock.kern`."""
     triage_status: TriageStatus = "open"
     # Bij follow_up: LLM-suggestie met wie het bewijs te verifiëren (voorstel
     # tot uitsluiting). Auditor maakt de afspraak.
@@ -113,6 +115,15 @@ class NCBlock(BaseModel):
 
     title: str
     citations: list[ClauseCitation]
+    kern: str = ""
+    """Eén zin: wat is hier het gemeenschappelijke gebrek.
+
+    Dit is wat het handgemaakte Q2-memo leesbaar maakt — "Drie clausules, één hoofdgebrek: er is
+    geen gedocumenteerd en getest continuïteitsbeheer." Zonder die zin is een NC-blok een
+    opsomming van citaten, en dan leest een memo van drie A4 als een korte bijlage.
+
+    Komt uit de autonome review, die per clausule zo'n zin produceert. Leeg als er geen review
+    heeft gedraaid: een verzonnen synthese is erger dan geen synthese."""
     deviation: str  # "waar de praktijk afwijkt"
     pattern_note: str | None = None  # cross-clause patroon (auto)
     corrective_measure: str  # dwingende taal, geen "aanbeveling"
