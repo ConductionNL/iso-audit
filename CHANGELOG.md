@@ -6,6 +6,52 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — autonome review: per clausule oordelen, en aan of uit te zetten
+
+De classificatie oordeelt per document. 42 documenten die clausule 8.16 raken geven 42 oordelen
+over dezelfde eis, en daar stelt een auditor er één over: *wordt deze eis gehaald, gegeven al het
+bewijs dat we hebben?*
+
+`groepeer_per_clausule()` bundelt de bevindingen op **(norm, clausule)**. Op de run van
+2026-08-24 gemeten:
+
+| | |
+|---|---|
+| bevindingen | 347 |
+| **clausule-groepen** | **67** |
+| groepen met een NC erin | **37** |
+| grootste groep | clausule 10.2 met 27 bevindingen |
+
+Van 387 losse NC's naar 37 clausules om te beoordelen — een factor tien, zonder dat er bewijs
+verdwijnt.
+
+Norm en clausule samen en nooit clausule alleen: §7.5 is in 9001 "Gedocumenteerde informatie" en
+in 27001 "Bescherming tegen fysieke en omgevingsbedreigingen". Op één hoop zou bewijs over het
+ene iets zeggen over het andere. Onbruikbare bevindingen — een oordeel zonder beschrijving én
+zonder onderbouwing — tellen niet mee; blijft er niets over, dan is er niets te reviewen.
+
+**De modus is aan of uit te zetten**, en staat standaard **uit**. Een stap die altijd draait en
+tokens kost is geen keuze maar een verrassing op de rekening. De schakelaar volgt het patroon van
+`--source` en `--mode`: expliciete vlag, dan `ISO_AUDIT_REVIEW` als env-var-fallback die luid
+meldt dát hij gebruikt wordt, dan uit. De vlag wint van de omgeving — andersom zou een
+cron-instelling een handmatige run stil overrulen. De herkomst van de keuze (vlag, omgeving,
+standaard) gaat mee, zodat "waarom draaide deze stap wel of niet" achteraf te beantwoorden is.
+
+De schakelaar zit vóór de modelaanroep en niet erna: een review die draait en zijn uitkomst
+weggooit kost hetzelfde als een review die telt.
+
+### Gemeten — 2026-08-25 — de e2e-laag is flaky, en zat niet in de eerdere groene runs
+
+De volledige suite duurt **273 seconden**, niet de ~31 die ik gisteren rapporteerde: de
+Playwright-laag zat niet in die runs. Draait hij wel mee, dan faalt er telkens één test op een
+timeout van 30 s — en elke run een andere (`..._is_typbaar`, daarna
+`..._vervangt_de_omgeving_en_is_terug_te_draaien`). Dat is timing onder belasting en geen
+logische regressie; de tests slagen los van elkaar.
+
+Vastgelegd omdat een flaky laag erger is dan geen laag: hij leert je de rode uitslag negeren. De
+timeouts staan hard op 30 s en 15 s in de helper; dat hoort configureerbaar en de oorzaak hoort
+gemeten, niet opgerekt.
+
 ### Changed — 2026-08-24 — minor is de standaard, major de uitzondering
 
 De eerste run met de nieuwe definitie gaf **71 major tegen 8 minor**. Dat kan niet: major
