@@ -6,6 +6,42 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-25 — de norm viel alsnog uit de keten
+
+De run met auto-triage legde bloot dat de per-norm-koppeling niet doorliep. `clause_matches` had
+3.067 koppelingen op 9001 en 1.332 op 27001, maar `bevindingen.norm` stond op `beide` en
+`review_adviezen.norm` was **leeg** — in het log stond letterlijk "op  §9.3" met een gat waar de
+norm hoort.
+
+Drie gaten, alle drie alleen zichtbaar in een echte run:
+
+1. **`_classify_drive` bouwde een minimale doc-dict** met id, naam en herkomst, en daar viel
+   `clausule_normen` weg. Elke bevinding kreeg dus de run-parameter.
+2. **De terugleesquery filterde op de run-norm** (`WHERE norm = 'beide'`). Was de opslag wél
+   per-norm geweest, dan had die query nul bevindingen opgeleverd — de review en de memo hadden
+   niets gezien terwijl de database vol stond. Nu haalt `beide` de rijen van allebei de normen op
+   plus de oude `beide`-rijen, zodat bestaande databases niet stil leeg raken.
+3. **De teruggegeven bevinding droeg geen `norm` en geen `onbruikbaar`.** De review groepeert op
+   `clausule_id` + `norm` en filtert op `onbruikbaar`; zonder die velden groepeerde hij op een
+   lege norm en telde hij lege oordelen mee.
+
+De clausuletitel volgt nu ook de norm van de rij: §7.5 toont "Gedocumenteerde informatie" bij een
+9001-bevinding in plaats van de 27001-titel die de samengevoegde map bovenaan zet.
+
+### Gemeten — 2026-08-25 — de auto-triage heeft voor het eerst gedraaid
+
+| | |
+|---|---|
+| bevindingen | 403 → 64 clausulegroepen |
+| review-adviezen | 29 bevestigen · 13 verlagen · 7 onvoldoende bewijs · 2 samenvoegen · 13 storingen |
+| **auto-triage** | **5 bevindingen automatisch op `valide`** |
+| trail | 5 regels, actor `auto-triage`, met de reden van de review erbij |
+
+Het werkt end-to-end: van koppeling tot triage-status met een spoor. Dat het er maar vijf zijn,
+komt door de kapotte normketen hierboven — de review zag 64 groepen met een lege norm en gaf maar
+één keer "bevestigen" op een positieve bevinding. Met de fix erin hoort dat aantal fors hoger te
+liggen.
+
 ### Added — 2026-08-25 — een audit uit het overzicht halen
 
 Het dashboard toonde twee audits waarvan er één uit een eerdere opzet kwam (`9001-2026-Q3`, 1.106

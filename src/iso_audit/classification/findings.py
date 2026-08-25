@@ -774,23 +774,25 @@ def classificeer_alle_bevindingen(
     if op_kosten is not None:
         op_kosten(teller)
 
-    rows = conn.execute(
-        "SELECT * FROM bevindingen WHERE norm=? ORDER BY clausule_id", (norm,)
-    ).fetchall()
+    rows = conn.execute(*_bevindingen_query(norm)).fetchall()
     conn.close()
 
     alle: list[dict[str, Any]] = [
         {
             "clausule": r["clausule_id"],
-            "clausule_titel": ctx.clausules.get(r["clausule_id"], {}).get(
-                "titel", r["clausule_id"]
-            ),
+            # Ook onder `clausule_id`: de review en de memo lezen dat veld, en twee namen voor
+            # hetzelfde is precies hoe de review op een lege norm groepeerde.
+            "clausule_id": r["clausule_id"],
+            "clausule_titel": _titel(r["clausule_id"], str(r["norm"] or ""), ctx.clausules),
             "document_naam": r["document_naam"] or "",
             "doc_id": r["doc_id"],
             "herkomst": r["herkomst"],
+            "norm": r["norm"],
             "classificatie": r["classificatie"],
+            "ernst": dict(r).get("ernst"),
             "beschrijving": r["beschrijving"] or "",
             "onderbouwing": r["onderbouwing"] or "",
+            "onbruikbaar": dict(r).get("onbruikbaar", 0),
             "pre_classificatie": r["pre_classificatie"],
             "id": r["id"],
         }
@@ -833,6 +835,43 @@ def _geldig_oordeel(waarde: Any) -> str | None:
             return geldig
     logger.warning("Onbekende classificatie %r genegeerd; geen bevinding aangemaakt", schoon)
     return None
+
+
+def _titel(clausule: str, norm: str, samengevoegd: dict[str, Any]) -> str:
+    """De clausuletitel van de juiste norm.
+
+    §7.5 is in 9001 "Gedocumenteerde informatie" en in 27001 iets heel anders; de samengevoegde
+    map zet 27001 bovenaan. Kent de rij zijn norm, dan wint die.
+    """
+    if norm in ("9001", "27001"):
+        from iso_audit.classification.clause_mapping import titel_voor
+
+        return titel_voor(clausule, norm)
+    titel = samengevoegd.get(clausule, {}).get("titel")
+    return str(titel) if titel else clausule
+
+
+def _bevindingen_query(norm: str) -> tuple[str, tuple[str, ...]]:
+    """De query die alle bevindingen van een run teruggeeft.
+
+    Bij `beide` zijn dat de rijen van **beide** normen én de oude rijen die letterlijk `beide`
+    dragen. Filteren op alleen de run-parameter leverde na de per-norm-opslag nul bevindingen
+    op — en dan krijgen de review en de memo niets te zien terwijl de database vol staat.
+    """
+    from iso_audit.classification.clause_mapping import normen_van
+
+    waarden = (*normen_van(norm), norm)
+    plaatshouders = ",".join("?" for _ in waarden)
+    return (
+        f"SELECT * FROM bevindingen WHERE norm IN ({plaatshouders}) ORDER BY clausule_id",  # nosec B608
+        waarden,
+    )
+
+
+def _bevindingen_voor_norm(conn: Any, norm: str) -> list[Any]:
+    """Alle bevindingen van een run, over de normen die eronder vallen."""
+    sql, waarden = _bevindingen_query(norm)
+    return list(conn.execute(sql, waarden).fetchall())
 
 
 def bouw_bevindingen(
@@ -946,7 +985,15 @@ def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:
             audit_id=ctx.audit_id,
         )
         bevs = bouw_bevindingen(
-            doc={"id": doc_id, "naam": doc["naam"], "herkomst": doc.get("herkomst") or "Drive"},
+            # `clausule_normen` moet mee: daar staat uit welke norm elke koppeling komt. Een
+            # minimale dict liet dat vallen, en dan kreeg elke bevinding de run-parameter
+            # (`beide`) — gemeten in de run van 2026-08-25 21:40.
+            doc={
+                "id": doc_id,
+                "naam": doc["naam"],
+                "herkomst": doc.get("herkomst") or "Drive",
+                "clausule_normen": doc.get("clausule_normen") or [],
+            },
             clausules=cids,
             resultaten=resultaten,
             clausule_titels=ctx.clausules,
