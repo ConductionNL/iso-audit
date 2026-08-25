@@ -90,8 +90,14 @@ def memo_cmd(
     html_pad.parent.mkdir(parents=True, exist_ok=True)
     html_pad.write_text(html, encoding="utf-8")
     pdf_pad = output.with_suffix(".pdf")
-    renderer.render_pdf(html, pdf_pad)
+    budget = renderer.render_pdf(html, pdf_pad)
     _console.print(f"[green]memo geschreven:[/green] {html_pad} + {pdf_pad}")
+    # Het paginabudget hoort in beeld bij degene die de memo maakt, niet alleen in een logregel.
+    # De klanteis is één tot drie A4; stil overschrijden breekt hem zonder dat iemand het ziet.
+    if budget.past:
+        _console.print(f"[green]{budget.paginas} pagina('s)[/green] — binnen de eis")
+    else:
+        _console.print(f"[yellow]{budget.melding}[/yellow]")
 
 
 @app.command("draft")

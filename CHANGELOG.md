@@ -6,6 +6,23 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — de memo telt zijn pagina's
+
+De klant stelt "één tot drie A4" als harde eis. Er was niets dat die eis controleerde, dus een
+memo die op vier pagina's uitkwam brak hem zonder dat iemand het merkte — hetzelfde patroon als
+de PDF die maandenlang ontbrak omdat de melding een `logger.warning` was.
+
+`schrijf_pdf()` geeft nu een `PaginaBudget` terug: het aantal pagina's, of het past, en zo niet
+een melding met beide getallen erin. "Te lang" zonder getal laat de auditor raden hoeveel eruit
+moet.
+
+De memo wordt **wel** geschreven als hij te lang is. Een auditor die hem te lang vindt kan
+comprimeren; een memo die weigert helpt niemand. Dat is het verschil met de weigering bij
+ontbrekende normtekst: daar ontbrak inhoud, hier is de inhoud er en is alleen de vorm te ruim.
+
+Het budget is zichtbaar waar de memo gemaakt wordt: in de CLI met een gekleurde regel, en in het
+portaal via het runlog.
+
 ### Gemeten — 2026-08-25 — de volledige keten op een schone omgeving
 
 Cluster geleegd (met archief naar `/var/lib/iso-audit/archief/2026-08-25/`), daarna één run met

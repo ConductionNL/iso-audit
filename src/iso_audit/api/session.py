@@ -9,6 +9,7 @@ garantie: reclassificatie/triage wordt nooit overschreven, alleen toegevoegd.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import time
@@ -649,7 +650,12 @@ class AuditSession:
 
     def export_pdf(self, output: str | Path) -> Path:
         pad = Path(output)
-        MemoRendererImpl().render_pdf(self.render_html(), pad)
+        budget = MemoRendererImpl().render_pdf(self.render_html(), pad)
+        # Zichtbaar in het runlog en dus in het portaal: de klanteis is één tot drie A4, en
+        # een memo die daar stil overheen gaat breekt hem zonder dat iemand het merkt.
+        self.laatste_paginabudget = budget
+        if not budget.past:
+            logging.getLogger(__name__).warning("%s", budget.melding)
         return pad
 
     # --- memo-input (bewerkbaar vóór generatie) ------------------------------

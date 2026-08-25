@@ -8,6 +8,10 @@ staat aan; alleen expliciet veilige velden (rich tekst, logo) gebruiken ``|safe`
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from iso_audit.memo.renderer.pdf import PaginaBudget
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -34,8 +38,12 @@ class MemoRendererImpl:
         template = self._env.get_template(_MEMO_TEMPLATE)
         return template.render(memo=memo, profile=profile, colors=profile.brand.colors)
 
-    def render_pdf(self, html: str, output: Path) -> None:
-        """Render een HTML-string naar PDF. Importeert WeasyPrint lazy."""
+    def render_pdf(self, html: str, output: Path) -> PaginaBudget:
+        """Render een HTML-string naar PDF. Importeert WeasyPrint lazy.
+
+        Geeft het paginabudget terug: de klanteis is één tot drie A4, en een memo die daar
+        stil overheen gaat breekt die eis zonder dat iemand het merkt.
+        """
         from iso_audit.memo.renderer.pdf import schrijf_pdf
 
-        schrijf_pdf(html, output)
+        return schrijf_pdf(html, output)
