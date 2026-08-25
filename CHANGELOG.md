@@ -6,6 +6,39 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Gemeten — 2026-08-25 — de volledige keten op een schone omgeving
+
+Cluster geleegd (met archief naar `/var/lib/iso-audit/archief/2026-08-25/`), daarna één run met
+alle vier de bronnen en de review aan:
+
+| | |
+|---|---|
+| documenten | 709 — Nextcloud 121 van 168, inclusief de 32 OpenDocument-bestanden |
+| clausule-koppelingen | 4.399, waarvan **3.067 voor ISO 9001** (was 0 vóór de per-norm-koppeling) |
+| bevindingen | 314: 170 positief, 91 NC, 53 OFI |
+| review | 63 clausulegroepen op Sonnet, **$0,65** |
+| adviezen | 19 bevestigen · 15 verlagen · 15 onvoldoende bewijs · 4 samenvoegen · 10 storingen |
+| rapport | md, html, docx, pdf, csv, xlsx |
+
+Van 4.399 koppelingen naar 63 clausulevragen naar 19 bevestigde oordelen. De 15 verlagingen en
+15 keer "onvoldoende bewijs" zijn precies wat een mens moet wegen.
+
+### Fixed — 2026-08-25 — de verwijzingscontrole was te streng
+
+Negen van de tien storingen in die run kwamen van de eigen controle: het model verwees naar een
+document met een **verkorte** naam. `ISO-735` waar het document `ISO-735 | Sub Domain-takeover`
+heet, of de titel zonder `.docx`. De verwijzing klopte inhoudelijk; de vergelijking was
+letterlijk.
+
+Nu tellen ook de naam zonder extensie, de delen rond een `|`, en issue-sleutels als `ISO-735` —
+zeven tekens, maar de meest precieze verwijzing die er is: hij wijst één ticket aan. Onder de
+lengtegrens van acht tekens vallen verder alleen generieke stukjes weg; een document dat `a.md`
+heet mag niet met elke reden matchen.
+
+Wat niet verandert: een naam die nergens in het meegegeven corpus voorkomt blijft een storing.
+Tolerant voor de vorm, streng op de inhoud — dezelfde les als bij de Bronbevrager, waar de
+komma-lijst en het Nederlandse "en" drie iteraties kostten.
+
 ### Added — 2026-08-25 — auto-triage: het onbetwiste deel, en niet meer
 
 Wat er op 2026-08-24 gebeurde — 902 bevindingen in vier bulkacties op `valide` — is geen

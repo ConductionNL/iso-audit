@@ -192,6 +192,50 @@ def _json_uit(tekst: str) -> dict[str, Any]:
     return gegevens
 
 
+_SLEUTEL = re.compile(r"[A-Z]{2,}[-_]?\d+")
+"""Een issue-sleutel als `ISO-735` telt ook onder de lengtegrens.
+
+Zeven tekens, maar het is de meest precieze verwijzing die er is: hij wijst één ticket aan. De
+lengtegrens bestaat om te voorkomen dat een generiek woord als verwijzing telt, niet om
+identifiers uit te sluiten."""
+
+MIN_NAAMDEEL = 8
+"""Hoeveel tekens een naamdeel minstens moet hebben om als verwijzing te tellen.
+
+Zonder ondergrens zou een document dat `a.md` heet met elke reden matchen, en dan controleert
+de verwijzingscontrole niets meer."""
+
+
+def _naamdelen(naam: str) -> set[str]:
+    """De vormen waarin een documentnaam in een reden kan opduiken.
+
+    Het model citeert zelden letterlijk: het schrijft `ISO-735` waar het document
+    `ISO-735 | Sub Domain-takeover` heet, of de titel zonder `.docx`. Gemeten op 2026-08-25:
+    negen van de 63 clausulegroepen faalden op de controle terwijl de verwijzing klopte.
+    """
+    delen = {naam}
+    zonder_extensie = re.sub(r"\.[A-Za-z0-9]{1,5}$", "", naam)
+    delen.add(zonder_extensie)
+    # Documentnamen als "ISO-735 | Sub Domain-takeover": beide helften tellen.
+    delen.update(stuk.strip() for stuk in zonder_extensie.split("|"))
+    return {d for d in delen if len(d) >= MIN_NAAMDEEL or _SLEUTEL.fullmatch(d)}
+
+
+def _verwijst_naar(reden: str, namen: set[str]) -> bool:
+    """Verwijst de reden naar een van de meegegeven documenten?
+
+    Tolerant voor de vorm, streng op de inhoud: een naam die nergens in het meegegeven corpus
+    voorkomt blijft een storing. Hetzelfde onderscheid als bij de Bronbevrager, waar het model
+    zijn verwijzingen ook anders opschreef dan de code verwachtte.
+    """
+    kleine_reden = reden.lower()
+    for naam in namen:
+        for deel in _naamdelen(naam):
+            if deel.lower() in kleine_reden:
+                return True
+    return False
+
+
 def lees_advies(ruw: str, groep: Clausulegroep) -> Advies:
     """Controleer en lees het antwoord van de review.
 
@@ -220,7 +264,7 @@ def lees_advies(ruw: str, groep: Clausulegroep) -> Advies:
 
     reden = str(gegevens.get("reden") or "").strip()
     namen = {str(b.get("document_naam") or "") for b in groep.bevindingen}
-    if not any(naam and naam in reden for naam in namen):
+    if not _verwijst_naar(reden, namen):
         raise ReviewFoutError(
             "de reden verwijst niet naar een meegegeven document; zonder verwijzing is het "
             "advies niet na te trekken"

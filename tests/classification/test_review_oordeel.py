@@ -111,3 +111,90 @@ def test_onvoldoende_bewijs_mag_zonder_klasse() -> None:
     """Als er geen oordeel te vellen is, hoort er ook geen klasse te staan."""
     advies = lees_advies(_antwoord(advies="onvoldoende_bewijs", voorgestelde_klasse=None), _groep())
     assert advies.voorgestelde_klasse is None
+
+
+def test_een_verkorte_documentnaam_telt_als_verwijzing() -> None:
+    """Het model citeert een documentnaam zelden letterlijk.
+
+    Gemeten in de volledige run van 2026-08-25: 9 van de 63 clausulegroepen faalden op de
+    verwijzingscontrole terwijl de verwijzing inhoudelijk klopte. Het model schreef
+    `ISO-735` waar het document `ISO-735 | Sub Domain-takeover` heet, of noemde de titel
+    zonder `.docx`.
+
+    Tolerant voor de vorm, streng op de inhoud — dezelfde les als bij de Bronbevrager, waar de
+    komma-lijst en het Nederlandse "en" drie iteraties kostten. Wat níet mag veranderen: een
+    naam die nergens in het meegegeven corpus voorkomt, blijft een storing.
+    """
+    groep = Clausulegroep(
+        clausule="5.24",
+        norm="27001",
+        bevindingen=[
+            {
+                "doc_id": "d1",
+                "document_naam": "ISO-735 | Sub Domain-takeover",
+                "classificatie": "NC",
+                "beschrijving": "x",
+                "onderbouwing": "y",
+            }
+        ],
+    )
+    advies = lees_advies(_antwoord(reden="De enige bevinding is gebaseerd op ISO-735."), groep)
+    assert advies.advies == "verlagen"
+
+
+def test_een_naam_zonder_extensie_telt_ook() -> None:
+    groep = Clausulegroep(
+        clausule="9.2",
+        norm="9001",
+        bevindingen=[
+            {
+                "doc_id": "d1",
+                "document_naam": "Reactie en acties nav 2e controle audits.docx",
+                "classificatie": "NC",
+                "beschrijving": "x",
+                "onderbouwing": "y",
+            }
+        ],
+    )
+    advies = lees_advies(
+        _antwoord(reden="'Reactie en acties nav 2e controle audits' toont opvolging."), groep
+    )
+    assert advies.advies == "verlagen"
+
+
+def test_een_verzonnen_naam_blijft_een_storing() -> None:
+    """De versoepeling mag geen deur openzetten voor bronnen die niet bestaan."""
+    groep = Clausulegroep(
+        clausule="5.24",
+        norm="27001",
+        bevindingen=[
+            {
+                "doc_id": "d1",
+                "document_naam": "ISO-735 | Sub Domain-takeover",
+                "classificatie": "NC",
+                "beschrijving": "x",
+                "onderbouwing": "y",
+            }
+        ],
+    )
+    with pytest.raises(ReviewFoutError, match="verwijz"):
+        lees_advies(_antwoord(reden="Volgens Verzonnen-Rapport-2026."), groep)
+
+
+def test_een_te_kort_naamdeel_telt_niet_als_verwijzing() -> None:
+    """Anders zou een document dat "a.md" heet met elke reden matchen."""
+    groep = Clausulegroep(
+        clausule="5.1",
+        norm="27001",
+        bevindingen=[
+            {
+                "doc_id": "d1",
+                "document_naam": "a.md",
+                "classificatie": "NC",
+                "beschrijving": "x",
+                "onderbouwing": "y",
+            }
+        ],
+    )
+    with pytest.raises(ReviewFoutError, match="verwijz"):
+        lees_advies(_antwoord(reden="Er is onvoldoende bewijs aangetroffen."), groep)
