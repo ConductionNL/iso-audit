@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — incrementele ingest: een ongewijzigd document wordt niet opnieuw opgehaald
+
+Gemeten op 2026-08-24: het dure deel — de modelaanroepen — werd al volledig hergebruikt (0 calls
+in ronde 2 en 3), maar een herhaalde run duurde nog steeds zestien minuten. Die gingen bijna
+helemaal op aan documenten die niet veranderd waren:
+
+| bron | listing | inhoud per document | totaal |
+|---|---|---|---|
+| Drive | 65 s voor 456 docs | 2,49 s | 1.202 s |
+| Nextcloud | 3,2 s voor 121 docs | 0,55 s | 69 s |
+
+De ingest hergebruikt nu de opgeslagen tekst wanneer de wijzigingstijd van de bron gelijk is aan
+`documents.modified_at`. **De listing draait altijd volledig** — dat is de enige manier om te
+merken dat een document verdwenen of bijgekomen is, en het is 65 s van de 1.200. Alleen het
+ophalen van de inhoud wordt overgeslagen.
+
+Drie redenen om tóch te lezen, elk gemeten:
+
+- **Geen wijzigingstijd** — Planning levert rijen uit een sheet zonder tijdstempel, 150 van de
+  709. Geen geraden tijd: dan zou een document als ongewijzigd gelden terwijl niemand dat weet.
+- **Leeg opgeslagen** — leeg betekent niet gelezen; overslaan zou de leegte bevriezen.
+- **`ISO_AUDIT_OPNIEUW_LEZEN`** — na een wijziging in de lezers is de opgeslagen tekst verouderd
+  zonder dat de bron dat weet. Op 2026-08-24 werden 32 OpenDocument-bestanden voor het eerst
+  leesbaar; met alleen een tijdstempel-vergelijking zouden die als "ongewijzigd" nooit binnen
+  zijn gekomen. Een cache zonder uitweg is een val.
+
+De dekkingteller telt hergebruik apart (`hergebruikt`) en meldt het. `gelezen` blijft het totaal:
+een overgeslagen document is wél gelezen, alleen niet nu. Een dekking die daarover zwijgt laat de
+auditor denken dat alles vers is opgehaald.
+
 ### Added — 2026-08-25 — de autonome review draait, gemeten tegen het echte model
 
 De review is compleet: prompt, aanroep, verwijzingscontrole, trail, schakelaar en steekproef.

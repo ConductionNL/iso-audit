@@ -37,6 +37,7 @@ from iso_audit.config.google_ids import uit_url
 from iso_audit.config.verbinding import normaliseer
 from iso_audit.sources import register
 from iso_audit.sources.base import Document, Finding
+from iso_audit.sources.protocol_ingest import mag_overslaan
 from iso_audit.sources.tekst import (
     DOCX_MIME,
     GESCANDE_FORMATEN,
@@ -198,6 +199,12 @@ class Dekkingteller:
 
     gezien: int = 0
     gelezen: int = 0
+    hergebruikt: int = 0
+    """Hoeveel van `gelezen` uit een eerdere run komt in plaats van vers opgehaald.
+
+    Apart geteld en gemeld: een dekking die zwijgt over wat er niet opnieuw is gelezen, laat de
+    auditor denken dat alles vers is. `gelezen` blijft het totaal — een overgeslagen document is
+    wél gelezen, alleen niet nu."""
     overgeslagen: Counter[str] = field(default_factory=Counter)
 
     def sla_over(self, reden: str) -> None:
@@ -430,9 +437,27 @@ class DriveSource:
 # ---------------------------------------------------------------------------
 
 
+def _bekende_teksten_drive() -> dict[str, tuple[str, str]]:
+    """Wat er al van Drive is ingelezen; onbereikbaar betekent gewoon alles opnieuw ophalen."""
+    try:
+        from iso_audit.sources.protocol_ingest import bekende_teksten
+        from iso_audit.store import initialiseer, verbinding
+
+        conn = verbinding()
+        try:
+            initialiseer(conn)
+            return bekende_teksten(conn, "Drive")
+        finally:
+            conn.close()
+    except Exception as fout:
+        logger.warning("Kon eerdere teksten niet lezen (alles wordt opgehaald): %s", fout)
+        return {}
+
+
 def _verwerk_batch(
     batch: list[dict[str, Any]],
     teller: Dekkingteller | None = None,
+    bekend: dict[str, tuple[str, str]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Lees één batch; retourneert `(documenten, handmatige_review)`.
 
@@ -476,6 +501,25 @@ def _verwerk_batch(
             )
             logger.info("Onbekend type, handmatige review vereist: %s (%s)", naam, mime)
             teller.sla_over(f"onbekend type: {mime}")
+            continue
+        # Ongewijzigd sinds de vorige run? Dan de opgeslagen tekst hergebruiken. Het ophalen
+        # kost 2,49 s per document (gemeten 2026-08-24) tegen 65 s voor de hele listing; dit
+        # is het verschil tussen zestien minuten en twee. De listing zelf draait altijd, want
+        # dat is de enige manier om te zien dat er iets is verdwenen of bijgekomen.
+        bewaard = mag_overslaan(file_id, bestand.get("modifiedTime"), bekend or {})
+        if bewaard is not None:
+            teller.gelezen += 1
+            teller.hergebruikt += 1
+            documenten.append(
+                {
+                    "naam": naam,
+                    "id": file_id,
+                    "mime_type": mime,
+                    "tekst": bewaard,
+                    "herkomst": "Drive",
+                    "modified_at": bestand.get("modifiedTime"),
+                }
+            )
             continue
         try:
             tekst = _fetch_tekst(file_id, mime)
@@ -570,6 +614,8 @@ def haal_documenten_op(
     alle_documenten: list[dict[str, Any]] = []
     alle_handmatige_review: list[dict[str, Any]] = []
     teller = Dekkingteller()
+    # Eén keer opgehaald voor alle batches: per batch zou dit 26 queries zijn op dezelfde tabel.
+    bekend = _bekende_teksten_drive()
     for i in range(0, len(alle_bestanden), BATCH_SIZE):
         batch = alle_bestanden[i : i + BATCH_SIZE]
         logger.info(
@@ -578,7 +624,7 @@ def haal_documenten_op(
             -(-len(alle_bestanden) // BATCH_SIZE),
             len(batch),
         )
-        docs, review = _verwerk_batch(batch, teller)
+        docs, review = _verwerk_batch(batch, teller, bekend)
         alle_documenten.extend(docs)
         alle_handmatige_review.extend(review)
 
