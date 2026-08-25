@@ -6,6 +6,30 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — een audit uit het overzicht halen
+
+Het dashboard toonde twee audits waarvan er één uit een eerdere opzet kwam (`9001-2026-Q3`, 1.106
+bevindingen, 4 runs). Er was geen manier om die kwijt te raken behalve met de hand op de opslag,
+en dus bleef hij staan en las het overzicht als "er lopen twee audits".
+
+**Archiveren, niet verwijderen.** De map gaat naar `archief/<datum>/<audit-id>-<tijd>/`, compleet,
+met een `gearchiveerd.json` erbij die zegt wie het deed, wanneer en waarom. Een audit die gedraaid
+heeft is bewijs dát er geaudit is; die weggooien maakt "wat is er in Q2 getoetst?"
+onbeantwoordbaar. Er is bewust géén route die echt verwijdert — wie een dossier definitief kwijt
+wil doet dat op de opslag, niet met één klik in een auditwerktuig.
+
+Drie regels eromheen:
+
+- **Een reden is verplicht**, in de API en in de UI. Zonder reden is later niet te zien of dit
+  opruimen was of iets wegwerken — zelfde onderscheid als bij het verbergen van een run.
+- **Niet tijdens een run** (409). De map verplaatsen terwijl er een run in schrijft, levert een
+  run op die in het niets schrijft.
+- **De knop zegt wat hij doet.** "De map gaat naar het archief; er wordt niets verwijderd" staat
+  in de tooltip én in de bevestiging, anders klikt iemand hem denkend dat het dossier weg is.
+
+Het overzicht loopt over mappen met een manifest, dus verplaatsen haalt de audit er vanzelf uit —
+geen statusveld dat kan gaan liegen tegen de bestanden.
+
 ### Fixed — 2026-08-25 — de samengevoegde clause-map verliest niets meer
 
 `laad_clause_map("beide")` deed `{**map_9001, **map_27001}`. Achttien clausulenummers bestaan in

@@ -30,6 +30,7 @@ audits/
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -269,6 +270,60 @@ class AuditRegistry:
         return aid
 
     # --- activiteit ---------------------------------------------------------
+
+    def archiveer(self, aid: str, *, door: str, reden: str) -> Path:
+        """Haal een audit uit het overzicht door hem naar het archief te verplaatsen.
+
+        **Verplaatsen en niet verwijderen.** Een audit die gedraaid heeft, is bewijs dát er
+        geaudit is; die weggooien maakt de volgende vraag — "wat is er in Q2 getoetst?" —
+        onbeantwoordbaar. Het overzicht loopt over mappen met een manifest, dus verplaatsen
+        haalt hem er vanzelf uit.
+
+        **Een reden is verplicht.** Zonder reden is later niet te zeggen of dit opruimen was of
+        iets wegwerken — hetzelfde onderscheid als bij het verbergen van een run.
+
+        Retourneert het pad in het archief.
+
+        :raises RegistryError: als de audit niet bestaat of de reden leeg is.
+        """
+        import json
+        import shutil
+        from datetime import UTC, datetime
+
+        if not reden.strip():
+            raise RegistryError(
+                "Geef een reden op. Zonder reden is later niet te zien of dit opruimen was."
+            )
+        bron = self.eis(aid)
+        nu = datetime.now(UTC)
+        map_ = self.root.parent / "archief" / nu.strftime("%Y-%m-%d")
+        map_.mkdir(parents=True, exist_ok=True)
+        # Een teller erbij als het al bestaat: twee archiveringen binnen dezelfde seconde is
+        # zeldzaam maar niet onmogelijk, en dan mag de tweede de eerste niet overschrijven —
+        # dat zou precies het dossier weggooien dat we bewaren.
+        doel = map_ / f"{aid}-{nu:%H%M%S}"
+        nummer = 2
+        while doel.exists():
+            doel = map_ / f"{aid}-{nu:%H%M%S}-{nummer}"
+            nummer += 1
+        shutil.move(str(bron), str(doel))
+        (doel / "gearchiveerd.json").write_text(
+            json.dumps(
+                {
+                    "audit_id": aid,
+                    "door": door,
+                    "reden": reden.strip(),
+                    "op": nu.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                ensure_ascii=False,
+                indent=1,
+            ),
+            encoding="utf-8",
+        )
+        logging.getLogger(__name__).info(
+            "Audit %s gearchiveerd door %s: %s", aid, door, reden.strip()
+        )
+        return doel
 
     def markeer_actief(self, aid: str, door: str) -> None:
         """Leg vast wie als laatste muteerde. Geen slot — zie ``andere_actief``."""

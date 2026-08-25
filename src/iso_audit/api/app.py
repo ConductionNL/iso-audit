@@ -248,6 +248,38 @@ def create_app(
         """
         return [asdict(r) for r in ov.alles(registry)]
 
+    class AuditArchiveren(BaseModel):
+        """Reden verplicht: zonder reden is later niet te zien of dit opruimen was."""
+
+        reden: str
+
+    @app.post("/audits/{audit_id}/archiveer")
+    def archiveer_audit(audit_id: str, body: AuditArchiveren, request: Request) -> dict[str, str]:
+        """Haal een audit uit het overzicht door hem naar het archief te verplaatsen.
+
+        **Verplaatsen, niet verwijderen.** Een audit die gedraaid heeft is bewijs dát er
+        geaudit is; die weggooien maakt "wat is er in Q2 getoetst?" onbeantwoordbaar. Er is
+        daarom geen route die echt verwijdert — wie een dossier definitief kwijt wil, doet dat
+        bewust op de opslag en niet met één klik in een auditwerktuig.
+        """
+        wie = identiteit_van(request)
+        loopt = _run_loopt()
+        if loopt == audit_id:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Er loopt een run in deze audit. Wacht tot die klaar is: de map "
+                    "verplaatsen tijdens een run levert een run op die in het niets schrijft."
+                ),
+            )
+        try:
+            doel = registry.archiveer(audit_id, door=wie, reden=body.reden)
+        except RegistryError as exc:
+            code = 404 if "bestaat niet" in str(exc) else 400
+            raise HTTPException(status_code=code, detail=str(exc)) from exc
+        log_event("audit_gearchiveerd", wie, audit=audit_id, reden=body.reden.strip())
+        return {"audit_id": audit_id, "archief": str(doel)}
+
     @app.post("/audits", status_code=201)
     def maak_audit(nieuw: NieuweAudit, request: Request) -> dict[str, object]:
         """Maak een audit aan. Een auditorhandeling, geen beheeractie."""

@@ -433,11 +433,28 @@ async function loadDashboard(){
       <td>${voortgang}<br>${memo}</td>
       <td>${a.bronnen.length ? a.bronnen.map(esc).join(", ") : `<span class="mini">—</span>`}</td>
       <td>${wie}</td>
+      <td><button class="alt mini" onclick="archiveerAudit('${a.id}')" title="Uit het overzicht halen. De map gaat naar het archief; er wordt niets verwijderd.">Archiveer</button></td>
     </tr>`;
   }).join("");
   wrap.innerHTML = `<table><thead><tr>
-      <th>Audit</th><th>Status</th><th>Triage</th><th>Bronnen</th><th>Laatst bewerkt</th>
+      <th>Audit</th><th>Status</th><th>Triage</th><th>Bronnen</th><th>Laatst bewerkt</th><th></th>
     </tr></thead><tbody>${rijen}</tbody></table>`;
+}
+
+async function archiveerAudit(id){
+  // Reden verplicht, ook in de UI: zonder reden is later niet te zien of dit opruimen was of
+  // iets wegwerken. Zelfde regel als bij het verbergen van een run.
+  const reden = prompt(`Audit "${id}" uit het overzicht halen.\n\nDe map gaat naar het archief; er wordt niets verwijderd.\n\nWaarom?`);
+  if(reden === null) return;
+  if(!reden.trim()){ alert("Geef een reden op."); return; }
+  const r = await fetch(`/audits/${encodeURIComponent(id)}/archiveer`,{method:"POST",
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({reden})});
+  if(!r.ok){
+    const d = await r.json().catch(()=>({detail:"onbekende fout"}));
+    alert(d.detail || "archiveren mislukt");
+    return;
+  }
+  await loadDashboard();
 }
 
 async function maakAudit(){
