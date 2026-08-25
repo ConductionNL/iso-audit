@@ -33,6 +33,19 @@ verwijzing is het advies niet na te trekken en dus waardeloos.
 `kern` is één zin: wat is hier het gebrek, of waarom is er geen gebrek. Dit is de zin die in een
 managementmemo terecht kan komen, dus schrijf hem zo.
 
+`acties` is wat er moet gebeuren, alleen bij een NC en hooguit drie. Per actie:
+
+- **wat** — de opdracht, concreet genoeg om af te vinken. Niet "verbeter het toegangsbeheer"
+  maar "autorisatiematrix vaststellen en per kwartaal herzien".
+- **wie** — een **rol**, nooit een persoon: "IT-lead", "KAM + MT", "DevOps". Wie het precies
+  doet is een besluit van de organisatie, en een persoonsnaam in een auditdocument die niemand
+  heeft goedgekeurd is een probleem op zich.
+- **waar** — waar het resultaat komt te staan, als je dat uit het bewijs kunt afleiden.
+- **uiterlijk** — een **termijn**, geen datum: "2026-Q3", "doorlopend, eerste review 2026-Q4".
+
+Laat een veld weg als je het niet uit het bewijs kunt afleiden. Een verzonnen eigenaar of
+termijn is erger dan een leeg vakje: dat vakje ziet de auditor en vult hij.
+
 ## Uitvoer
 
 Retourneer uitsluitend geldig JSON (geen toelichting buiten JSON):
@@ -42,7 +55,8 @@ Retourneer uitsluitend geldig JSON (geen toelichting buiten JSON):
  "ernst": "major"|"minor"|null,
  "kern": "<één zin>",
  "reden": "<met documentnamen>",
- "zonder_inhoud": <aantal bevindingen zonder beschrijving en onderbouwing>}
+ "zonder_inhoud": <aantal bevindingen zonder beschrijving en onderbouwing>,
+ "acties": [{"wat": "...", "wie": "<rol>", "waar": "...", "uiterlijk": "<termijn>"}]}
 
 `voorgestelde_klasse` is een **voorstel**, geen besluit: het wordt niet toegepast zonder dat een
 mens het overneemt.

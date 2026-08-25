@@ -161,6 +161,34 @@ class ReviewFoutError(Exception):
     """
 
 
+MAX_ACTIES = 4
+"""Hoeveel acties er per clausule meegaan.
+
+Het handgemaakte Q2-memo had er drie per NC. Meer past niet op drie A4, en een actielijst die
+niemand afwerkt is geen actielijst."""
+
+_PERSOONSNAAM = re.compile(r"^[A-Z][a-z]{2,}\s+(?:van\s+|de\s+|den\s+|der\s+)?[A-Z][a-z]{2,}$")
+"""Twee gekapitaliseerde woorden achter elkaar: dat is een mens, geen rol.
+
+`wie` hoort een rol te zijn. Een agent die een naam toewijst neemt een besluit van de
+organisatie, en dan staat er bovendien een persoonsnaam in een auditdocument die niemand heeft
+goedgekeurd. Rollen als "IT-lead", "KAM + MT" of "DevOps" vallen hier niet onder."""
+
+
+@dataclass(frozen=True)
+class VoorgesteldeActie:
+    """Eén regel voor de actietabel van de memo: wat, welke rol, welke termijn.
+
+    Een rol en een termijn, geen naam en geen datum: wie het precies doet en wanneer precies is
+    aan de organisatie.
+    """
+
+    wat: str
+    wie: str | None = None
+    waar: str | None = None
+    uiterlijk: str | None = None
+
+
 @dataclass(frozen=True)
 class Advies:
     """Wat de review over één clausule vindt. Een voorstel, geen besluit."""
@@ -171,6 +199,7 @@ class Advies:
     kern: str
     reden: str
     zonder_inhoud: int
+    acties: list[VoorgesteldeActie] = field(default_factory=list)
 
 
 def _json_uit(tekst: str) -> dict[str, Any]:
@@ -236,6 +265,39 @@ def _verwijst_naar(reden: str, namen: set[str]) -> bool:
     return False
 
 
+def _lees_acties(ruw: Any) -> list[VoorgesteldeActie]:
+    """Lees de voorgestelde acties; een actie zonder opdracht telt niet.
+
+    Afkappen op `MAX_ACTIES` en niet melden in het antwoord: hier is afkappen geen verlies van
+    bewijs maar van een suggestie, en de auditor ziet de clausule sowieso. Dat is het verschil
+    met de bevindingenlijst, waar afkappen wél gemeld wordt.
+    """
+    if not isinstance(ruw, list):
+        return []
+    acties: list[VoorgesteldeActie] = []
+    for item in ruw[:MAX_ACTIES]:
+        if not isinstance(item, dict):
+            continue
+        wat = str(item.get("wat") or "").strip()
+        if not wat:
+            continue  # zonder opdracht zeggen wie en wanneer niets
+        wie = str(item.get("wie") or "").strip() or None
+        if wie and _PERSOONSNAAM.match(wie):
+            raise ReviewFoutError(
+                f"`wie` moet een rol zijn en geen persoon: {wie!r}. Een naam toewijzen is een "
+                "besluit van de organisatie."
+            )
+        acties.append(
+            VoorgesteldeActie(
+                wat=wat,
+                wie=wie,
+                waar=str(item.get("waar") or "").strip() or None,
+                uiterlijk=str(item.get("uiterlijk") or "").strip() or None,
+            )
+        )
+    return acties
+
+
 def lees_advies(ruw: str, groep: Clausulegroep) -> Advies:
     """Controleer en lees het antwoord van de review.
 
@@ -271,6 +333,7 @@ def lees_advies(ruw: str, groep: Clausulegroep) -> Advies:
         )
 
     return Advies(
+        acties=_lees_acties(gegevens.get("acties")),
         advies=advies,
         voorgestelde_klasse=str(klasse) if klasse is not None else None,
         ernst=str(gegevens["ernst"]) if gegevens.get("ernst") else None,
@@ -399,6 +462,26 @@ def beoordeel(
             logger.warning("Review %s §%s: %s", groep.norm, groep.clausule, storing)
         if conn is not None:
             _leg_vast(conn, groep, vraag, ruw, advies, storing, model, usd, afgekapt, door)
+            if advies is not None:
+                # Naast de trail ook als laatste stand, zodat de memo-bouwer erbij kan zonder
+                # het ruwe antwoord te hoeven parsen. De trail blijft het bewijs; dit is de
+                # werkvoorraad.
+                from iso_audit.store import bewaar_review_advies
+
+                bewaar_review_advies(
+                    conn,
+                    norm=groep.norm,
+                    clausule=groep.clausule,
+                    advies=advies.advies,
+                    voorgestelde_klasse=advies.voorgestelde_klasse,
+                    ernst=advies.ernst,
+                    kern=advies.kern,
+                    reden=advies.reden,
+                    acties=[
+                        {"wat": a.wat, "wie": a.wie, "waar": a.waar, "uiterlijk": a.uiterlijk}
+                        for a in advies.acties
+                    ],
+                )
         uitkomsten.append((groep, advies, storing))
 
     return uitkomsten

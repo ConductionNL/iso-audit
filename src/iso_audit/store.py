@@ -210,6 +210,22 @@ def initialiseer(conn: sqlite3.Connection) -> None:
             UNIQUE(doc_id, herkomst, clausule_id, norm)
         );
 
+        -- Eén rij per (norm, clausule): de autonome review oordeelt over een clausule als
+        -- geheel, niet per bevinding. De memo-bouwer leest hier de kernzin en de voorgestelde
+        -- actietabel; het ruwe antwoord met tijdstempel blijft in `assistent_vragen`.
+        CREATE TABLE IF NOT EXISTS review_adviezen (
+            norm                TEXT NOT NULL,
+            clausule_id         TEXT NOT NULL,
+            advies              TEXT NOT NULL,
+            voorgestelde_klasse TEXT,
+            ernst               TEXT,
+            kern                TEXT NOT NULL DEFAULT '',
+            reden               TEXT NOT NULL DEFAULT '',
+            acties_json         TEXT NOT NULL DEFAULT '[]',
+            beoordeeld_op       TEXT NOT NULL,
+            PRIMARY KEY (norm, clausule_id)
+        );
+
         CREATE TABLE IF NOT EXISTS interviews (
             clausule_id    TEXT NOT NULL,
             norm           TEXT NOT NULL,
@@ -682,3 +698,75 @@ def laad_pending_decisions(conn: sqlite3.Connection, audit_id: str) -> list[sqli
         "SELECT * FROM decisions WHERE audit_id = ? AND status = 'pending' ORDER BY created_at",
         (audit_id,),
     ).fetchall()
+
+
+def bewaar_review_advies(
+    conn: sqlite3.Connection,
+    *,
+    norm: str,
+    clausule: str,
+    advies: str,
+    kern: str,
+    reden: str,
+    voorgestelde_klasse: str | None = None,
+    ernst: str | None = None,
+    acties: list[dict[str, Any]] | None = None,
+) -> None:
+    """Leg het review-advies voor één clausule vast; een tweede run overschrijft.
+
+    Overschrijven is hier geen verlies: het ruwe antwoord met tijdstempel, model en kosten staat
+    in `assistent_vragen` en die is append-only. Deze tabel is de laatste stand waar de
+    memo-bouwer op werkt.
+    """
+    conn.execute(
+        """
+        INSERT INTO review_adviezen
+            (norm, clausule_id, advies, voorgestelde_klasse, ernst, kern, reden, acties_json,
+             beoordeeld_op)
+        VALUES (?,?,?,?,?,?,?,?,datetime('now'))
+        ON CONFLICT(norm, clausule_id) DO UPDATE SET
+            advies              = excluded.advies,
+            voorgestelde_klasse = excluded.voorgestelde_klasse,
+            ernst               = excluded.ernst,
+            kern                = excluded.kern,
+            reden               = excluded.reden,
+            acties_json         = excluded.acties_json,
+            beoordeeld_op       = excluded.beoordeeld_op
+        """,
+        (
+            norm,
+            clausule,
+            advies,
+            voorgestelde_klasse,
+            ernst,
+            kern,
+            reden,
+            json.dumps(acties or [], ensure_ascii=False),
+        ),
+    )
+    conn.commit()
+
+
+def review_adviezen(conn: sqlite3.Connection) -> dict[tuple[str, str], dict[str, Any]]:
+    """Alle review-adviezen, op (norm, clausule)."""
+    # Expliciete kolommen en geen `SELECT *`: deze functie wordt ook aangeroepen op een
+    # verbinding zonder `row_factory`, en dan is een rij een tuple. Op naam uitpakken maakt hem
+    # onafhankelijk van hoe de verbinding is opgezet.
+    uit: dict[tuple[str, str], dict[str, Any]] = {}
+    rijen = conn.execute(
+        "SELECT norm, clausule_id, advies, voorgestelde_klasse, ernst, kern, reden,"
+        " acties_json, beoordeeld_op FROM review_adviezen"
+    ).fetchall()
+    for norm, clausule, advies, klasse, ernst, kern, reden, acties_json, op in rijen:
+        uit[(str(norm), str(clausule))] = {
+            "norm": str(norm),
+            "clausule_id": str(clausule),
+            "advies": str(advies),
+            "voorgestelde_klasse": klasse,
+            "ernst": ernst,
+            "kern": str(kern or ""),
+            "reden": str(reden or ""),
+            "acties": json.loads(acties_json or "[]"),
+            "beoordeeld_op": str(op),
+        }
+    return uit

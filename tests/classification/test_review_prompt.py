@@ -64,3 +64,23 @@ def test_er_is_een_kernzin_voor_de_memo() -> None:
     tekst = _tekst()
     assert "kern" in tekst
     assert "managementmemo" in tekst
+
+
+def test_de_prompt_vraagt_om_acties() -> None:
+    """Zonder actietabel is de memo een constatering zonder opdracht."""
+    tekst = _tekst()
+    assert "acties" in tekst
+    for veld in ("wat", "wie", "waar", "uiterlijk"):
+        assert veld in tekst, f"actieveld ontbreekt: {veld}"
+
+
+def test_wie_moet_een_rol_zijn() -> None:
+    """Een agent die een persoon aanwijst, neemt een besluit van de organisatie."""
+    tekst = _tekst()
+    assert "een **rol**" in tekst or "een rol" in tekst
+    assert "nooit een persoon" in tekst
+
+
+def test_een_leeg_veld_is_beter_dan_een_verzonnen_eigenaar() -> None:
+    tekst = _tekst()
+    assert "verzonnen eigenaar" in tekst

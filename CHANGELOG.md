@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — de review vult de actietabel van de memo
+
+Het handgemaakte Q2-memo heeft per NC een tabel **Wat | Wie | Waar | Uiterlijk**. Die velden
+bestonden in het datamodel maar niemand vulde ze, en een memo zonder die tabel is een
+constatering zonder opdracht.
+
+De review kan ze voorbereiden omdat hij als enige de clausule als geheel heeft gezien. Wat hij
+levert is een **voorstel**, met twee harde grenzen:
+
+- **`wie` is een rol, nooit een persoon.** "IT-lead", "KAM + MT", "DevOps" — geen namen. Wie het
+  precies doet is een besluit van de organisatie, en een persoonsnaam in een auditdocument die
+  niemand heeft goedgekeurd is een probleem op zich. Een antwoord met twee gekapitaliseerde
+  woorden achter elkaar wordt geweigerd.
+- **`uiterlijk` is een termijn, geen datum.** "2026-Q3", "doorlopend, eerste review 2026-Q4".
+
+Een veld dat niet uit het bewijs volgt blijft leeg. Een verzonnen eigenaar is erger dan een leeg
+vakje: dat vakje ziet de auditor en vult hij. Hooguit vier acties per clausule — het Q2-memo had
+er drie, en meer past niet op drie A4.
+
+**Nieuwe tabel `review_adviezen`**, één rij per (norm, clausule). De review draait in de pipeline
+en de memo wordt later gebouwd, mogelijk in een ander proces; zonder opslag zou de kernzin alleen
+in de trail staan — leesbaar voor een mens die zoekt, onbruikbaar voor de memo-bouwer. Een
+tweede run overschrijft, en dat is geen verlies: het ruwe antwoord met tijdstempel, model en
+kosten blijft in `assistent_vragen`, en die is append-only.
+
+`verrijk_met_review()` zet kernzin en acties op de bevindingen bij het exporteren, op **(norm,
+clausule)** — achttien nummers bestaan in beide normen, en zonder die controle zou een kernzin
+over "Gedocumenteerde informatie" onder "Bescherming tegen fysieke bedreigingen" belanden. Wat de
+auditor zelf invulde wint van een voorstel.
+
 ### Added — 2026-08-25 — de synthese-zin uit de review komt in de memo
 
 Het handgemaakte Q2-memo heeft per NC één zin die zegt wat het gemeenschappelijke gebrek is:

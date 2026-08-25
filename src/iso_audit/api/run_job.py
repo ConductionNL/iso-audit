@@ -113,6 +113,50 @@ def _resolve_standard(row_norm: str, clause: str, db: NormDatabase | None) -> st
     return "iso-9001-2015"
 
 
+_SLUG_NAAR_NORM = {"iso-9001-2015": "9001", "iso-27001-2022": "27001"}
+
+
+def verrijk_met_review(findings: list[Finding], conn: Any) -> list[Finding]:
+    """Zet de kernzin en de voorgestelde acties uit de review op de bevindingen.
+
+    De review oordeelt per clausule, de werkset bestaat uit bevindingen. Zonder deze koppeling
+    blijft de kernzin in de database staan en komt hij nooit in de memo — dan is de review een
+    logregel.
+
+    Op **(norm, clausule)** en niet op clausule alleen: achttien nummers bestaan in beide
+    normen, en dan zou een kernzin over "Gedocumenteerde informatie" onder "Bescherming tegen
+    fysieke bedreigingen" belanden.
+
+    Wat de auditor zelf invulde wint van een voorstel: bestaande acties worden niet
+    overschreven.
+    """
+    from iso_audit.memo.models import ActionRow
+    from iso_audit.store import review_adviezen
+
+    adviezen = review_adviezen(conn)
+    if not adviezen:
+        return findings
+    for f in findings:
+        norm = _SLUG_NAAR_NORM.get(f.standard, f.standard)
+        advies = adviezen.get((norm, f.clause))
+        if not advies:
+            continue
+        if not f.kern:
+            f.kern = str(advies.get("kern") or "")
+        if not f.actions:
+            f.actions = [
+                ActionRow(
+                    wat=str(a.get("wat") or ""),
+                    wie=a.get("wie"),
+                    waar=a.get("waar"),
+                    uiterlijk=a.get("uiterlijk"),
+                )
+                for a in advies.get("acties", [])
+                if str(a.get("wat") or "").strip()
+            ]
+    return findings
+
+
 def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> list[Finding]:
     """Lees de bevindingen uit de audit-DB en map ze naar het memo-Finding-model.
 
@@ -178,6 +222,16 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
                 ],
             )
         )
+    # De kernzin en de voorgestelde acties uit de autonome review erbij, als die heeft
+    # gedraaid. Zonder deze stap blijft de review een logregel.
+    from iso_audit.store import initialiseer as _init
+
+    verrijkt_conn = verbinding()
+    try:
+        _init(verrijkt_conn)
+        findings = verrijk_met_review(findings, verrijkt_conn)
+    finally:
+        verrijkt_conn.close()
     return findings
 
 
