@@ -543,8 +543,15 @@ def _gedaan_miro(conn: sqlite3.Connection, norm: str) -> set[str]:
 def _upsert_bevindingen(
     conn: sqlite3.Connection, bevindingen: list[dict[str, Any]], norm: str
 ) -> None:
-    """UPSERT: overschrijft bestaande rij bij conflict op composite key."""
+    """UPSERT: overschrijft bestaande rij bij conflict op composite key.
+
+    `norm` is de run-parameter en kan `beide` zijn; een bevinding die zijn eigen norm meebrengt
+    (uit de koppeling) wint daarvan. Zonder die voorrang kreeg elke bevinding `beide` en moest
+    `run_job._resolve_standard()` achteraf raden — met een half gevulde norm-DB raadde die er op
+    2026-08-24 448 van de 903 verkeerd.
+    """
     for bev in bevindingen:
+        rij_norm = str(bev.get("norm") or "") or norm
         conn.execute(
             """
             INSERT INTO bevindingen
@@ -565,7 +572,7 @@ def _upsert_bevindingen(
                 bev["_doc_id"],
                 bev["herkomst"],
                 bev["clausule"],
-                norm,
+                rij_norm,
                 bev["classificatie"],
                 bev.get("ernst"),
                 bev.get("beschrijving", ""),
@@ -852,31 +859,53 @@ def bouw_bevindingen(
     leeg oordeel niet kan.
     """
     per_clausule = {r.get("clausule"): r for r in resultaten if isinstance(r, dict)}
+    # De norm per clausule komt uit de koppeling: `clause_matches` weet uit welke norm een
+    # match komt, en zonder deze regel kreeg een bevinding de run-parameter (`beide`) mee.
+    # Achttien nummers bestaan in beide normen; dan zijn het twee bevindingen, want §7.5 is in
+    # 9001 "Gedocumenteerde informatie" en in 27001 iets heel anders.
+    normen_per_clausule: dict[str, list[str]] = {}
+    for cid, match_norm in doc.get("clausule_normen") or []:
+        normen_per_clausule.setdefault(str(cid), []).append(str(match_norm))
+
     bevindingen: list[dict[str, Any]] = []
     for cid in clausules:
         res = per_clausule.get(cid) or {}
         classificatie = _geldig_oordeel(res.get("classificatie"))
         if classificatie is None:
             continue  # geen oordeel is geen bevinding
-        beschrijving = res.get("beschrijving") or ""
-        onderbouwing = res.get("onderbouwing") or ""
-        bevindingen.append(
-            {
-                "_doc_id": doc["id"],
-                # Bron van de bevinding (Drive/Jira/Planning/…) — terugvoerbaar.
-                "herkomst": doc.get("herkomst") or "Drive",
-                "clausule": cid,
-                "clausule_titel": clausule_titels.get(cid, {}).get("titel", cid),
-                "document_naam": doc["naam"],
-                "classificatie": classificatie,
-                "ernst": res.get("ernst"),
-                "beschrijving": beschrijving,
-                "onderbouwing": onderbouwing,
-                "onbruikbaar": not beschrijving.strip() and not onderbouwing.strip(),
-                "pre_classificatie": None,
-            }
-        )
+        for match_norm in normen_per_clausule.get(cid) or [""]:
+            bevindingen.append(
+                _bevinding(doc, cid, match_norm, res, classificatie, clausule_titels)
+            )
     return bevindingen
+
+
+def _bevinding(
+    doc: dict[str, Any],
+    cid: str,
+    match_norm: str,
+    res: dict[str, Any],
+    classificatie: str,
+    clausule_titels: dict[str, Any],
+) -> dict[str, Any]:
+    """Eén bevindingsrij; `match_norm` leeg betekent: de aanroeper beslist, zoals voorheen."""
+    beschrijving = res.get("beschrijving") or ""
+    onderbouwing = res.get("onderbouwing") or ""
+    return {
+        "_doc_id": doc["id"],
+        # Bron van de bevinding (Drive/Jira/Planning/…) — terugvoerbaar.
+        "herkomst": doc.get("herkomst") or "Drive",
+        "clausule": cid,
+        "clausule_titel": clausule_titels.get(cid, {}).get("titel", cid),
+        "document_naam": doc["naam"],
+        "classificatie": classificatie,
+        "ernst": res.get("ernst"),
+        "beschrijving": beschrijving,
+        "onderbouwing": onderbouwing,
+        "onbruikbaar": not beschrijving.strip() and not onderbouwing.strip(),
+        "norm": match_norm,
+        "pre_classificatie": None,
+    }
 
 
 def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:

@@ -98,9 +98,15 @@ class _ProgressHandler(logging.Handler):
 def _resolve_standard(row_norm: str, clause: str, db: NormDatabase | None) -> str:
     """Bepaal de norm-DB-slug per finding. Bij norm='beide' via clausule-membership.
 
-    Clausule-ID's botsen tussen 9001 en 27001 (bv. §6.2); de DB slaat 'beide' op
-    zonder per-finding norm. We resolven dan: alleen in 27001 → 27001; anders
-    (alleen 9001, of botsing in beide) → 9001 (default).
+    Sinds de per-norm-koppeling (2026-08-25) draagt een bevinding zijn eigen norm en komt de
+    eerste tak er altijd uit. De rest is er nog voor bestaande databases waarin `beide` staat,
+    en voor paden zonder koppelingnorm (Miro, opvolgpunten).
+
+    Waar geraden moet worden: alleen in 27001 → 27001; anders (alleen 9001, of een nummer dat
+    in beide bestaat) → 9001. Die default was tot 2026-08-24 fout voor 448 van de 903
+    bevindingen, omdat de norm-DB waar hij het aan vroeg 13 van de 121 clausules bevatte. Met
+    een complete DB klopt hij voor de 103 nummers die maar in één norm bestaan; voor de
+    achttien die botsen kán hij niet kiezen.
     """
     if row_norm in _NORM_SLUG:
         return _NORM_SLUG[row_norm]

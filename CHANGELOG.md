@@ -6,6 +6,25 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-25 — een bevinding erft de norm van zijn koppeling
+
+`clause_matches` wist sinds de per-norm-koppeling precies uit welke norm een match komt — 3.067
+voor 9001 en 1.332 voor 27001 in de run van vanavond. `bevindingen` kreeg nog steeds `beide`, de
+run-parameter, en daardoor moest `run_job._resolve_standard()` achteraf raden.
+
+Gemeten op die run: met de complete norm-DB raadde hij **nul keer verkeerd** (was 448 van de 903
+op 2026-08-24). Wat overbleef waren **30 bevindingen** op een nummer dat in beide normen bestaat
+— daar kán hij niet kiezen en valt hij terug op 9001.
+
+Dat gat is nu dicht: `bouw_bevindingen()` leest de norm uit `clausule_normen` van het gekoppelde
+document, en `_upsert_bevindingen()` geeft die voorrang op de run-parameter. Raakt een document
+hetzelfde nummer in beide normen, dan zijn het **twee bevindingen** — §7.5 is in 9001
+"Gedocumenteerde informatie" en in 27001 iets heel anders, en één bevinding zou betekenen dat het
+oordeel over de ene norm voor de andere doorgaat.
+
+Paden zonder koppelingnorm (Miro, opvolgpunten) vallen terug op de run-parameter, zoals
+voorheen. `_resolve_standard()` blijft staan voor bestaande databases waarin `beide` staat.
+
 ### Added — 2026-08-25 — NC's bundelen tot thema-blokken
 
 De run van 2026-08-25 leverde 91 bevestigde NC's op. Eén blok per bevinding maakt daar 91 blokken
