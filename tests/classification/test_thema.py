@@ -13,9 +13,14 @@ from iso_audit.classification import thema
 
 
 def test_thema_lijst_is_finite() -> None:
-    """Taxonomie heeft een vaste lengte; Overig staat als laatste."""
+    """Taxonomie heeft een vaste lengte; Overig staat als laatste.
+
+    Het getal groeit alleen met een reden. 25 -> 26 op 2026-08-26: "Ontwikkeling &
+    wijzigingsbeheer" erbij, omdat §8.9, §8.25 en §8.33 nergens anders in pasten en daardoor
+    elk een eigen memo-blok kregen. Zie `tests/classification/test_thema_hiaten.py`.
+    """
     assert thema.THEMA_LIJST[-1] == "Overig"
-    assert len(thema.THEMA_LIJST) == 25
+    assert len(thema.THEMA_LIJST) == 26
     # Geen duplicates.
     assert len(set(thema.THEMA_LIJST)) == len(thema.THEMA_LIJST)
 

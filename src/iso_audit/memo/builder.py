@@ -8,14 +8,17 @@ findings-hash). Geen LLM; deterministisch op een vaste ``now``.
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 from datetime import UTC, datetime
 
 from iso_audit.memo import __version__ as memo_version
 from iso_audit.memo.classifier import DefaultClassifier
+from iso_audit.memo.groepering import GEEN_THEMA, Themagroep, groepeer_ncs
 from iso_audit.memo.models import (
     ActionRow,
     AuditMemo,
+    BronRef,
     ClauseCitation,
     Finding,
     HistoricalNC,
@@ -32,24 +35,71 @@ def _citations(f: Finding, norm_db: NormDatabase, language: str) -> list[ClauseC
     return [norm_db.citation(f.standard, c, language) for c in [f.clause, *f.extra_clauses]]
 
 
+def _groep_citations(
+    groep: Themagroep, norm_db: NormDatabase, language: str
+) -> list[ClauseCitation]:
+    """Alle clausules van het blok, elk één keer, op clausulenummer gesorteerd."""
+    per_clausule: dict[tuple[str, str], ClauseCitation] = {}
+    for f in groep.bevindingen:
+        for citation in _citations(f, norm_db, language):
+            per_clausule.setdefault((f.standard, citation.clause), citation)
+    return [per_clausule[k] for k in sorted(per_clausule)]
+
+
+def _groep_bronnen(groep: Themagroep) -> list[BronRef]:
+    """Elke bron van elke bevinding, ontdubbeld. Bundelen mag geen bewijs verstoppen."""
+    gezien: dict[tuple[str, str, str], BronRef] = {}
+    for f in groep.bevindingen:
+        for bron in f.bronnen:
+            # Ook `doc_naam` in de sleutel: twee bronnen met hetzelfde id maar een andere naam
+            # zijn allebei tonen beter dan er stilletjes één weglaten.
+            gezien.setdefault((bron.herkomst, bron.doc_id or "", bron.doc_naam), bron)
+    return list(gezien.values())
+
+
+def _groep_afwijking(groep: Themagroep) -> str:
+    """De afwijkingen van het blok onder elkaar, met clausule ervoor.
+
+    Eén bullet per bevinding en niet één samengesmolten alinea: de lezer moet kunnen zien welke
+    constatering bij welke eis hoort, anders is het blok niet meer na te trekken.
+    """
+    delen = [(f.clause, (f.deviation or f.description).strip()) for f in groep.bevindingen]
+    delen = [(c, t) for c, t in delen if t]
+    if not delen:
+        return ""
+    if len(delen) == 1:
+        return delen[0][1]
+    regels = "".join(
+        f"<li><strong>§{html.escape(clausule)}</strong> — {tekst}</li>" for clausule, tekst in delen
+    )
+    return f"<ul>{regels}</ul>"
+
+
 def _nc_block(
-    f: Finding,
+    groep: Themagroep,
     findings: list[Finding],
     norm_db: NormDatabase,
     detector: DefaultPatternDetector,
     language: str,
 ) -> NCBlock:
+    """Eén blok per thema. De titel is het thema; bij `Overig` is dat er niet, dus de bevinding."""
+    eerste = groep.bevindingen[0]
+    titel = eerste.title if groep.thema == GEEN_THEMA else groep.thema
+    acties = [a for f in groep.bevindingen for a in f.actions]
+    maatregelen = [f.corrective_measure for f in groep.bevindingen if f.corrective_measure]
     return NCBlock(
-        title=f.title,
-        citations=_citations(f, norm_db, language),
-        kern=f.kern,
-        deviation=f.deviation or f.description,
-        pattern_note=detector.pattern_note(f.clause, findings),
-        corrective_measure=f.corrective_measure or "(corrigerende maatregel in te vullen)",
-        actions=f.actions or [ActionRow(wat="(actie in te vullen)")],
-        bronnen=f.bronnen,
-        reasoning=f.reasoning,
-        triage_status=f.triage_status,
+        title=titel,
+        citations=_groep_citations(groep, norm_db, language),
+        kern=groep.kern,
+        deviation=_groep_afwijking(groep),
+        pattern_note=detector.pattern_note(eerste.clause, findings),
+        corrective_measure=maatregelen[0]
+        if maatregelen
+        else "(corrigerende maatregel in te vullen)",
+        actions=acties or [ActionRow(wat="(actie in te vullen)")],
+        bronnen=_groep_bronnen(groep),
+        reasoning=eerste.reasoning,
+        triage_status=eerste.triage_status,
     )
 
 
@@ -92,10 +142,11 @@ def build_memo(
     # Alleen door de auditor bevestigde (valide) NC's in de memo; niet_valide
     # (false positive) en follow_up (afspraak nodig, voorstel tot uitsluiting)
     # vallen eruit. De memo is gated op 'geen open kandidaten' (zie API).
+    # Eén blok per thema, niet per bevinding: 47 bevestigde NC's gaven 47 blokken en 35
+    # pagina's (gemeten 2026-08-26), terwijl het handgemaakte Q2-memo er twee had. Zie
+    # `memo/groepering.py` voor waarom op thema en niet op clausule gebundeld wordt.
     nc_blocks = [
-        _nc_block(f, findings, norm_db, detector, lang)
-        for f in classifier.ncs(findings)
-        if f.triage_status == "valide"
+        _nc_block(groep, findings, norm_db, detector, lang) for groep in groepeer_ncs(findings)
     ]
     improvements = [
         _improvement_block(f, norm_db, lang) for f in classifier.improvements(findings, threshold)

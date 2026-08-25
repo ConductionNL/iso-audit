@@ -122,6 +122,19 @@ def _resolve_standard(row_norm: str, clause: str, db: NormDatabase | None) -> st
 _SLUG_NAAR_NORM = {"iso-9001-2015": "9001", "iso-27001-2022": "27001"}
 
 
+def _alleen_placeholder(acties: list[Any]) -> bool:
+    """Geen actie, of alleen de placeholder die zegt dat er nog niets bepaald is.
+
+    De kop-NC's krijgen bij het draften een placeholder mee. Zonder deze controle liet
+    `verrijk_met_review` de actielijst staan omdat hij "niet leeg" was, en verdween elk voorstel
+    van de review achter een regel die zegt "in te vullen door auditor" — gemeten op
+    2026-08-25: 47 NC's, allemaal met die placeholder en geen enkele met een voorstel.
+    """
+    from iso_audit.memo.draft import ACTIE_PLACEHOLDER
+
+    return all(getattr(a, "wat", "") == ACTIE_PLACEHOLDER for a in acties)
+
+
 def verrijk_met_review(findings: list[Finding], conn: Any) -> list[Finding]:
     """Zet de kernzin en de voorgestelde acties uit de review op de bevindingen.
 
@@ -149,17 +162,20 @@ def verrijk_met_review(findings: list[Finding], conn: Any) -> list[Finding]:
             continue
         if not f.kern:
             f.kern = str(advies.get("kern") or "")
-        if not f.actions:
-            f.actions = [
-                ActionRow(
-                    wat=str(a.get("wat") or ""),
-                    wie=a.get("wie"),
-                    waar=a.get("waar"),
-                    uiterlijk=a.get("uiterlijk"),
-                )
-                for a in advies.get("acties", [])
-                if str(a.get("wat") or "").strip()
-            ]
+        voorstellen = [
+            ActionRow(
+                wat=str(a.get("wat") or ""),
+                wie=a.get("wie"),
+                waar=a.get("waar"),
+                uiterlijk=a.get("uiterlijk"),
+            )
+            for a in advies.get("acties", [])
+            if str(a.get("wat") or "").strip()
+        ]
+        # Alleen vervangen als er iets te vervangen ís: zonder voorstel blijft de placeholder
+        # staan, want een leeg vakje ziet de auditor en vult hij.
+        if voorstellen and _alleen_placeholder(f.actions):
+            f.actions = voorstellen
     return findings
 
 
@@ -211,6 +227,10 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
                 "beschrijving": r["beschrijving"],
                 "onderbouwing": r["onderbouwing"],
                 "document_naam": r["document_naam"],
+                # De clausuletitel uit de norm is de scherpste samenvatting van waar de
+                # bevinding over gaat; zonder dit veld viel §5.29 ("... continuïteit ...")
+                # in `Overig` terwijl het thema er letterlijk in stond.
+                "clausule_titel": titel,
             }
         )
         findings.append(
@@ -340,4 +360,16 @@ def draft_from_db(*, norm: str, norms_dir: str, language: str, top_n: int) -> li
     """Exporteer DB-findings en draaf de kop-NC's (na een live run)."""
     ruw = export_db_findings(norm=norm, norms_dir=norms_dir)
     norm_db = laad_norm_db(norms_dir)
-    return draft_findings(ruw, norm_db=norm_db, language=language, top_n=top_n)
+    gedraft = draft_findings(ruw, norm_db=norm_db, language=language, top_n=top_n)
+    # Nogmaals verrijken: `draft_findings` bouwt nieuwe Finding-objecten uit clusters en die
+    # dragen de kernzin van de ruwe bevindingen niet mee. Uitgerekend deze NC's hebben hem
+    # nodig — de memo bestaat uit NC-blokken.
+    from iso_audit.store import initialiseer as _init2
+    from iso_audit.store import verbinding as _verb2
+
+    conn2 = _verb2()
+    try:
+        _init2(conn2)
+        return verrijk_met_review(gedraft, conn2)
+    finally:
+        conn2.close()

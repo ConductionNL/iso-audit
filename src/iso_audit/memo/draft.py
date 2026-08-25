@@ -20,6 +20,13 @@ from iso_audit import modellen
 from iso_audit.memo.models import ActionRow, BronRef, Finding
 from iso_audit.memo.norm_lookup import NormDatabase
 
+ACTIE_PLACEHOLDER = "(actie in te vullen door auditor)"
+"""Wat er staat zolang niemand de actie heeft bepaald.
+
+Geen ingevulde actie: `verrijk_met_review` mag hem vervangen door een voorstel van de review.
+Een leeg vakje ziet de auditor en vult hij; een placeholder die een voorstel blokkeert, houdt
+juist het vakje leeg."""
+
 CLAUDE_MODEL = modellen.STANDAARD
 """Memo-tekst schrijven, geen bewijs beoordelen — dus het standaardmodel."""
 _PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
@@ -120,7 +127,7 @@ def _draft_cluster(
         description=f"Gedistilleerd uit {len(cluster)} ruwe NC-bevindingen op clausule {clause}.",
         deviation=str(data.get("deviation") or ""),
         corrective_measure=str(data.get("corrective_measure") or ""),
-        actions=[ActionRow(wat="(actie in te vullen door auditor)")],
+        actions=[ActionRow(wat=ACTIE_PLACEHOLDER)],
         reasoning=reasoning,
         bronnen=bron_refs,
         thema=thema,

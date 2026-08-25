@@ -64,6 +64,7 @@ THEMA_LIJST: list[str] = [
     "Toegangsbeheer",
     "Logging & monitoring",
     "Incident response",
+    "Ontwikkeling & wijzigingsbeheer",
     "Wettelijke & contractuele eisen",
     "Privacy & persoonsgegevens",
     "Context-analyse & belanghebbenden",
@@ -86,6 +87,25 @@ THEMA_REGELS: list[tuple[str, list[str]]] = [
     ("Screening & HR", ["screening", "achtergrondcontrole", "arbeidsvoorwaarden"]),
     ("Fysieke beveiliging", ["perimeter", "fysieke beveilig", "kantoorbeveilig"]),
     ("Leveranciersbeheer", ["leverancier", "supplier", "derde partij", "uitbesteding"]),
+    (
+        # §8.9 configuratiebeheer, §8.25 veilige ontwikkeling en §8.33 testinformatie horen bij
+        # elkaar en nergens anders; zonder dit thema vielen ze los in `Overig` (run 2026-08-26).
+        # Vóór "Template zonder toepassing" omdat die op het generieke woord `template` matcht.
+        "Ontwikkeling & wijzigingsbeheer",
+        [
+            "configuratiebeheer",
+            "wijzigingsbeheer",
+            "veilige ontwikkeling",
+            "ontwikkelingspijplijn",
+            "ontwikkelstraat",
+            "ontwikkelomgeving",
+            "testinformatie",
+            "testgegevens",
+            "productiegegevens",
+            "broncode",
+            "ci/cd",
+        ],
+    ),
     (
         "Memo & afwijkingsregistratie",
         ["memo afwijk", "memo nc", "afwijkingsprocedure", "afwijkingsmemo", "nc-memo"],
@@ -148,7 +168,19 @@ THEMA_REGELS: list[tuple[str, list[str]]] = [
     ("Auditprogramma", ["interne audit", "auditprogramma", "auditplan"]),
     ("Directiebeoordeling", ["directiebeoordeling", "management review"]),
     ("Training & competenties", ["training", "competenties", "opleiding"]),
-    ("Toegangsbeheer", ["toegangsbeheer", "toegangsrechten", "autorisatie"]),
+    (
+        "Toegangsbeheer",
+        [
+            "toegangsbeheer",
+            "toegangsrechten",
+            "autorisatie",
+            "authenticatie",
+            "mfa",
+            "multi-factor",
+            "wachtwoord",
+            "inloggegevens",
+        ],
+    ),
     ("Logging & monitoring", ["logging", "monitoring", "audit-trail", "audit trail"]),
     ("Incident response", ["incident response", "incidentmanagement", "incidentprocedure"]),
 ]
@@ -170,25 +202,42 @@ SYSTEM_PROMPT = (
 
 
 def bepaal_thema(bevinding: dict[str, Any]) -> str:
-    """Route A: keyword-match over beschrijving + onderbouwing + document_naam.
+    """Route A: keyword-match over beschrijving + onderbouwing + documentnaam + clausuletitel.
 
     First-match-wins. Lege/missende velden tellen niet mee. Geen externe
     afhankelijkheden — pure functie.
+
+    `clausule_titel` is optioneel en kwam er later bij: §5.29 heet "Informatiebeveiliging en
+    continuïteit tijdens verstoring" en viel toch in `Overig`, omdat de duidelijkste samenvatting
+    van de bevinding niet werd gelezen. Aanroepers die het veld niet meegeven, werken ongewijzigd.
+
+    Het is nadrukkelijk een **terugval** en geen gelijkwaardige input. Bij de eerste poging
+    (2026-08-26) telde de titel gewoon mee, en verschoven 8 NC's die al onder "Memo &
+    afwijkingsregistratie" hoorden naar "Rollen & verantwoordelijkheden" — de generieke normtaal
+    van een clausuletitel matcht nu eenmaal eerder dan de specifieke bevindingstekst. Dus eerst
+    de eigen tekst van de bevinding; alleen als die niets oplevert, de titel erbij.
     """
-    tekst = " ".join(
+    eigen = " ".join(
         [
             bevinding.get("beschrijving") or "",
             bevinding.get("onderbouwing") or "",
             bevinding.get("document_naam") or "",
         ]
-    ).lower()
+    )
+    thema = _match(eigen)
+    if thema != "Overig":
+        return thema
+    return _match(f"{eigen} {bevinding.get('clausule_titel') or ''}")
 
-    if not tekst.strip():
+
+def _match(tekst: str) -> str:
+    """First-match-wins over `THEMA_REGELS`. Lege tekst → `Overig`."""
+    laag = tekst.lower()
+    if not laag.strip():
         return "Overig"
-
     for thema, keywords in THEMA_REGELS:
         for kw in keywords:
-            if kw.lower() in tekst:
+            if kw.lower() in laag:
                 return thema
     return "Overig"
 

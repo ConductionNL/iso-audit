@@ -6,6 +6,45 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-26 — de memo bundelt NC's per thema in plaats van per bevinding
+
+`build_memo` maakte één NC-blok per bevinding. Op de werkset van vanochtend: 47 bevestigde NC's,
+47 blokken, **35 pagina's** — terwijl het handgemaakte Q2-memo er twee had en de klant expliciet
+om 1–3 A4 vraagt. `memo/groepering.py` bestond al maar was nergens aangesloten.
+
+Nu één blok per thema: 47 NC's → **25 blokken → 27 pagina's**. Elk blok noemt alle clausules die
+het raakt, elke bron van elke onderliggende bevinding blijft zichtbaar, en de afwijkingen staan
+als lijst met `§clausule` ervoor. Bundelen mag geen bewijs verstoppen — een memo die niet terug
+te voeren is op documenten is een mening.
+
+**Wat dit níet oplost, gemeten en niet weggeschreven.** 27 pagina's is nog steeds geen 3 A4, en
+dat is geen layout-probleem: alleen de normcitaten van 47 NC's zijn al ~4 A4 en de
+afwijkingsteksten ~9 (mediaan 355 tekens per stuk). De vaste memo-overhead is 1 pagina en elk
+blok kost er ~2. Drie A4 betekent dus **ten hoogste twee NC-blokken** — precies wat het Q2-memo
+laat zien. De resterende knop is de triage, niet de opmaak: 47 bevestigde NC's is een
+detailrapport, geen managementmemo.
+
+### Fixed — 2026-08-26 — drie hiaten in de thema-toekenning
+
+Van de 47 NC's viel 21% in `Overig`, en `Overig` is geen thema maar het ontbreken ervan: elk zo'n
+bevinding krijgt een eigen memo-blok. Drie oorzaken, alle drie gemeten op de echte run:
+
+- **De clausuletitel telde niet mee.** §5.29 heet "Informatiebeveiliging en continuïteit tijdens
+  verstoring" en het thema "Back-up & continuïteit" heeft `continuïteit` als keyword — maar
+  `bepaal_thema()` las alleen beschrijving, onderbouwing en documentnaam. Nu wel, en nadrukkelijk
+  als **terugval**: eerst de eigen tekst van de bevinding, en alleen als die niets oplevert de
+  titel erbij. Als gelijkwaardige input overstemt de generieke normtaal van een clausuletitel de
+  specifieke bevindingstekst. Effect als terugval: 5 van 47 veranderen, alle vijf vanuit `Overig`.
+- **De taxonomie miste ontwikkel- en wijzigingsbeheer.** §8.9 (configuratiebeheer), §8.25 (veilige
+  ontwikkeling) en §8.33 (testinformatie) horen bij elkaar en nergens anders. Nieuw thema
+  "Ontwikkeling & wijzigingsbeheer" (taxonomie 25 → 26).
+- **Toegangsbeheer kende authenticatie niet.** §5.17 (authenticatie-informatie) en §8.5 (MFA)
+  zijn toegangsbeheer; de keywords stopten bij "toegangsrechten" en "autorisatie".
+
+Bewust *niet* opgelost: §8.7 (afwijkende procesuitvoer) en §5.5 (meldplicht autoriteiten) blijven
+`Overig`. Daar een thema voor verzinnen om het blokkenaantal te drukken zou het cijfer verbeteren
+en de memo verslechteren.
+
 ### Fixed — 2026-08-26 — het review-antwoord werd afgekapt
 
 Negen van de veertien storingen in de run van 22:38 waren "Unterminated string" en verwante
