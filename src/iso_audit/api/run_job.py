@@ -179,7 +179,7 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
     """
     import sqlite3
 
-    from iso_audit.classification.clause_mapping import laad_clause_map
+    from iso_audit.classification.clause_mapping import laad_clause_map, titel_voor
     from iso_audit.classification.thema import bepaal_thema
     from iso_audit.store import verbinding
 
@@ -195,7 +195,14 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
     findings: list[Finding] = []
     for r in rows:
         clausule = r["clausule_id"]
-        titel = titels.get(clausule, {}).get("titel", clausule)
+        # De titel van de norm van de bevinding, niet die van de samenvoeging: §7.5 is in 9001
+        # "Gedocumenteerde informatie" en in 27001 "Bescherming tegen fysieke en
+        # omgevingsbedreigingen", en de samenvoeging zet 27001 bovenaan.
+        rij_norm = str(r["norm"] or "")
+        if rij_norm in ("9001", "27001"):
+            titel = titel_voor(clausule, rij_norm)
+        else:
+            titel = titels.get(clausule, {}).get("titel", clausule)
         herkomst = r["herkomst"] or ""
         doc_id = r["doc_id"] or ""
         beschrijving = r["beschrijving"] or r["onderbouwing"] or "(geen beschrijving)"

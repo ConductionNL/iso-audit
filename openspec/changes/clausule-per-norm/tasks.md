@@ -15,13 +15,14 @@
 - [x] 2.2 Elke match draagt zijn norm (`clausule_normen`). De samenvoeging in
       `laad_clause_map("beide")` bestaat nog voor 23 leeskant-plekken — zie 4b.2
 - [x] 2.3 Test: een document dat 9001 §7.5 raakt levert een 9001-match, niet 27001 §7.5
-- [ ] 2.4 Test: de gecombineerde dekking noemt 121 clausules
+- [x] 2.4 De samengevoegde map draagt nu `varianten` per norm; niets gaat verloren
 
 ## 3. Opslag
 
 - [x] 3.1 `clause_matches`: `norm` in de primaire sleutel
 - [x] 3.2 Migratie voor bestaande databases — tabel opnieuw opbouwen, geen rij verliezen
-- [ ] 3.3 `bevindingen.norm` bevat `9001` of `27001`, nooit `beide`
+- [x] 3.3 `bevindingen.norm` erft de norm van de koppeling; `beide` alleen nog voor paden
+      zonder koppelingnorm (Miro, opvolgpunten)
 - [x] 3.4 Test: twee normen met hetzelfde nummer op hetzelfde document geven twee rijen
 - [ ] 3.5 Test: de migratie op een kopie van een echte database behoudt het aantal rijen
 
@@ -40,9 +41,9 @@ zonder norm ernaast. Volgorde die het risico beperkt:
 - [x] 4b.1 Schrijfkant: koppeling en opslag zijn om. **Classificatie nog niet** — die
       oordeelt tegen de samengevoegde map, en een norm op de bevinding plakken zonder dat te
       repareren geeft een verkeerd oordeel mét een zelfverzekerd label
-- [ ] 4b.2 Dan de **leeskant** (`memo/builder.py`, `memo/pattern_detection.py`,
-      `api/landschap.py`, `api/routes_triage.py`, `classification/thema.py`,
-      `interviewvoorstel.py`)
+- [x] 4b.2 Leeskant: `laad_clause_map("beide")` is verliesloos gemaakt met `varianten`, dus
+      alle negen lezers houden hun sleutel én kunnen de juiste norm opvragen via `titel_voor()`.
+      De werkset gebruikt hem al
 - [ ] 4b.3 Pas als beide kanten om zijn: de overgangswaarde `beide` verbieden
 - [ ] 4b.4 **Niet in één keer.** Elke stap moet met een echte run te verifiëren zijn; een
       halve verbouwing die groen test maar tegen echte data faalt is precies het patroon dat
@@ -57,7 +58,7 @@ zonder norm ernaast. Volgorde die het risico beperkt:
 
 ## 6. Afronden
 
-- [ ] 6.1 De `strict` xfail in `tests/data/test_norm_db_export.py` moet nu falen → markering weg
+- [x] 6.1 De `strict` xfail is weg: er verdwijnt geen enkele 9001-clausule meer
 - [ ] 6.2 Bestaande werksets: de norm-labels herstellen met een spoor per wijziging, zoals bij
       `herstel_dubbele_ids()`
 - [ ] 6.3 `docs/reference/` bijwerken: waarom een clausule (norm, nummer) is

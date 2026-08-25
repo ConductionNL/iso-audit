@@ -57,10 +57,9 @@ def laad_clause_map(norm: str) -> dict[str, Any]:
         map_9001 = _laad_bestand("clause_map_9001.yaml")
         map_27001 = _laad_bestand("clause_map_27001.yaml")
         samengevoegd = dict(map_9001)
-        samengevoegd["clausules"] = {
-            **map_9001.get("clausules", {}),
-            **map_27001.get("clausules", {}),
-        }
+        samengevoegd["clausules"] = _voeg_samen(
+            map_9001.get("clausules", {}), map_27001.get("clausules", {})
+        )
         samengevoegd["norm"] = "ISO 9001:2015 + ISO 27001:2022"
         return samengevoegd
     if norm not in ("9001", "27001"):
@@ -76,6 +75,48 @@ def _laad_bestand(bestandsnaam: str) -> dict[str, Any]:
     with res.open("r", encoding="utf-8") as f:
         data: dict[str, Any] = yaml.safe_load(f)
     return data
+
+
+def _voeg_samen(map_9001: dict[str, Any], map_27001: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Voeg de twee clause-maps samen zonder iets te verliezen.
+
+    De sleutel blijft het clausulenummer: negen modules gebruiken deze map en een andere sleutel
+    breekt ze allemaal. Wat erbij komt is `varianten` — per norm de eigen ingang.
+
+    Tot 2026-08-25 was dit `{**map_9001, **map_27001}`, en achttien nummers bestaan in beide
+    normen. Daar won 27001, met 103 ingangen waar er 121 horen: in een gecombineerde audit
+    bestonden die 18 ISO 9001-clausules niet meer, en werden ze dus nooit getoetst. §7.5 was
+    "Bescherming tegen fysieke en omgevingsbedreigingen" in plaats van "Gedocumenteerde
+    informatie".
+
+    De top-level waarden blijven zoals ze waren (27001 wint bij een botsing) zodat bestaande
+    aanroepers niets merken; wie de norm kent gebruikt `titel_voor()`.
+    """
+    samen: dict[str, dict[str, Any]] = {}
+    for norm, bron in (("9001", map_9001), ("27001", map_27001)):
+        for clausule_id, gegevens in bron.items():
+            ingang = samen.setdefault(clausule_id, {"varianten": {}})
+            ingang["varianten"][norm] = gegevens
+            # 27001 als laatste, dus die overschrijft — zoals de oude samenvoeging deed.
+            ingang.update({k: v for k, v in gegevens.items() if k != "varianten"})
+    return samen
+
+
+def titel_voor(clausule: str, norm: str) -> str:
+    """De titel van een clausule binnen één norm.
+
+    Voor aanroepers die de norm kennen — sinds 2026-08-25 is dat elke bevinding. Zonder deze
+    functie zou een 9001-bevinding op §7.5 de 27001-titel tonen, want dat is degene die de
+    samenvoeging bovenaan zet.
+
+    Valt terug op het nummer zelf: een lege titel in een rapport leest als een ontbrekende
+    clausule, het nummer laat zien dat hij er is maar geen titel heeft.
+    """
+    clausules = laad_clause_map(norm if norm in ("9001", "27001") else "beide").get("clausules", {})
+    ingang = clausules.get(clausule) or {}
+    variant = (ingang.get("varianten") or {}).get(norm) or ingang
+    titel = variant.get("titel") or ""
+    return str(titel) if titel else clausule
 
 
 def koppel_documenten(

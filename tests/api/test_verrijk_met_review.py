@@ -83,3 +83,16 @@ def test_bestaande_acties_worden_niet_overschreven() -> None:
     f.actions = [ActionRow(wat="Door de auditor ingevuld", wie="MT")]
     verrijkt = verrijk_met_review([f], conn)
     assert verrijkt[0].actions[0].wat == "Door de auditor ingevuld"
+
+
+def test_de_titel_volgt_de_norm_van_de_bevinding() -> None:
+    """§7.5 heet in 9001 iets anders dan in 27001; de auditor ziet de titel in de werkset.
+
+    Zonder deze koppeling toont een 9001-bevinding de 27001-titel, want dat is degene die de
+    samengevoegde map bovenaan zet. Dan staat er "Bescherming tegen fysieke en
+    omgevingsbedreigingen" boven een bevinding over documentbeheer.
+    """
+    from iso_audit.classification.clause_mapping import titel_voor
+
+    assert titel_voor("7.5", "9001") != titel_voor("7.5", "27001")
+    assert "informatie" in titel_voor("7.5", "9001").lower()

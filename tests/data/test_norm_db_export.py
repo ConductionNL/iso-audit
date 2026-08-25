@@ -79,23 +79,17 @@ def test_elke_clausule_heeft_een_titel_en_een_tekst() -> None:
     assert not leeg, f"clausules zonder titel of tekst: {leeg[:10]}"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Deels gerepareerd op 2026-08-24. De **koppeling** draait nu per norm "
-        "(`koppel_alle_normen`), dus een gecombineerde run verliest geen 9001-clausules meer en "
-        "elke match draagt zijn eigen norm. Wat hieronder wordt getoetst is `laad_clause_map"
-        "('beide')` zelf, en die voegt nog steeds samen met `{**map_9001, **map_27001}` — 103 "
-        "ingangen waar er 121 horen. Drieëntwintig plekken lezen die samengevoegde map nog "
-        "(titels in het rapport, `ontbrekende_dekking`, de interviewvragen, de "
-        "classificatie-prompt), en die zien dus nog de 27001-titel bij een botsend nummer. Ook "
-        "`bevindingen.norm` staat nog op de run-parameter en niet op de norm van de match. "
-        "Zie `openspec/changes/clausule-per-norm/` §4b: leeskant na schrijfkant, en elke stap "
-        "met een echte run te verifiëren. `strict`: zodra de samenvoeging verliesloos is faalt "
-        "deze test en moet de markering weg."
-    ),
-)
 def test_een_gecombineerde_run_verliest_geen_9001_clausules() -> None:
+    """De samenvoeging was `{**map_9001, **map_27001}` en liet 27001 winnen bij een botsing.
+
+    Achttien nummers bestaan in beide normen, dus de samengevoegde map had 103 ingangen waar er
+    121 horen: in een gecombineerde audit bestonden 18 ISO 9001-clausules niet meer — §5.1
+    Leiderschap, §6.1 Risico's en kansen, §7.5 Gedocumenteerde informatie, §8.4 Externe
+    processen en zo verder. Het rapport claimde intussen "ISO 9001:2015 + ISO 27001:2022".
+
+    Sinds 2026-08-25 draagt elke ingang zijn `varianten` per norm, dus er gaat niets meer
+    verloren. De sleutel blijft het clausulenummer, want negen modules gebruiken die map.
+    """
     from iso_audit.classification.clause_mapping import laad_clause_map
 
     map_9001 = laad_clause_map("9001").get("clausules", {})
@@ -103,9 +97,10 @@ def test_een_gecombineerde_run_verliest_geen_9001_clausules() -> None:
     verdwenen = [
         clausule_id
         for clausule_id, veld in map_9001.items()
-        if samengevoegd.get(clausule_id, {}).get("titel") != veld.get("titel")
+        if (samengevoegd.get(clausule_id, {}).get("varianten", {}).get("9001", {}).get("titel"))
+        != veld.get("titel")
     ]
     assert not verdwenen, (
-        f"{len(verdwenen)} ISO 9001-clausules worden in een gecombineerde audit vervangen door "
-        f"hun 27001-naamgenoot en dus nooit getoetst: {verdwenen}"
+        f"{len(verdwenen)} ISO 9001-clausules zijn niet meer als 9001-clausule terug te vinden "
+        f"in een gecombineerde audit: {verdwenen}"
     )

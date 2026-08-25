@@ -6,6 +6,25 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-25 — de samengevoegde clause-map verliest niets meer
+
+`laad_clause_map("beide")` deed `{**map_9001, **map_27001}`. Achttien clausulenummers bestaan in
+beide normen en daar won 27001: **103 ingangen waar er 121 horen**. In een gecombineerde audit
+bestonden die 18 ISO 9001-clausules niet meer — §5.1 Leiderschap, §6.1 Risico's en kansen,
+§7.5 Gedocumenteerde informatie, §8.4 Externe processen — terwijl het rapport op pagina 1
+"ISO 9001:2015 + ISO 27001:2022" claimde.
+
+De sleutel blijft het clausulenummer: negen modules gebruiken deze map, en een andere sleutel
+breekt ze allemaal. Wat erbij komt is **`varianten`**, per norm de eigen ingang. De top-level
+waarden blijven zoals ze waren, dus bestaande aanroepers merken niets; wie de norm kent gebruikt
+`titel_voor(clausule, norm)`.
+
+De werkset doet dat al: een bevinding op 9001 §7.5 toont nu "Gedocumenteerde informatie" en niet
+"Bescherming tegen fysieke en omgevingsbedreigingen".
+
+**De `strict` xfail is weg.** Die pinde dit gat vast sinds 2026-08-24; er verdwijnt geen enkele
+9001-clausule meer.
+
 ### Fixed — 2026-08-25 — een bevinding erft de norm van zijn koppeling
 
 `clause_matches` wist sinds de per-norm-koppeling precies uit welke norm een match komt — 3.067
