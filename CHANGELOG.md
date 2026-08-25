@@ -6,6 +6,19 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — de review is aan te zetten in het portaal
+
+Een modus die alleen via een env-var of de opdrachtregel aan te zetten is, is voor de auditor
+niet aan te zetten — en die is degene die beslist of het de tokens waard is. In het runscherm
+staat nu een vinkje **Autonome review** plus een veld voor de steekproef ("alleen de zwaarste N
+clausules, 0 = alle"). Het vinkje meldt in zijn tooltip dat het tokens kost; een schakelaar
+zonder prijskaartje wordt aangezet zonder afweging.
+
+Het portaal stuurt `review: true|false` mee en overstemt daarmee `ISO_AUDIT_REVIEW` — dat is een
+mens die op Start klikt, en dan hoort een cron-instelling niet te bepalen wat er gebeurt. De
+API houdt wél drie standen (`null` = de omgeving beslist), zodat de env-var-fallback voor
+cron-runs blijft werken.
+
 ### Added — 2026-08-25 — incrementele ingest: een ongewijzigd document wordt niet opnieuw opgehaald
 
 Gemeten op 2026-08-24: het dure deel — de modelaanroepen — werd al volledig hergebruikt (0 calls

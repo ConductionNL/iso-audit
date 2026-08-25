@@ -59,6 +59,14 @@ class RunStartRequest(BaseModel):
     chapter: str | None = None
     top_n: int = 0
     pace: float = 0.05
+    review: bool | None = None
+    """Autonome review aan (`true`), uit (`false`) of de omgeving laten beslissen (`null`).
+
+    Drie standen en geen boolean met een default: `false` als standaard zou betekenen dat het
+    portaal `ISO_AUDIT_REVIEW` altijd overstemt, en dan is de env-var-fallback voor cron zinloos.
+    Zie `classification/review.ReviewInstelling`."""
+    review_steekproef: int = 0
+    """Beoordeel alleen de N zwaarste clausules; 0 is alles."""
 
 
 def maak_router(audits: Audits) -> APIRouter:
@@ -165,6 +173,8 @@ def maak_router(audits: Audits) -> APIRouter:
                 chapter=r.chapter,
                 top_n=r.top_n,
                 pace_s=r.pace,
+                review=r.review,
+                review_steekproef=r.review_steekproef,
                 run_id=run_id,
             )
         except RunLooptError as exc:

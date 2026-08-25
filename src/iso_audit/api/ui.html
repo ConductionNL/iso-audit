@@ -210,6 +210,14 @@
     <div style="margin-top:.6rem">
       <label>Chapter-filter: <input id="chapter" placeholder="bv. 8 · leeg = alles" style="width:140px"></label>
       &nbsp; <label><input type="checkbox" id="live-mode"> Live run (echte pipeline + LLM)</label>
+      <br>
+      <label title="Per clausule een tweede oordeel op een zwaarder model. Kost tokens.">
+        <input type="checkbox" id="review-mode"> Autonome review
+      </label>
+      &nbsp; <label>alleen de zwaarste
+        <input id="review-steekproef" type="number" min="0" step="1" value="0" style="width:64px">
+        clausules <span class="note">(0 = alle)</span>
+      </label>
       <br><br><button onclick="startRun()">Start run</button>
     </div>
     <div id="bar-wrap" hidden><div id="bar"></div></div>
@@ -1076,7 +1084,12 @@ async function startRun(){
   const chapter = document.getElementById("chapter").value.trim() || null;
   const r = await fetch(A("/run/start"),{method:"POST",headers:{"Content-Type":"application/json"},
     // Géén norm meesturen: die hoort bij de audit en komt uit het manifest.
-    body:JSON.stringify({mode:live?"live":"sim",sources:cfg.sources,chapter})});
+    // `review` is drie standen: aangevinkt = true, niet aangevinkt = false. Het portaal is
+    // een expliciete keuze van een mens, dus die overstemt ISO_AUDIT_REVIEW — anders zou een
+    // cron-instelling bepalen wat er gebeurt als iemand hier op Start klikt.
+    body:JSON.stringify({mode:live?"live":"sim",sources:cfg.sources,chapter,
+      review:document.getElementById("review-mode").checked,
+      review_steekproef:parseInt(document.getElementById("review-steekproef").value||"0",10)})});
   if(!r.ok){
     const d = await r.json().catch(()=>({detail:"onbekende fout"}));
     const prog=document.getElementById("run-progress"); prog.hidden=false;

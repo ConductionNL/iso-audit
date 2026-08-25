@@ -188,6 +188,8 @@ def run_live_pipeline(
     chapter: str | None,
     on_log: Callable[[str], None],
     alleen_ingest: bool = False,
+    review: bool | None = None,
+    review_steekproef: int = 0,
 ) -> RunUitkomst:
     """Draai de echte audit-pipeline met opgevangen voortgang (geen review-prompt).
 
@@ -251,6 +253,8 @@ def run_live_pipeline(
             mode=AutonoomMode(conn=conn),
             sources=sources,
             alleen_ingest=alleen_ingest,
+            review=review,
+            review_steekproef=review_steekproef,
             op_kosten=_bewaar_kosten,
             op_dekking=_bewaar_dekking,
         )

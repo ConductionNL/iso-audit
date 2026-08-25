@@ -352,6 +352,8 @@ class AuditSession:
         chapter: str | None = None,
         top_n: int = 0,
         pace_s: float = 0.05,
+        review: bool | None = None,
+        review_steekproef: int = 0,
         run_id: str | None = None,
     ) -> dict[str, object]:
         """Stap 2: start de run. ``mode='live'`` = echte pipeline (Drive+LLM);
@@ -377,7 +379,7 @@ class AuditSession:
             self._run = _RunState(status="running", total=7, start=time.monotonic(), mode="live")
             threading.Thread(
                 target=self._run_live_worker,
-                args=(norm, gekozen, chapter, top_n, run_id),
+                args=(norm, gekozen, chapter, top_n, run_id, review, review_steekproef),
                 daemon=True,
             ).start()
             return {"mode": "live", "status": "running"}
@@ -412,6 +414,8 @@ class AuditSession:
         chapter: str | None,
         top_n: int,
         run_id: str | None = None,
+        review: bool | None = None,
+        review_steekproef: int = 0,
     ) -> None:
         from iso_audit.api.run_job import draft_from_db, run_live_pipeline
         from iso_audit.api.runs import afsluiten
@@ -429,6 +433,8 @@ class AuditSession:
                 sources=sources,
                 chapter=chapter,
                 on_log=_on_log,
+                review=review,
+                review_steekproef=review_steekproef,
             )
             self._run.log.append("Findings exporteren + kop-NC's draften…")
             drafted = draft_from_db(
