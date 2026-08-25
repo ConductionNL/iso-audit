@@ -6,6 +6,26 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — NC's bundelen tot thema-blokken
+
+De run van 2026-08-25 leverde 91 bevestigde NC's op. Eén blok per bevinding maakt daar 91 blokken
+van; het handgemaakte Q2-memo had er **twee**, elk met drie bevindingen over drie clausules
+("NC 1 — Bedrijfscontinuïteit & redundantie": §8.14, §5.29, §5.30).
+
+`groepeer_ncs()` bundelt op **thema** en niet op clausule — het Q2-memo bundelt juist over
+clausules heen, want daar laat één gebrek zich in meerdere eisen zien. Het thema stond al op elke
+bevinding; de review levert de kernzin die het blok zijn synthese geeft.
+
+Er valt geen bewijs weg: elke bevinding blijft zichtbaar onder zijn blok met zijn eigen bron. Een
+managementmemo die niet terug te voeren is op documenten, is een mening.
+
+**"Overig" krijgt geen verzamelblok.** Dat is geen thema maar het ontbreken ervan — 25% van de
+bevindingen viel erin op 2026-08-24 — en ze als één NC presenteren zou suggereren dat ze één
+gebrek delen. Elk krijgt zijn eigen blok.
+
+Grootste thema eerst: daar ligt het meeste bewijs, en een lezer die na één blok stopt heeft dan
+het zwaarste gezien.
+
 ### Added — 2026-08-25 — de review vult de actietabel van de memo
 
 Het handgemaakte Q2-memo heeft per NC een tabel **Wat | Wie | Waar | Uiterlijk**. Die velden
