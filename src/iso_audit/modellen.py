@@ -41,6 +41,24 @@ STANDAARD = HAIKU_4_5
 de rapportgeneratie. Bewust het goedkoopste: die drie paden schrijven tekst op basis
 van al-geclassificeerde bevindingen en vellen geen oordeel over bewijs."""
 
+REVIEW_STANDAARD = SONNET_5
+"""Het model voor de autonome review — bewust zwaarder dan de classificatie.
+
+De classificatie draait over honderden documenten en is daarom op het goedkoopste model; de
+review draait over tientallen clausules en bereidt een oordeel voor dat een auditor overneemt.
+Daar wegen de tokens niet op tegen een verkeerd voorbereid oordeel.
+
+Instelbaar via `ISO_AUDIT_REVIEW_MODEL`; met de env-var wint de omgeving, met de vlag de
+opdrachtregel — zelfde volgorde als bij de schakelaar zelf."""
+
+REVIEW_ENV_VAR = "ISO_AUDIT_REVIEW_MODEL"
+
+
+def review_model() -> str:
+    """Het model voor de review, of `REVIEW_STANDAARD` als er niets is gezet."""
+    return os.environ.get(REVIEW_ENV_VAR) or REVIEW_STANDAARD
+
+
 KIESBAAR: tuple[str, ...] = (HAIKU_4_5, SONNET_5, OPUS_5)
 """Wat een auditor in de UI kan kiezen voor de **classificatie**, van goedkoop naar
 duur. Elk model hier MOET een prijsregel hebben in `classification/findings.py`;

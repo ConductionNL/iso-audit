@@ -23,9 +23,29 @@ import pytest
 PROMPTMAP = Path("src/iso_audit/classification/prompts")
 
 
+# Prompts die een document tegen de norm classificeren. De review-prompt hoort hier niet bij:
+# die definieert geen NC of OFI maar weegt bevindingen die er al zijn, en heeft daarom een eigen
+# gate (`test_review_prompt.py`). Expliciet opgesomd zodat een nieuwe classificatie-prompt niet
+# stil buiten deze controles valt — `test_elke_prompt_is_ingedeeld` bewaakt dat.
+_CLASSIFICATIE = ("v2-scherp.md", "v2-genuanceerd.md", "v2-miro.md")
+_OVERIG = ("README.md", "v2-review.md")
+
+
 def _promptbestanden() -> list[Path]:
-    """De prompts zelf; `README.md` beschrijft de map en is er geen."""
-    return sorted(p for p in PROMPTMAP.glob("*.md") if p.name != "README.md")
+    """De classificatie-prompts."""
+    return sorted(PROMPTMAP / naam for naam in _CLASSIFICATIE)
+
+
+def test_elke_prompt_is_ingedeeld() -> None:
+    """Elk bestand in de map is óf een classificatie-prompt óf expliciet uitgezonderd.
+
+    Zonder deze controle valt een nieuwe prompt stil buiten de definitie-gates, en dan is de
+    NC-definitie weer een belofte in plaats van een test.
+    """
+    aanwezig = {p.name for p in PROMPTMAP.glob("*.md")}
+    ingedeeld = set(_CLASSIFICATIE) | set(_OVERIG)
+    assert aanwezig <= ingedeeld, f"niet ingedeeld: {sorted(aanwezig - ingedeeld)}"
+    assert set(_CLASSIFICATIE) <= aanwezig, f"ontbreekt: {sorted(set(_CLASSIFICATIE) - aanwezig)}"
 
 
 def test_de_promptmap_bestaat_en_is_gevuld() -> None:
@@ -41,8 +61,8 @@ def test_de_prompts_staan_niet_meer_hardgecodeerd() -> None:
     waar het oordeel valt.
     """
     bron = Path("src/iso_audit/classification/findings.py").read_text(encoding="utf-8")
-    assert "_SYSTEM_SCHERP = \"\"\"" not in bron
-    assert "_SYSTEM_GENUANCEERD = \"\"\"" not in bron
+    assert '_SYSTEM_SCHERP = """' not in bron
+    assert '_SYSTEM_GENUANCEERD = """' not in bron
 
 
 @pytest.mark.parametrize("bestand", _promptbestanden(), ids=lambda p: p.name)
@@ -118,7 +138,9 @@ def test_geen_oordeel_is_een_geldige_uitkomst(bestand: Path) -> None:
     oordeel. Dat is de mechaniek achter 6,8 bevindingen per document.
     """
     tekst = bestand.read_text(encoding="utf-8").lower()
-    assert "null" in tekst, f"{bestand.name} biedt geen uitweg voor 'hier valt niets over te zeggen'"
+    assert "null" in tekst, (
+        f"{bestand.name} biedt geen uitweg voor 'hier valt niets over te zeggen'"
+    )
 
 
 @pytest.mark.parametrize("bestand", _promptbestanden(), ids=lambda p: p.name)

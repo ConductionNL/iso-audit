@@ -21,8 +21,10 @@ draagt; een agent die een status zet maakt van beoordelen bevestigen.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
@@ -142,3 +144,260 @@ def groepeer_per_clausule(bevindingen: list[dict[str, Any]]) -> list[Clausulegro
 
     groepen = [g for g in per_sleutel.values() if g.bevindingen]
     return sorted(groepen, key=lambda g: (GEWICHT.get(g.zwaarste, 9), g.norm, g.clausule))
+
+
+ADVIEZEN = frozenset({"bevestigen", "verlagen", "samenvoegen", "onvoldoende_bewijs"})
+KLASSEN = frozenset({"NC", "OFI", "positief"})
+
+_CODEBLOK = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
+
+
+class ReviewFoutError(Exception):
+    """Het antwoord van de review is onbruikbaar.
+
+    Bewust een storing en geen stil genegeerd advies: dat de review iets onbruikbaars teruggaf,
+    is zelf een gegeven over de review — en zonder die melding lijkt "geen advies" hetzelfde als
+    "niets aan de hand".
+    """
+
+
+@dataclass(frozen=True)
+class Advies:
+    """Wat de review over één clausule vindt. Een voorstel, geen besluit."""
+
+    advies: str
+    voorgestelde_klasse: str | None
+    ernst: str | None
+    kern: str
+    reden: str
+    zonder_inhoud: int
+
+
+def _json_uit(tekst: str) -> dict[str, Any]:
+    """Lees JSON, ook als er een codeblok omheen staat.
+
+    Tolerant voor de vorm, streng op de inhoud — dezelfde regel als bij de Bronbevrager, waar
+    dat drie iteraties kostte omdat het model zijn verwijzingen anders opschreef dan verwacht.
+    """
+    kandidaat = tekst.strip()
+    blok = _CODEBLOK.search(kandidaat)
+    if blok:
+        kandidaat = blok.group(1).strip()
+    try:
+        gegevens = json.loads(kandidaat)
+    except json.JSONDecodeError as fout:
+        raise ReviewFoutError(f"antwoord is geen geldige JSON: {fout}") from fout
+    if not isinstance(gegevens, dict):
+        raise ReviewFoutError(f"antwoord is geen object maar {type(gegevens).__name__}")
+    return gegevens
+
+
+def lees_advies(ruw: str, groep: Clausulegroep) -> Advies:
+    """Controleer en lees het antwoord van de review.
+
+    Drie controles, elk met een reden uit de praktijk van 2026-08-24:
+
+    - **Het advies moet een van de vier zijn.** Een vijfde waarde levert een regel op die geen
+      enkel scherm kent; de classificatie gaf die dag twee keer de string `'null'` terug.
+    - **De reden moet naar een meegegeven document verwijzen.** Zonder verwijzing is het advies
+      niet na te trekken, en een verzonnen documentnaam is erger dan geen.
+    - **De kernzin mag niet leeg zijn.** Die gaat naar de managementmemo; leeg betekent dat de
+      memo niets te melden heeft over een clausule die wél aandacht kreeg.
+    """
+    gegevens = _json_uit(ruw)
+
+    advies = str(gegevens.get("advies") or "").strip().lower()
+    if advies not in ADVIEZEN:
+        raise ReviewFoutError(f"onbekend advies {advies!r}; verwacht een van {sorted(ADVIEZEN)}")
+
+    klasse = gegevens.get("voorgestelde_klasse")
+    if klasse is not None and str(klasse) not in KLASSEN:
+        raise ReviewFoutError(f"onbekende klasse {klasse!r}; verwacht een van {sorted(KLASSEN)}")
+
+    kern = str(gegevens.get("kern") or "").strip()
+    if not kern:
+        raise ReviewFoutError("kern ontbreekt; die zin gaat naar de memo")
+
+    reden = str(gegevens.get("reden") or "").strip()
+    namen = {str(b.get("document_naam") or "") for b in groep.bevindingen}
+    if not any(naam and naam in reden for naam in namen):
+        raise ReviewFoutError(
+            "de reden verwijst niet naar een meegegeven document; zonder verwijzing is het "
+            "advies niet na te trekken"
+        )
+
+    return Advies(
+        advies=advies,
+        voorgestelde_klasse=str(klasse) if klasse is not None else None,
+        ernst=str(gegevens["ernst"]) if gegevens.get("ernst") else None,
+        kern=kern,
+        reden=reden,
+        zonder_inhoud=int(gegevens.get("zonder_inhoud") or 0),
+    )
+
+
+MAX_BEVINDINGEN_PER_GROEP = 25
+"""Hoeveel bevindingen er per clausule aan het model meegaan.
+
+Clausule 10.2 had er 27 op 2026-08-24, en dat is de uitschieter. Afkappen is beter dan een
+prompt die met de dataset meegroeit, maar het moet **gemeld** worden: een lijst die stil op 25
+stopt leest als "dit is alles" — dezelfde regel als bij de Bronbevrager, die zijn afkapping in
+het antwoord én in de trail zet."""
+
+
+def bouw_reviewvraag(groep: Clausulegroep, normtekst: str = "") -> tuple[str, int]:
+    """De gebruikersprompt voor één clausule. Geeft ook terug hoeveel er is afgekapt."""
+    meegegeven = groep.bevindingen[:MAX_BEVINDINGEN_PER_GROEP]
+    afgekapt = len(groep.bevindingen) - len(meegegeven)
+    regels = [
+        f"Clausule: {groep.norm} §{groep.clausule}",
+        f"Bevindingen: {len(groep.bevindingen)} over {groep.documenten} document(en).",
+    ]
+    if normtekst:
+        regels.append(f"Normtekst: {normtekst}")
+    if afgekapt:
+        regels.append(
+            f"LET OP: {afgekapt} bevinding(en) zijn niet meegestuurd wegens de bovengrens van "
+            f"{MAX_BEVINDINGEN_PER_GROEP}. Je oordeel gaat over wat je hier ziet."
+        )
+    regels.append("")
+    for bev in meegegeven:
+        regels.append(
+            f"- [{bev.get('classificatie')}] {bev.get('document_naam')}: "
+            f"{(bev.get('beschrijving') or '(geen beschrijving)')} "
+            f"| onderbouwing: {(bev.get('onderbouwing') or '(geen)')}"
+        )
+    return "\n".join(regels), afgekapt
+
+
+def _systeemprompt() -> str:
+    from importlib.resources import files
+
+    return (files("iso_audit.classification.prompts") / "v2-review.md").read_text(encoding="utf-8")
+
+
+def beoordeel(
+    groepen: list[Clausulegroep],
+    *,
+    instelling: ReviewInstelling,
+    model: str,
+    steekproef: int = 0,
+    client: Any | None = None,
+    conn: Any | None = None,
+    door: str = "",
+    normtekst_voor: Any | None = None,
+) -> list[tuple[Clausulegroep, Advies | None, str | None]]:
+    """Beoordeel clausulegroepen; geeft per groep `(groep, advies, storing)`.
+
+    Draait alleen als de instelling aan staat — de schakelaar zit vóór de aanroep, niet erna.
+
+    `steekproef` kapt af op de eerste N groepen. Die staan op zwaarte gesorteerd, dus een
+    steekproef bekijkt de clausules met een NC eerst. Bedoeld om te meten wat de review eruit
+    haalt vóórdat er zeventig groepen op een zwaar model doorheen gaan: 67 groepen op Opus is
+    een uitgave die je één keer met de juiste prompt wil doen, niet een experiment dat tegelijk
+    de rekening is.
+
+    Een storing op één groep stopt de rest niet, maar wordt wel vastgelegd. Dat een groep geen
+    advies opleverde is zelf een gegeven; zonder die melding lijkt het op "niets aan de hand".
+    """
+    if not instelling.mag_model_aanroepen():
+        logger.info("Autonome review staat uit (%s); geen enkele aanroep", instelling.herkomst)
+        return []
+
+    import anthropic
+
+    from iso_audit.classification.findings import _vraag_model, prijs_voor
+    from iso_audit.classification.respons import GEEN_THINKING, tekst_uit
+
+    te_doen = groepen[:steekproef] if steekproef else groepen
+    if steekproef and len(groepen) > steekproef:
+        logger.info(
+            "Steekproef: %d van %d clausulegroepen (zwaarste eerst); %d niet beoordeeld",
+            len(te_doen),
+            len(groepen),
+            len(groepen) - len(te_doen),
+        )
+
+    systeem = _systeemprompt()
+    aanroeper = client or anthropic.Anthropic()
+    tarief = prijs_voor(model)
+    uitkomsten: list[tuple[Clausulegroep, Advies | None, str | None]] = []
+
+    for groep in te_doen:
+        normtekst = normtekst_voor(groep) if normtekst_voor else ""
+        vraag, afgekapt = bouw_reviewvraag(groep, normtekst)
+        storing: str | None = None
+        advies: Advies | None = None
+        usd = 0.0
+        ruw = ""
+        try:
+            resp = _vraag_model(
+                aanroeper,
+                model=model,
+                max_tokens=1200,
+                system=systeem,
+                messages=[{"role": "user", "content": vraag}],
+                thinking=GEEN_THINKING,
+            )
+            ruw = tekst_uit(resp)
+            if tarief:
+                gebruik = getattr(resp, "usage", None)
+                invoer = getattr(gebruik, "input_tokens", 0) or 0
+                uitvoer = getattr(gebruik, "output_tokens", 0) or 0
+                usd = invoer / 1e6 * tarief["input"] + uitvoer / 1e6 * tarief["output"]
+            advies = lees_advies(ruw, groep)
+        except ReviewFoutError as fout:
+            storing = f"ReviewFoutError: {fout}"
+        except Exception as fout:
+            storing = f"{type(fout).__name__}: {fout}"
+
+        if storing:
+            logger.warning("Review %s §%s: %s", groep.norm, groep.clausule, storing)
+        if conn is not None:
+            _leg_vast(conn, groep, vraag, ruw, advies, storing, model, usd, afgekapt, door)
+        uitkomsten.append((groep, advies, storing))
+
+    return uitkomsten
+
+
+def _leg_vast(
+    conn: Any,
+    groep: Clausulegroep,
+    vraag: str,
+    ruw: str,
+    advies: Advies | None,
+    storing: str | None,
+    model: str,
+    usd: float,
+    afgekapt: int,
+    door: str,
+) -> None:
+    """Elke aanroep in de append-only trail, storingen inbegrepen.
+
+    Zonder de storingen is niet vast te stellen wat de review zag toen zij iets beweerde — en op
+    2026-08-24 bleek dat een 500 op de assistent-route maandenlang geen spoor naliet.
+    """
+    from iso_audit.classification.findings import PRIJZEN_GRONDSLAG, PRIJZEN_PEILDATUM
+    from iso_audit.store import bewaar_assistentvraag
+
+    bewaar_assistentvraag(
+        conn,
+        agent="review",
+        record={
+            "vraag": vraag,
+            "antwoord": ruw,
+            "meegegeven": [
+                {"id": str(b.get("doc_id")), "naam": str(b.get("document_naam"))}
+                for b in groep.bevindingen
+            ],
+            "gebruikt": [advies.advies] if advies else [],
+            "model": model,
+            "usd": round(usd, 6),
+            "peildatum": PRIJZEN_PEILDATUM,
+            "grondslag": PRIJZEN_GRONDSLAG,
+            "clausule": f"{groep.norm} §{groep.clausule}",
+            "afgekapt": afgekapt,
+        },
+        storing=storing,
+        gesteld_door=door,
+    )

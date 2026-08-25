@@ -6,6 +6,44 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-25 — de autonome review draait, gemeten tegen het echte model
+
+De review is compleet: prompt, aanroep, verwijzingscontrole, trail, schakelaar en steekproef.
+
+**Steekproef van 12 clausulegroepen op de echte bevindingen** (347 bevindingen, 67 groepen):
+
+| model | bevestigen | verlagen | onvoldoende bewijs |
+|---|---|---|---|
+| Haiku 4.5 | 7 | 2 | 0 |
+| **Sonnet 5** | **5** | **6** | **1** |
+
+Sonnet is strenger, en op de juiste manier: §5.13 heeft één bevinding en krijgt
+`onvoldoende_bewijs` — uit één document volgt geen clausule-breed oordeel. De twee grootste
+stapels, §10.2 met 27 bevindingen en §4.1 met 20, worden allebei verlaagd naar OFI. Dat zijn
+precies de clausules waar het per-document-oordeel het hardst doorsloeg.
+
+Daarom staat de review standaard op **Sonnet** (`ISO_AUDIT_REVIEW_MODEL`) en niet op het
+classificatie-model: de classificatie draait over honderden documenten en is op het goedkoopste
+model, de review over tientallen clausules en bereidt een oordeel voor dat een auditor overneemt.
+
+**Drie standen op de opdrachtregel.** `--review`, `--geen-review`, of niets zeggen en de omgeving
+laten beslissen. Bewust geen `store_true`: die is altijd `False` als hij ontbreekt, en dan kan
+`ISO_AUDIT_REVIEW` nooit iets aanzetten en `--geen-review` de omgeving nooit overstemmen.
+
+**`--review-steekproef N`** beoordeelt alleen de N zwaarste clausules. De groepen staan op
+zwaarte, dus een steekproef pakt de NC's eerst. 67 groepen op een zwaar model is een uitgave die
+je één keer met de juiste prompt wil doen, niet een experiment dat tegelijk de rekening is.
+
+**Wat de review niet doet:** een status zetten, een bevinding sluiten, de werkset aanraken. Hij
+levert een advies met een reden die naar meegegeven documentnamen verwijst — een reden zonder
+verwijzing is een storing, niet een advies. Elke aanroep gaat met model, kosten, peildatum en
+grondslag in `assistent_vragen`, storingen inbegrepen; één mislukte groep stopt de rest niet, en
+een mislukte review breekt de run niet.
+
+**Afkappen wordt gemeld.** Maximaal 25 bevindingen per groep gaan mee (§10.2 had er 27), en het
+model krijgt te horen hoeveel het er niet ziet. Een lijst die stil op 25 stopt leest als "dit is
+alles".
+
 ### Added — 2026-08-25 — autonome review: per clausule oordelen, en aan of uit te zetten
 
 De classificatie oordeelt per document. 42 documenten die clausule 8.16 raken geven 42 oordelen

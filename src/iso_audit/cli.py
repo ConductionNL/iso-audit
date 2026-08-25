@@ -212,6 +212,8 @@ def _run_pipeline(args: argparse.Namespace) -> int:
         write_sheets=args.write_sheets,
         chapter=args.chapter,
         scherpte=args.scherpte,
+        review=args.review,
+        review_steekproef=args.review_steekproef,
         thema_llm=args.thema_llm,
         rehash=args.rehash,
         dry_run_cost=args.dry_run_cost,
@@ -349,6 +351,36 @@ def _voeg_pipeline_args_toe(parser: argparse.ArgumentParser) -> None:
         "--rehash",
         action="store_true",
         help="Ignoreer checkpoint en herclassificeer alles (UPSERT)",
+    )
+    # Aan/uit als drie standen: expliciet aan, expliciet uit, of niets zeggen en de
+    # omgeving laten beslissen. Een `store_true`-vlag kan dat derde niet — die is altijd
+    # False als hij ontbreekt, en dan kan een expliciete `--geen-review` de env-var niet
+    # overstemmen. Zie `classification/review.ReviewInstelling`.
+    review = parser.add_mutually_exclusive_group()
+    review.add_argument(
+        "--review",
+        dest="review",
+        action="store_const",
+        const=True,
+        help="Autonome review aan: per clausule een tweede oordeel op een zwaarder model",
+    )
+    review.add_argument(
+        "--geen-review",
+        dest="review",
+        action="store_const",
+        const=False,
+        help="Autonome review uit, ook als ISO_AUDIT_REVIEW aan staat",
+    )
+    parser.set_defaults(review=None)
+    parser.add_argument(
+        "--review-steekproef",
+        type=int,
+        default=0,
+        metavar="N",
+        help=(
+            "Beoordeel alleen de N zwaarste clausules — meet wat de review oplevert "
+            "vóór je alle clausules op een zwaar model zet"
+        ),
     )
     parser.add_argument(
         "--dry-run-cost",

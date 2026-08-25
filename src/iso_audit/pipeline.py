@@ -374,6 +374,8 @@ def run_audit(
     scherpte: float = 1.0,
     thema_llm: bool = False,
     rehash: bool = False,
+    review: bool | None = None,
+    review_steekproef: int = 0,
     dry_run_cost: bool = False,
     mode: Mode | None = None,
     audit_id: str | None = None,
@@ -541,8 +543,10 @@ def run_audit(
     # Per norm koppelen, niet op een samengevoegde map: `laad_clause_map("beide")` laat 27001
     # de 9001-ingang overschrijven bij een botsend nummer, en dan worden 18 van de 28 ISO
     # 9001-clausules in een gecombineerde audit nooit getoetst.
-    maps = {n: filter_clause_map(laad_clause_map(n), chapter) if chapter else laad_clause_map(n)
-            for n in normen_van(norm)}
+    maps = {
+        n: filter_clause_map(laad_clause_map(n), chapter) if chapter else laad_clause_map(n)
+        for n in normen_van(norm)
+    }
     gekoppeld_alle, niet_geclassificeerd = koppel_alle_normen(documenten, norm, maps)
     gearchiveerd = [d for d in gekoppeld_alle if (d.get("modified_at") or "") < cutoff]
     gekoppeld = [d for d in gekoppeld_alle if (d.get("modified_at") or "") >= cutoff]
@@ -636,6 +640,8 @@ def run_audit(
         rehash=rehash,
         op_kosten=op_kosten,
     )
+
+    _autonome_review(bevindingen, review=review, review_steekproef=review_steekproef)
 
     logger.info("Stap 6/7: Menselijke review...")
     bevestigde_bevindingen = review_en_bevestig(bevindingen, auto_accept=no_review)
@@ -767,6 +773,63 @@ def _converteer_md_naar_html_docx_pdf(md_pad: str) -> None:
         logger.info("PDF: %s", html_to_pdf(html_pad))
     except Exception as e:
         logger.warning("PDF-conversie mislukt: %s", e)
+
+
+def _autonome_review(
+    bevindingen: list[dict[str, Any]], *, review: bool | None, review_steekproef: int
+) -> None:
+    """Tweede zeef per clausule — alleen als de modus aan staat.
+
+    Deze stap zit **na** de classificatie en **vóór** de menselijke review: hij bereidt het
+    oordeel voor dat de auditor daarna neemt. Hij schrijft geen status en raakt de werkset niet;
+    zijn uitkomst gaat naar de trail, waar hij per clausule na te lezen is.
+
+    Best-effort zoals de andere niet-essentiële stappen: een mislukte review mag een run die
+    verder klopt niet ongeldig maken.
+    """
+    from iso_audit.classification.review import (
+        ReviewInstelling,
+        beoordeel,
+        groepeer_per_clausule,
+    )
+    from iso_audit.modellen import review_model
+
+    instelling = ReviewInstelling.bepaal(review)
+    if not instelling.aan:
+        logger.info("Autonome review staat uit (%s).", instelling.herkomst)
+        return
+
+    groepen = groepeer_per_clausule(bevindingen)
+    logger.info(
+        "Autonome review (%s): %d bevindingen -> %d clausulegroepen, model %s",
+        instelling.herkomst,
+        len(bevindingen),
+        len(groepen),
+        review_model(),
+    )
+    try:
+        from iso_audit.store import initialiseer, verbinding
+
+        conn = verbinding()
+        initialiseer(conn)
+        try:
+            uitkomsten = beoordeel(
+                groepen,
+                instelling=instelling,
+                model=review_model(),
+                steekproef=review_steekproef,
+                conn=conn,
+            )
+        finally:
+            conn.close()
+    except Exception as fout:
+        logger.warning("Autonome review mislukt (run gaat door): %s", fout)
+        return
+
+    from collections import Counter
+
+    adviezen = Counter(a.advies if a else "storing" for _, a, _ in uitkomsten)
+    logger.info("Review-adviezen: %s", dict(adviezen))
 
 
 def run_report_only(norm: str, scherpte: float = 1.0, thema_llm: bool = False) -> None:
