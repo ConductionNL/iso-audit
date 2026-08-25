@@ -161,6 +161,15 @@ class ReviewFoutError(Exception):
     """
 
 
+MAX_ANTWOORD_TOKENS = 2500
+"""Budget voor één review-antwoord.
+
+Stond op 1200 tot 2026-08-25, en dat was krap sinds de prompt ook om een actietabel vraagt: 18
+van de 37 storingen in die run waren afgekapte antwoorden ("Unterminated string"). Het budget
+staat op de langste variant — advies, klasse, ernst, kern, reden met documentnamen en drie
+acties — en niet op de gemiddelde. Bij een krap budget sneuvelt wat achteraan staat, en dat zijn
+juist de acties."""
+
 MAX_ACTIES = 4
 """Hoeveel acties er per clausule meegaan.
 
@@ -215,6 +224,14 @@ def _json_uit(tekst: str) -> dict[str, Any]:
     try:
         gegevens = json.loads(kandidaat)
     except json.JSONDecodeError as fout:
+        # Een antwoord dat als JSON begint maar niet afsluit, is afgekapt — niet onleesbaar.
+        # De melding "geen geldige JSON" stuurt je dan naar het model terwijl het budget de
+        # oorzaak is. Zelfde onderscheid als bij de classificatie sinds 2026-08-17.
+        if kandidaat.lstrip().startswith("{"):
+            raise ReviewFoutError(
+                f"antwoord is afgekapt na {len(kandidaat)} tekens; verhoog "
+                f"MAX_ANTWOORD_TOKENS (nu {MAX_ANTWOORD_TOKENS}). Ruwe fout: {fout}"
+            ) from fout
         raise ReviewFoutError(f"antwoord is geen geldige JSON: {fout}") from fout
     if not isinstance(gegevens, dict):
         raise ReviewFoutError(f"antwoord is geen object maar {type(gegevens).__name__}")
@@ -441,7 +458,7 @@ def beoordeel(
             resp = _vraag_model(
                 aanroeper,
                 model=model,
-                max_tokens=1200,
+                max_tokens=MAX_ANTWOORD_TOKENS,
                 system=systeem,
                 messages=[{"role": "user", "content": vraag}],
                 thinking=GEEN_THINKING,

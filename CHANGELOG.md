@@ -6,6 +6,39 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-26 — het review-antwoord werd afgekapt
+
+Negen van de veertien storingen in de run van 22:38 waren "Unterminated string" en verwante
+JSON-fouten. Dat was geen onleesbaar model maar een te krap budget: `max_tokens` stond nog op
+1200 terwijl de prompt sinds gisteren ook om een actietabel vraagt. Het antwoord werd halverwege
+een string afgekapt.
+
+Budget naar **2500**, op de langste variant — advies, klasse, ernst, kern, reden met
+documentnamen en drie acties — en niet op de gemiddelde. Bij een krap budget sneuvelt wat
+achteraan staat, en dat zijn juist de acties.
+
+En de melding klopt nu: een antwoord dat als JSON begint maar niet afsluit is **afgekapt**, geen
+onleesbare rommel. "Geen geldige JSON" stuurde je naar het model terwijl het budget de oorzaak
+was — dezelfde les als bij de classificatie sinds 2026-08-17.
+
+### Gemeten — 2026-08-26 — de normketen dicht, en wat dat doet
+
+Dezelfde bronnen, dezelfde dag, één fix ertussen:
+
+| | run 21:40 | **run 22:38** |
+|---|---|---|
+| bevindingen per norm | alles `beide` | **31× 9001, 17× 27001** — geen enkele `beide` |
+| clausulegroepen | 64 (op één hoop) | **70** (per norm gescheiden) |
+| **auto-triage** | 5 | **33** |
+| bevindingen met kernzin | 0 | **140** |
+| bevindingen met actietabel | 0 | **96** |
+
+De review-adviezen: 28 bevestigen · 18 verlagen · 7 onvoldoende bewijs · 3 samenvoegen · 14
+storingen (waarvan 9 afkappingen, nu gerepareerd).
+
+Die 140 kernzinnen en 96 actietabellen waren nog nooit gevuld. Dat is wat de memo nodig heeft om
+drie A4 te worden: per NC een synthese-zin en een tabel met rol en termijn.
+
 ### Fixed — 2026-08-25 — de norm viel alsnog uit de keten
 
 De run met auto-triage legde bloot dat de per-norm-koppeling niet doorliep. `clause_matches` had
