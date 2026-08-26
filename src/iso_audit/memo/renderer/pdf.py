@@ -23,7 +23,12 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 MAX_PAGINAS = 3
-"""De harde klanteis: één tot drie A4."""
+"""Het richtgetal van de klant: één tot drie A4.
+
+Een richtgetal en geen kap. Een paar regels uitlopen voor de netheid mag; het mag alleen niet de
+standaard worden. Daarom waarschuwt dit en blokkeert het niets, en daarom kort de memo nergens
+tekst af — de lengte wordt bestuurd door te kiezen wát in de memo staat en wat in de bijlage,
+niet door te snijden in wat er staat."""
 
 
 @dataclass(frozen=True)
@@ -54,8 +59,9 @@ def schrijf_pdf(html: str, output: Path | str) -> PaginaBudget:
     melding = ""
     if not past:
         melding = (
-            f"De memo is {paginas} pagina's; de eis is maximaal {MAX_PAGINAS} A4. "
-            "Comprimeer de NC-blokken of verplaats verbeterpunten naar de bijlage."
+            f"De memo is {paginas} pagina's; het richtgetal is {MAX_PAGINAS} A4. "
+            "Een paar regels uitlopen is geen bezwaar; dit is een signaal om te kijken of er "
+            "materiaal in staat dat in de bijlage hoort — niet om tekst af te kappen."
         )
         logger.warning("%s", melding)
     return PaginaBudget(pad=pad, paginas=paginas, past=past, melding=melding)

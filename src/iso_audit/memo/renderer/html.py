@@ -21,14 +21,6 @@ from iso_audit.memo.theme.profile import Profile
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 _MEMO_TEMPLATE = "management-memo/memo.html.j2"
 
-BRONNEN_IN_MEMO = 3
-"""Hoeveel brondocumenten per blok in de memo zelf worden genoemd.
-
-De rest staat in het detailrapport, en het blok zegt hoeveel dat er zijn. Op de werkset van
-2026-08-25 droeg een thema-blok veertien brondocumenten; die alle veertien uitschrijven kostte
-bijna een halve pagina per blok. Drie noemen met "en elf andere" is kort en eerlijk: het is een
-verwijzing, geen stille afkapping."""
-
 
 class MemoRendererImpl:
     """Implementeert het ``MemoRenderer``-protocol (HTML + PDF)."""
@@ -40,7 +32,6 @@ class MemoRendererImpl:
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        self._env.globals["BRONNEN_IN_MEMO"] = BRONNEN_IN_MEMO
 
     def render_html(self, memo: AuditMemo, profile: Profile) -> str:
         """Render de memo naar een self-contained HTML-string."""

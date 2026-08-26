@@ -6,6 +6,26 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-26 — de memo kort nergens tekst af
+
+Het paginabudget is een **richtgetal**, geen kap. Een paar regels uitlopen voor de netheid mag;
+het mag alleen niet de standaard worden. De lengte wordt daarom bestuurd door te kiezen wát in de
+memo staat en wat in de bijlage — niet door te snijden in wat er staat.
+
+Concreet weer verwijderd wat eerder vandaag als afkapping was ingebouwd: geen bloktekst die op
+een zinsgrens stopt met "vervolg in de bijlage", en geen bronlijst die na drie documenten
+"en elf andere" zegt. Alle brondocumenten worden genoemd, ook als dat een paar regels kost — een
+lijst die halverwege stopt dwingt de lezer voor zijn eerste vraag al naar de bijlage.
+
+Wat wél naar de bijlage gaat, gaat er heel naartoe: de normtekst en de onderbouwing per clausule.
+Dat is een keuze over samenstelling en geen afkapping, en het is het verschil tussen de 35 en de
+15 pagina's van vandaag. Meting bevestigt dat de afkapping ook niets opleverde: mét review-kern
+is een blok al kort (kern hoogstens 266 tekens, corrigerende maatregel hoogstens 570), en het
+verwijderen ervan kost nul pagina's op de werkset van 2026-08-25.
+
+Het waarschuwingsbericht zegt dat nu ook: een signaal om te kijken of er materiaal in de memo
+staat dat in de bijlage hoort, niet om tekst af te kappen.
+
 ### Added — 2026-08-26 — eigenaren invullen in het portaal, met een besprekingsmodal
 
 De memo levert per NC een actietabel met "wat", en "wie", "waar" en "uiterlijk" stonden er als
