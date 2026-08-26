@@ -244,6 +244,11 @@ class RepoSource:
             try:
                 gegevens = client.repository(verwijzing.eigenaar, verwijzing.naam)
             except ForgeError as fout:
+                # Ook in de dekking, niet alleen in het log. Een hele repository die stil uit de
+                # audit verdwijnt is erger dan een die er niet in zat: de auditor denkt hem
+                # geauditeerd te hebben. Gevonden door de proefrun van 2026-08-26, waar een
+                # privérepo zonder token wegviel zonder dat de dekking dat meldde.
+                self.overgeslagen[verwijzing.sleutel] = str(fout)
                 logger.warning("Repository niet gelezen: %s (%s)", verwijzing.sleutel, fout)
                 continue
             self._gegevens[verwijzing.sleutel] = gegevens

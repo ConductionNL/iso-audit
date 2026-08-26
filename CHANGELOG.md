@@ -6,6 +6,33 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-26 — twee gaten die de proefrun blootlegde
+
+De eerste proefrun zonder token over drie publieke repo's en drie webpagina's leverde 26
+documenten op, alle 26 met een clausule. Onderweg vielen twee eigen fouten op:
+
+**`repository()` gebruikte de duiding niet.** De melding was `github: ConductionNL/hydra gaf
+404` — een kale status, precies wat er net was weggewerkt op de andere vier plekken. Juist de
+eerste aanroep per repository miste hem. Nu: *"bestaat niet, of het token mag het niet zien (404)
+— GitHub geeft beide zo terug"*.
+
+**Een overgeslagen repository kwam niet in de dekking.** Alleen een logregel. Een hele repository
+die stil uit de audit verdwijnt is erger dan een die er niet in zat: dan denkt de auditor hem
+geauditeerd te hebben. `ConductionNL/hydra` is privé en viel zonder token weg zonder dat de
+dekking dat meldde.
+
+Wat de proefrun verder liet zien — het bewijs landt waar het hoort:
+
+| clausule | documenten |
+|---|---|
+| 27001 §8.32 wijzigingsbeheer | 11 |
+| 27001 §8.8 kwetsbaarheden | 7 |
+| 27001 §5.2 rollen | 6 |
+| 27001 §8.25 / §8.31 ontwikkeling en scheiding | 5 elk |
+| 27001 §5.34 privacy | 3 |
+
+Nul documenten bleven ongekoppeld.
+
 ### Changed — 2026-08-26 — wat niet gelezen kon worden, zegt waarom
 
 Een bron die stilzwijgend niets teruggeeft, laat "geen workflows gevonden" en "ik mocht de

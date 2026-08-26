@@ -100,9 +100,7 @@ class _NepSessie:
 
     def post(self, url: str, **kwargs: object) -> object:
         self.aanroepen += 1
-        verval = time.strftime(
-            "%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + self._verloopt)
-        )
+        verval = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + self._verloopt))
         return type(
             "Antwoord",
             (),

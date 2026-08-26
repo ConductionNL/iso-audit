@@ -63,3 +63,20 @@ def test_een_onbekende_status_wordt_gewoon_genoemd() -> None:
 def test_er_komt_altijd_een_leesbare_reden(status: int) -> None:
     """Een lege reden is hetzelfde als geen melding."""
     assert len(duiding(_Antwoord(status))) > 20
+
+
+def test_ook_de_repository_aanroep_duidt_de_status() -> None:
+    """Gevonden door de proefrun van 2026-08-26: een privérepo gaf "gaf 404" — een kale status.
+
+    Dat is precies waar de duiding voor bestaat, en juist de eerste aanroep per repository
+    miste hem. Een auditor die "gaf 404" leest, weet niet of de repo weg is of dat hij hem niet
+    mag zien.
+    """
+    import inspect
+
+    from iso_audit.clients import forge
+
+    for klasse in (forge.GitHubClient, forge.CodebergClient):
+        bron = inspect.getsource(klasse.repository)
+        assert "duiding(antwoord)" in bron, klasse.__name__
+        assert "gaf {antwoord.status_code}" not in bron, klasse.__name__

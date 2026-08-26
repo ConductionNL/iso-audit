@@ -242,7 +242,7 @@ def test_de_instellingstekst_noemt_de_reden_uit_de_forge() -> None:
 
 
 def test_een_onleesbare_workflowmap_komt_in_de_dekking() -> None:
-    """"Geen workflows" en "ik mocht de map niet lezen" zien er anders identiek uit."""
+    """ "Geen workflows" en "ik mocht de map niet lezen" zien er anders identiek uit."""
 
     class _Client:
         forge = "github"
@@ -271,3 +271,33 @@ def test_een_onleesbare_workflowmap_komt_in_de_dekking() -> None:
     list(bron.list_documents())
     assert bron.overgeslagen
     assert all("403" in r for r in bron.overgeslagen.values())
+
+
+def test_een_onleesbare_repository_komt_in_de_dekking() -> None:
+    """Een hele repository die stil wegvalt is erger dan een die er niet in zat.
+
+    Gevonden door de proefrun van 2026-08-26: `ConductionNL/hydra` is privé en gaf zonder token
+    een 404. De repo verdween uit de audit met alleen een logregel — dan denkt de auditor hem
+    geauditeerd te hebben.
+    """
+    from iso_audit.clients.forge import ForgeError
+
+    class _Weigert:
+        forge = "github"
+
+        def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens:
+            raise ForgeError("bestaat niet, of het token mag het niet zien (404)")
+
+        def bestand(self, eigenaar: str, naam: str, pad: str) -> object: ...
+
+        def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
+            return [], ""
+
+        def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
+            return Wijzigingen()
+
+    bron = RepoSource([{"forge": "github", "eigenaar": "ConductionNL", "naam": "hydra"}])
+    bron._clients["github"] = _Weigert()  # type: ignore[assignment]
+    assert list(bron.list_documents()) == []
+    assert "github:ConductionNL/hydra" in bron.overgeslagen
+    assert "404" in bron.overgeslagen["github:ConductionNL/hydra"]

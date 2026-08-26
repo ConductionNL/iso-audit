@@ -165,7 +165,7 @@ class GitHubClient:
     def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens:
         antwoord = self._get(f"/repos/{eigenaar}/{naam}")
         if antwoord.status_code != 200:
-            raise ForgeError(f"github: {eigenaar}/{naam} gaf {antwoord.status_code}")
+            raise ForgeError(f"github {eigenaar}/{naam}: {duiding(antwoord)}")
         d = antwoord.json()
         branch = d.get("default_branch") or "main"
         beschermd, review, reden = self._bescherming(eigenaar, naam, branch)
@@ -256,7 +256,7 @@ class CodebergClient:
     def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens:
         antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}")
         if antwoord.status_code != 200:
-            raise ForgeError(f"codeberg: {eigenaar}/{naam} gaf {antwoord.status_code}")
+            raise ForgeError(f"codeberg {eigenaar}/{naam}: {duiding(antwoord)}")
         d = antwoord.json()
         branch = d.get("default_branch") or "main"
         beschermd, review, reden = self._bescherming(eigenaar, naam, branch)
