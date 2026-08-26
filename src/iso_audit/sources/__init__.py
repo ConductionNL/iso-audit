@@ -50,7 +50,7 @@ _GEBUNDELD: dict[str, type[Source]] = {}
 in het pakket zit, zodat `laad_adapters()` hem kan herstellen ook als de modules al
 geïmporteerd waren."""
 
-_ADAPTERMODULES: tuple[str, ...] = ("drive", "jira", "nextcloud", "planning")
+_ADAPTERMODULES: tuple[str, ...] = ("drive", "jira", "nextcloud", "planning", "repo", "website")
 """Modules die bij `laad_adapters()` geïmporteerd worden zodat hun `@register` draait.
 
 Bewust een expliciete lijst en geen automatische ontdekking: welke adapters een installatie

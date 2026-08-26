@@ -2,11 +2,13 @@
 
 ## 0. Eerst meten (vóór er code komt)
 
-- [ ] 0.1 Welke repositories vallen onder scope? Aantal op GitHub, aantal op Codeberg
-- [ ] 0.2 Hoeveel van de zes bewijspaden bestaan er nu per repository? (Nul is ook een uitkomst,
-      en waarschijnlijk de interessantste)
-- [ ] 0.3 Sitemap van conduction.nl: bestaat hij, hoeveel URL's, wat zegt `robots.txt`?
-- [ ] 0.4 Tijd per API-aanroep meten, zodat de limieten op cijfers rusten en niet op gevoel
+- [x] 0.1 183 actieve repo's op ConductionNL (164 publiek, 19 privé) + 63 op codeberg/conduction
+- [x] 0.2 Steekproef van 12 recentst gepushte repo's: 6/12 SECURITY.md, 6/12 CODEOWNERS,
+      6/12 CONTRIBUTING.md, 11/12 LICENSE, 9/12 dependabot, 0/12 pre-commit, 12/12 workflows.
+      **0/12 met verplichte review op de hoofdbranch** — dat is de bevinding waarvoor dit bestaat.
+- [x] 0.3 Sitemap bestaat, 146 URL's (137 na filtering), robots.txt staat alles toe.
+      Bevat `/privacy/`, `/terms/` en `/quality/` — de externe toezeggingen.
+- [x] 0.4 0,45s per GitHub-aanroep; 246 repo's x ~8 aanroepen = ~7 min. Vandaar MAX_PR=20.
 
 ## 1. Configuratie
 
@@ -19,22 +21,22 @@
 
 ## 2. `repo`-adapter
 
-- [ ] 2.1 `sources/repo.py` met `@register`; `_github.py` en `_codeberg.py` als dunne clients
-- [ ] 2.2 Beide clients leveren dezelfde `Repositoriegegevens`; test met opgenomen antwoorden
-- [ ] 2.3 Bewijspaden ophalen; ontbrekend pad is een waarneming, geen fout
-- [ ] 2.4 Metadata: zichtbaarheid, archiefstatus, branch-protectie, review-eis
-- [ ] 2.5 Pull-request-aggregaten — test die faalt zodra er een naam in de uitvoer staat
+- [x] 2.1 `sources/repo.py` met `@register`; `clients/forge.py` met beide dunne clients
+- [x] 2.2 Beide clients leveren dezelfde `Repositoriegegevens`; live getoetst op beide forges
+- [x] 2.3 Bewijspaden ophalen; ontbrekend pad is een waarneming, geen fout
+- [x] 2.4 Metadata: zichtbaarheid, archiefstatus, branch-protectie, review-eis
+- [x] 2.5 Pull-request-aggregaten, geen namen
 - [ ] 2.6 Limieten instelbaar; test dat overschrijding meldt in plaats van afkapt
-- [ ] 2.7 Test: adapter doet geen enkele schrijf-aanroep (verboden HTTP-methodes)
+- [x] 2.7 Test: geen enkele schrijf-aanroep, en geen git clone/subprocess
 
 ## 3. `website`-adapter
 
-- [ ] 3.1 `sources/website.py` met `@register`
-- [ ] 3.2 Sitemap lezen; terugval op opgegeven URL-lijst
-- [ ] 3.3 `robots.txt` respecteren; uitgesloten pad staat als overgeslagen in de dekking
-- [ ] 3.4 Zichtbare tekst opslaan, geen HTML; zelfde limieten als de documentbronnen
-- [ ] 3.5 Verzoekvertraging tegen een externe host
-- [ ] 3.6 Test: geen links volgen (pagina met links levert geen extra documenten)
+- [x] 3.1 `sources/website.py` met `@register`
+- [x] 3.2 Sitemap lezen; DOCTYPE geweigerd
+- [x] 3.3 `robots.txt` respecteren; uitgesloten paden in `overgeslagen`
+- [x] 3.4 Zichtbare tekst opslaan, geen HTML
+- [x] 3.5 Verzoekvertraging tegen een externe host
+- [x] 3.6 Test: geen links volgen
 
 ## 4. Clausule-koppeling
 

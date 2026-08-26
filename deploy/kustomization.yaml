@@ -52,4 +52,4 @@ configMapGenerator:
 # eerst publiceren en pas daarna deze regel wijzigen.
 images:
   - name: ghcr.io/conductionnl/iso-audit
-    newTag: "0.2.0a59"
+    newTag: "0.2.0a60"

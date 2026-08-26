@@ -6,6 +6,42 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — repositories en de website als auditbron
+
+De vijf bestaande bronnen zijn alle vijf **documentbronnen**: wat de organisatie over zichzelf
+heeft opgeschreven. Twee bronnen die dat niet zijn, stonden buiten beeld.
+
+**`repo` — GitHub én Codeberg.** §8.4, §8.9, §8.25, §8.28, §8.31 en §8.32 gaan over dingen die in
+een repository zichtbaar zijn en nergens anders aantoonbaar. Het vier-ogen-principe is geen
+belofte in een handboek maar een schakelaar op een branch.
+
+Gemeten vóór er code kwam, over de twaalf recentst gepushte actieve ConductionNL-repo's:
+6/12 zonder `SECURITY.md`, 6/12 zonder `CODEOWNERS`, 0/12 met pre-commit — en **0 van de 12 met
+een hoofdbranch die review verplicht stelt**. Bij de eerste live-run meldde de bron over
+iso-audit zelf: geen branch-bescherming, en 12 van de laatste 12 samenvoegingen zonder
+goedkeurende review.
+
+Eén adapter met twee dunne clients (`clients/forge.py`), tegen de huisregel "liever herhaling dan
+abstractie" in en met reden: wat verschilt is de HTTP-aanroep, wat níet verschilt is de
+auditinhoud. Die twee keer neerzetten laat haar uiteenlopen, en dan levert het tool per forge
+ander bewijs zonder dat iemand het merkt.
+
+**`website` — wat de organisatie publiek belooft.** Een privacyverklaring of een claim over
+certificering is een verplichting die je aangaat; het gat met de interne praktijk is een
+klassieke NC (§5.31, §5.34, 9001 §8.2). Sitemap of een opgegeven URL-lijst, nooit links volgen —
+een crawler is niet te begrenzen, niet te herhalen en niet uit te leggen aan wie vraagt wat het
+tool heeft gezien. `robots.txt` wordt gerespecteerd. conduction.nl levert 137 pagina's,
+waaronder `/privacy/`, `/terms/` en `/quality/`.
+
+Grenzen die met tests zijn vastgezet: geen schrijf-aanroepen, geen `git clone`, geen
+source-tree (alleen een expliciete lijst bewijspaden), **geen persoonsnamen** — uitspraken over
+wijzigingen zijn aggregaten, want een NC gaat over een proces dat niet werkt en niet over een
+collega. En "niet vast te stellen met dit token" is een eigen uitkomst, nooit "niet ingesteld":
+een onbekende instelling als bevinding rapporteren is een verzonnen bevinding.
+
+Nog niet af: de configuratie staat nu op de constructor en de env-var, nog niet in `bronnen.yaml`
+met een scherm eromheen. Zie `openspec/changes/code-en-website-bronnen/tasks.md`.
+
 ### Fixed — 2026-08-26 — een uitrol haalt het portaal niet meer onderuit
 
 De uitrol van a58 legde het portaal negen minuten plat. Argo synct de nieuwe `newTag` zodra de
