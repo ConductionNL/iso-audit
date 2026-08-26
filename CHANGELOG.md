@@ -6,6 +6,39 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — een GitHub App als bron-credential
+
+Een fijnmazig PAT is altijd van een persoon. Vertrekt die persoon, dan valt de bron stil en staat
+er in de volgende audit "bron niet beschikbaar" waar bewijs had moeten staan. Een App is
+eigendom van de organisatie en overleeft dat.
+
+Wat per persoon blijft: het **aanmaken**. GitHub heeft dat bewust niet in de API — de
+Authorizations API is in 2020 verwijderd en een App aanmaken gaat via de browser. Wat hier is
+gebouwd, is het stuk dat automatiseerbaar is: uit App-id, installatie-id en private key een
+installatietoken minten, en dat vernieuwen voordat het verloopt.
+
+Drie velden in het configuratiescherm onder "Code-repositories". Zijn ze gezet, dan hebben ze
+**voorrang** op het persoonlijke token. Ontbreekt er één, dan is er geen App en valt het terug —
+een halve configuratie wordt niet stil geaccepteerd.
+
+`cryptography` doet het ondertekenen; die zat er al via `google-auth` en staat nu expliciet in
+`pyproject.toml`, want je importeert niet wat je niet declareert. Twintig regels eigen code
+tegenover een extra afhankelijkheid in een project onder 27001-scope.
+
+**Twee bugs die de tests vonden voordat ze konden bijten:**
+
+- `datetime.strptime(...).timestamp()` leest een `Z`-tijd als **lokale** tijd. In CEST maakte dat
+  het installatietoken twee uur te oud, waardoor de cache nooit werkte en elke aanroep opnieuw
+  mintte. In een negatieve tijdzone was het erger: dan zou een verlopen token voor geldig zijn
+  doorgegaan.
+- De Authorization-kop werd per methode gezet, en `_bescherming` miste hem. Functioneel gedekt
+  omdat die alleen via `repository()` bereikbaar is, maar dat leunt op aanroeporde. Elke GET
+  loopt nu langs één doorgang, met een test die faalt zodra een methode die omzeilt.
+
+De private key komt nergens uit: niet in een log, niet in een foutmelding, niet in een
+healthcheck. Een test controleert dat een onleesbare sleutel geen sleutelmateriaal in de
+melding zet.
+
 ### Added — 2026-08-26 — hoogstens drie verbeterthema's in de memo
 
 Twee losse knoppen, en dat onderscheid is het punt:

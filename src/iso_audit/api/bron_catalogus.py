@@ -245,6 +245,32 @@ STANDAARD: list[BronDefinitie] = [
                 ),
             ),
             Veld(
+                naam="GITHUB_APP_ID",
+                label="GitHub-App id",
+                verplicht=False,
+                hint=(
+                    "Vul dit in plaats van een persoonlijk token, als de organisatie een App "
+                    "heeft. Een App is eigendom van de organisatie en blijft werken als iemand "
+                    "vertrekt; een persoonlijk token niet."
+                ),
+            ),
+            Veld(
+                naam="GITHUB_APP_INSTALLATION_ID",
+                label="GitHub-App installatie-id",
+                verplicht=False,
+                hint="Het id van de installatie op de organisatie, niet dat van de App zelf.",
+            ),
+            Veld(
+                naam="GITHUB_APP_PRIVATE_KEY",
+                label="GitHub-App private key",
+                geheim=True,
+                verplicht=False,
+                hint=(
+                    "Het PEM-blok dat GitHub eenmalig laat downloaden. Heeft voorrang op het "
+                    "persoonlijke token."
+                ),
+            ),
+            Veld(
                 naam="CODEBERG_TOKEN",
                 label="Codeberg-token",
                 geheim=True,

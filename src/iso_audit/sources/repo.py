@@ -35,6 +35,7 @@ from iso_audit.clients.forge import (
     Bestand,
     ForgeClient,
     ForgeError,
+    GitHubClient,
     Repositoriegegevens,
     Wijzigingen,
 )
@@ -122,6 +123,23 @@ def lees_verwijzingen(ruw: list[dict[str, str]]) -> list[RepoVerwijzing]:
     return verwijzingen
 
 
+def _app_credential() -> object | None:
+    """De GitHub-App-credential, als de drie velden gezet zijn.
+
+    Een App is eigendom van de organisatie en blijft werken als iemand vertrekt; een persoonlijk
+    token niet. Daarom heeft dit voorrang. Ontbreekt één van de drie velden, dan is er geen App
+    en valt het terug op het persoonlijke token — geen halve configuratie stil accepteren.
+    """
+    from iso_audit.clients import github_app
+
+    app_id = os.environ.get(github_app.APP_ID_ENV, "").strip()
+    installatie = os.environ.get(github_app.INSTALLATIE_ENV, "").strip()
+    sleutel = os.environ.get(github_app.PRIVATE_KEY_ENV, "").strip()
+    if not (app_id and installatie and sleutel):
+        return None
+    return github_app.AppCredential(app_id, installatie, sleutel)
+
+
 def uit_tekst(ruw: str) -> list[dict[str, str]]:
     """Parseer `forge:eigenaar/naam` uit de env-var naar de configuratievorm.
 
@@ -198,11 +216,17 @@ class RepoSource:
         self._gegevens: dict[str, Repositoriegegevens] = {}
 
     def _client(self, forge: str) -> ForgeClient:
-        if forge not in self._clients:
-            token = os.environ.get(
-                GITHUB_TOKEN_ENV if forge == "github" else CODEBERG_TOKEN_ENV, ""
+        if forge in self._clients:
+            return self._clients[forge]
+        if forge == "github":
+            # Rechtstreeks en niet via `CLIENTS`: alleen de GitHub-client kent een
+            # App-credential, en via de registry-lookup is dat niet te typeren.
+            self._clients[forge] = GitHubClient(
+                token=os.environ.get(GITHUB_TOKEN_ENV, ""),
+                credential=_app_credential(),
             )
-            self._clients[forge] = CLIENTS[forge](token=token)
+        else:
+            self._clients[forge] = CLIENTS[forge](token=os.environ.get(CODEBERG_TOKEN_ENV, ""))
         return self._clients[forge]
 
     def list_documents(self, filter: dict[str, object] | None = None) -> Iterator[Document]:

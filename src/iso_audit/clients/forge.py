@@ -99,15 +99,32 @@ class GitHubClient:
     forge = "github"
     basis = "https://api.github.com"
 
-    def __init__(self, token: str = "", basis: str = "") -> None:
+    def __init__(self, token: str = "", basis: str = "", credential: object | None = None) -> None:
         self.basis = basis or self.basis
         self._sessie = requests.Session()
         self._sessie.headers.update({"Accept": "application/vnd.github+json"})
-        if token:
+        # Een App-credential heeft voorrang op een persoonlijk token: een PAT hangt aan één
+        # persoon en valt stil als die vertrekt, en dan staat er in de volgende audit "bron niet
+        # beschikbaar" waar bewijs had moeten staan. Het token wordt per aanroep opgehaald omdat
+        # een installatietoken maar een uur leeft; `AppCredential` cachet het zelf.
+        self._credential = credential
+        if not credential and token:
             self._sessie.headers["Authorization"] = f"Bearer {token}"
 
+    def _get(self, pad: str) -> requests.Response:
+        """Elke GET loopt hierlangs, zodat de Authorization-kop nooit vergeten kan worden.
+
+        Eerder stond die kop-actie in elke methode los. Dat werkt tot iemand een methode
+        toevoegt en het vergeet — en dan valt de App-authenticatie stil op één plek, wat als
+        "geen rechten" leest. Eén doorgang is een eigenschap in plaats van een afspraak.
+        """
+        if self._credential is not None:
+            token = self._credential.token()  # type: ignore[attr-defined]
+            self._sessie.headers["Authorization"] = f"Bearer {token}"
+        return _haal(self._sessie, f"{self.basis}{pad}")
+
     def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens:
-        antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}")
+        antwoord = self._get(f"/repos/{eigenaar}/{naam}")
         if antwoord.status_code != 200:
             raise ForgeError(f"github: {eigenaar}/{naam} gaf {antwoord.status_code}")
         d = antwoord.json()
@@ -129,9 +146,7 @@ class GitHubClient:
         self, eigenaar: str, naam: str, branch: str
     ) -> tuple[bool | None, bool | None]:
         """404 = geen bescherming; 403 = geen recht om het te zien, en dat is niet hetzelfde."""
-        antwoord = _haal(
-            self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/branches/{branch}/protection"
-        )
+        antwoord = self._get(f"/repos/{eigenaar}/{naam}/branches/{branch}/protection")
         if antwoord.status_code == 404:
             return False, False
         if antwoord.status_code != 200:
@@ -140,7 +155,7 @@ class GitHubClient:
         return True, bool(d.get("required_pull_request_reviews"))
 
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
-        antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/contents/{pad}")
+        antwoord = self._get(f"/repos/{eigenaar}/{naam}/contents/{pad}")
         if antwoord.status_code == 404:
             return Bestand(pad=pad, aanwezig=False, reden="bestaat niet")
         if antwoord.status_code != 200:
@@ -148,7 +163,7 @@ class GitHubClient:
         return Bestand(pad=pad, inhoud=_decodeer(antwoord.json()))
 
     def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> list[str]:
-        antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/contents/{map_}")
+        antwoord = self._get(f"/repos/{eigenaar}/{naam}/contents/{map_}")
         if antwoord.status_code != 200:
             return []
         d = antwoord.json()
@@ -158,19 +173,14 @@ class GitHubClient:
 
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
         """Aggregaat over de laatste gesloten pull requests. Geen namen — zie de spec."""
-        antwoord = _haal(
-            self._sessie,
-            f"{self.basis}/repos/{eigenaar}/{naam}/pulls?state=closed&per_page={aantal}",
-        )
+        antwoord = self._get(f"/repos/{eigenaar}/{naam}/pulls?state=closed&per_page={aantal}")
         if antwoord.status_code != 200:
             return Wijzigingen(onbekend=True)
         gemerged = [p for p in antwoord.json() if p.get("merged_at")]
         zonder = 0
         for pr in gemerged:
             nummer = pr.get("number")
-            rev = _haal(
-                self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/pulls/{nummer}/reviews"
-            )
+            rev = self._get(f"/repos/{eigenaar}/{naam}/pulls/{nummer}/reviews")
             if rev.status_code != 200:
                 return Wijzigingen(onbekend=True)
             if not [r for r in rev.json() if r.get("state") == "APPROVED"]:
