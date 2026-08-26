@@ -36,6 +36,10 @@
   tr.sevrow-OFI td:first-child { border-left:4px solid #b8860b; }
   tr.sevrow-POSITIVE td:first-child { border-left:4px solid #1a7d46; }
   #triage-filter { margin:.4rem 0; display:flex; gap:.4rem; align-items:center; }
+  /* Voortgangsindicator: bovenaan, buiten de inhoud, zodat hij niets verschuift. */
+  #bezig { position:fixed; top:0; left:0; right:0; z-index:60; padding:.15rem .6rem;
+           background:var(--blue,#4376fc); color:#fff; font-size:.75rem; letter-spacing:.02em; }
+  #bezig[hidden] { display:none; }
   /* Besprekingsmodal: memo links, actietabel rechts. Eigenaren invullen hoort in het portaal
      en niet in een los .docx — anders weet de trail niet wie wat heeft toegezegd. */
   #bespreek-modal { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; display:flex; }
@@ -109,6 +113,8 @@
 </style>
 </head>
 <body onload="boot()">
+<div id="bezig" hidden aria-live="polite" role="status">bezig…</div>
+
 <div id="bespreek-modal" hidden>
   <div class="modal-vlak">
     <div class="modal-kop">
@@ -335,7 +341,31 @@ const TRIAGE = ["open","valide","niet_valide","follow_up"];
 class SessieVerlopen extends Error {}
 class PadGeweigerd extends Error {}
 
+// Eén indicator voor alle serververkeer, aangestuurd vanuit `j()` zelf. Gemeten op
+// 2026-08-26: alleen `/instellingen/health` is traag (3,5s — die test live verbindingen);
+// de rest zit onder een halve seconde. Een spinner per scherm zou dus overwegend versiering
+// zijn, terwijl het echte probleem is dat er niets zichtbaar gebeurt tijdens die ene wacht.
+//
+// Tellen en niet booleaan: bij `Promise.all` lopen er meerdere tegelijk, en dan zou de eerste
+// die terugkomt de indicator uitzetten terwijl de trage nog loopt.
+let _bezig = 0;
+function _bezigAan(){
+  _bezig += 1;
+  document.getElementById("bezig").hidden = false;
+}
+function _bezigAf(){
+  _bezig = Math.max(0, _bezig - 1);
+  if(_bezig === 0) document.getElementById("bezig").hidden = true;
+}
 const j = async (url,opts) => {
+  _bezigAan();
+  try {
+    return await _j(url,opts);
+  } finally {
+    _bezigAf();
+  }
+};
+const _j = async (url,opts) => {
   const r = await fetch(url,opts);
   if(r.status === 401 || r.status === 403){
     // Meten in plaats van gokken. Een 403 hoeft niets met de sessie te maken te hebben:

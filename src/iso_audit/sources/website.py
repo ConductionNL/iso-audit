@@ -169,10 +169,19 @@ class WebsiteSource:
 
     def healthcheck(self) -> dict[str, object]:
         if not self._sites:
+            # Zie `RepoSource.healthcheck` voor waarom `soort` hier meemoet.
+            #
+            # Extra reden om het hier goed te doen: een website heeft geen token nodig, dus
+            # "niet gekoppeld" zonder uitleg laat een auditor zoeken naar een credential die
+            # niet bestaat.
             return {
                 "status": "niet_gekoppeld",
                 "naam": self.naam,
-                "reden": "geen websites geconfigureerd",
+                "soort": "niet_geconfigureerd",
+                "reden": (
+                    "Er is nog geen website ingevuld. Een website heeft geen token nodig; "
+                    "vul een adres in zoals https://www.conduction.nl."
+                ),
             }
         return {
             "status": "ok",

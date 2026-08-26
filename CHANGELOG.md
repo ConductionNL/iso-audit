@@ -6,6 +6,38 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-26 — "niet gekoppeld" zegt nu wat er ontbreekt
+
+Het configuratiescherm toonde bij `website` en `repo`: *"De verbinding kon niet worden gelegd.
+Zie het serverlog voor details."* Er was niets mis met een verbinding — er stond alleen nog geen
+adres of repository ingevuld. Bij `website` extra verwarrend, want die heeft **geen token nodig**;
+dan zoekt een auditor naar een credential die niet bestaat.
+
+De oorzaak was niet de tekst maar het ontbreken van `soort`. `_check_source` haalt elke
+adapter-reden zonder `soort` door de normalisatie, en dat mechanisme is er met goede reden: tot
+2026-08-14 landde een Jira-401 mét tenant-URL en responsbody rechtstreeks in de browser. Wie zijn
+eigen `soort` meestuurt, verklaart daarmee dat de tekst van hem is en geen credentials draagt —
+en dat deden de twee nieuwe adapters niet.
+
+Nu: *"Er is nog geen website ingevuld. Een website heeft geen token nodig; vul een adres in zoals
+https://www.conduction.nl."*
+
+### Added — 2026-08-26 — één indicator voor lopend serververkeer
+
+Gemeten in het draaiende portaal: alleen `/instellingen/health` is traag — **3,5 seconden**, want
+die test live verbindingen naar Drive, Jira en Nextcloud. Alle andere endpoints zitten onder een
+halve seconde (`/findings`, `/acties`, `/runs`, `/landschap` elk 0,01s). Een spinner per scherm
+zou dus overwegend versiering zijn; het probleem is dat er tijdens die ene wacht niets zichtbaar
+gebeurt.
+
+Daarom één indicator, aangestuurd vanuit `j()` zelf. Dat dekt élke aanroep zonder dat iemand het
+per scherm hoeft te onthouden — dezelfde redenering als bij `_get()` in de forge-client: een
+eigenschap in plaats van een afspraak.
+
+Geteld en niet booleaan: bij `Promise.all` lopen er meerdere tegelijk, en dan zou de eerste die
+terugkomt de indicator uitzetten terwijl de trage nog loopt. Hij gaat ook uit als een aanroep
+faalt — een indicator die blijft staan laat het portaal bevroren lijken.
+
 ### Added — 2026-08-26 — wat de organisatie over zichzelf zegt, als bewijs
 
 Er wordt **niets ingevuld** — alleen gelezen wat er staat. Drie plekken waar een organisatie

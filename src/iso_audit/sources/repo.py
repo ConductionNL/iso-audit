@@ -320,10 +320,20 @@ class RepoSource:
 
     def healthcheck(self) -> dict[str, object]:
         if not self._verwijzingen:
+            # `soort` meesturen is geen formaliteit: zonder dat veld haalt `_check_source`
+            # de tekst door de normalisatie, en wordt "nog geen repositories ingevuld"
+            # vervangen door "De verbinding kon niet worden gelegd. Zie het serverlog." Dat
+            # wijst een auditor op een storing terwijl hij alleen nog niets heeft ingevuld.
+            # Die normalisatie bestaat om adapter-tekst met credentials tegen te houden; deze
+            # tekst is van ons en bevat er geen.
             return {
                 "status": "niet_gekoppeld",
                 "naam": self.naam,
-                "reden": "geen repositories geconfigureerd",
+                "soort": "niet_geconfigureerd",
+                "reden": (
+                    "Er zijn nog geen repositories ingevuld. Voeg ze toe als "
+                    "forge:eigenaar/naam, bijvoorbeeld github:ConductionNL/iso-audit."
+                ),
             }
         # Een ontbrekend token is een **waarschuwing** en geen fout: publieke repositories zijn
         # zonder token gewoon leesbaar — gemeten op 2026-08-26 tegen codeberg/nldesign. Wat er
