@@ -109,7 +109,10 @@ def test_memo_input_edit_roundtrip(tmp_path: Path) -> None:
     assert client.post("/memo/input", json=data).status_code == 200
     opnieuw = client.get("/memo/input").json()
     assert opnieuw["title"] == "Aangepaste titel"
-    assert opnieuw["context"]["sources"] == ["Google Drive", "Jira"]
+    # Een bron is sinds 2026-08-26 een object met een aanduiding erbij: "Google Drive" zegt
+    # niet wélke map, en zonder dat kan een externe auditor de scope niet natrekken. Een kale
+    # string blijft toegestaan bij het inlezen en wordt genormaliseerd naar `{naam: ...}`.
+    assert [b["naam"] for b in opnieuw["context"]["sources"]] == ["Google Drive", "Jira"]
 
 
 def test_memo_input_invalid_400(tmp_path: Path) -> None:

@@ -46,7 +46,7 @@ def test_voorbeeld_rendert_valide_html() -> None:
     html = MemoRendererImpl().render_html(memo, profile)
     doc = lxml_html.fromstring(html)  # raises bij kapotte HTML
     tekst = doc.text_content()
-    for sectie in ["Context", "NC 1", "NC 2", "Verbeterpunt", "Status eerder geconstateerde"]:
+    for sectie in ["Context", "NC 1", "NC 2", "OFI 1", "Status eerder geconstateerde"]:
         assert sectie in tekst
 
 

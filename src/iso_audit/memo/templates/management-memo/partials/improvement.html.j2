@@ -1,36 +1,25 @@
-{#- Eén verbeterpunt (variabele `imp`) -#}
-<h2>Verbeterpunt — {{ imp.title }}</h2>
+{#- Eén verbeterpunt (variabele `imp`). Zelfde compacte vorm als een NC-blok: het advies
+    hoort in de memo, de onderbouwing in de bijlage. -#}
+<h2>{{ imp.code }}{% if imp.code %} — {% endif %}{{ imp.title }}</h2>
 
-<h4>Norm</h4>
-{% for c in imp.citations %}
-<p class="norm-ref">{{ c.standard }} §{{ c.clause }} — {{ c.title }}</p>
-<div class="norm-quote">"{{ c.text }}"</div>
-{% endfor %}
+<p class="norm-ref">
+{%- for c in imp.citations %}{% if not loop.first %} · {% endif %}{{ c.standard }} §{{ c.clause }} — {{ c.title }}{% endfor -%}
+</p>
 
-{# Zelfde regel als bij een NC-blok: is er een synthese, dan is die de blok-tekst en staat de
-   onderbouwing per clausule in het detailrapport. #}
 {% if imp.kern %}
 <p class="kern"><strong>{{ imp.kern }}</strong></p>
 {% endif %}
 
 {% if imp.deviation %}
-<h4>Wat er is waargenomen</h4>
 <div>{{ imp.deviation | safe }}</div>
-{% else %}
-<p class="detailref">Waarnemingen per clausule: zie <em>{{ memo.detail_report_ref }}</em>.</p>
-{% endif %}
-{% if imp.bronnen %}
-<p class="reasoning"><em>Brondocumenten:</em></p>
-<ul class="reasoning">
-{% for b in imp.bronnen %}
-<li>[{{ b.herkomst }}] {% if b.url %}<a href="{{ b.url }}">{{ b.doc_naam or b.doc_id or b.herkomst }}</a>{% else %}{{ b.doc_naam or b.doc_id }}{% endif %}{% if b.beschrijving %} — {{ b.beschrijving }}{% endif %}</li>
-{% endfor %}
-</ul>
 {% endif %}
 
-<h4>Waarom verbeterpunt en geen NC?</h4>
-<div>{{ imp.classification_rationale | safe }}</div>
+{# Eén regel, geen kop: waarom dit een verbeterpunt is en geen NC. Zonder die verantwoording
+   is de klasse een bewering, en "alles moet duidelijk zijn" gaat juist hierover. #}
+<p class="rationale"><em>Waarom verbeterpunt en geen NC?</em> {{ imp.classification_rationale | safe }}</p>
 
 {% if imp.suggestion %}
 <div class="recommendation"><strong>Aanbeveling:</strong> {{ imp.suggestion | safe }}</div>
 {% endif %}
+
+{% include "management-memo/partials/bijlage-verwijzing.html.j2" %}

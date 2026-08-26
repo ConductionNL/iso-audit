@@ -1377,9 +1377,13 @@ async function saveMemoInput(){
 async function preview(){
   document.getElementById("memo-frame").innerHTML = `<iframe src="${A("/memo/preview")}"></iframe>`;
 }
+// Na het exporteren een dównload aanbieden, geen serverpad. Het pad dat hier stond wees in
+// een pod met een read-only filesystem achter een oauth-proxy: niemand kon erbij.
 async function exportPdf(){
-  const d = await j(A("/memo/export"),{method:"POST"});
-  document.getElementById("memo-msg").textContent = "PDF: "+d.pdf;
+  await j(A("/memo/export"),{method:"POST"});
+  document.getElementById("memo-msg").innerHTML =
+    `✓ memo geëxporteerd — <a href="${A("/download?scope=memo")}">download memo (zip)</a> · ` +
+    `<a href="${A("/download?scope=bewijslast")}">download volledige bewijslast (zip)</a>`;
   await loadRuns();
 }
 // Eigen hover-tooltip (betrouwbaarder dan native title): toont data-tip bij hover.

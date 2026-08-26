@@ -21,6 +21,7 @@ import yaml
 
 from iso_audit.api import werkset
 from iso_audit.classification.auto_triage import AUTO_ACTOR
+from iso_audit.memo.bronaanduiding import aanduiding_voor
 from iso_audit.memo.builder import build_memo
 from iso_audit.memo.models import Finding, MemoInput, Severity, TriageStatus
 from iso_audit.memo.norm_lookup import laad_norm_db
@@ -48,6 +49,29 @@ class RunLooptError(SessionError):
 
 # Leesbare namen voor de memo-context (scope + geraadpleegde bronnen).
 _NORM_NAAM = {"9001": "ISO 9001:2015", "27001": "ISO 27001:2022"}
+
+
+def _instellingen_plat() -> dict[str, str]:
+    """De niet-geheime instellingen als platte afbeelding, uit de omgeving.
+
+    Bewust uit `os.environ` en niet opnieuw uit de configuratie: `Settings.naar_omgeving()` zet
+    daar vóór een run precies de waarden neer waarmee die run draaide. De memo hoort te zeggen
+    waar de audit op rustte, niet wat er inmiddels is gekoppeld.
+
+    Geheime velden blijven eruit. De memo wordt gedeeld; een token dat erin belandt is een
+    incident, en er is geen enkele reden ze aan te raken.
+    """
+    import os
+
+    from iso_audit.config.settings import VELDEN
+
+    return {
+        veld.sleutel: os.environ[veld.env]
+        for veld in VELDEN
+        if not veld.geheim and os.environ.get(veld.env)
+    }
+
+
 _BRON_NAAM = {"drive": "Google Drive", "jira": "Jira", "miro": "Miro", "planning": "Planning"}
 
 
@@ -715,7 +739,13 @@ class AuditSession:
         norms = ["9001", "27001"] if norm == "beide" else [norm]
         bereik = f"§{chapter}" if chapter else "§4 t/m §10"
         ctx["scope"] = {_NORM_NAAM.get(n, n): bereik for n in norms}
-        ctx["sources"] = [_BRON_NAAM.get(s, s) for s in (sources or ["drive"])]
+        # Mét de aanduiding waarmee de bron terug te vinden is — welke Drive-map, welk
+        # Jira-project. Zonder dat is "Geraadpleegde bronnen: Google Drive, Jira" decoratie:
+        # een externe auditor kan de scope van deze audit er niet mee natrekken.
+        ctx["sources"] = [
+            aanduiding_voor(bron, _instellingen_plat()).model_dump()
+            for bron in (sources or ["drive"])
+        ]
         self._memo_input_path.write_text(
             yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
         )

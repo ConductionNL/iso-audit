@@ -1,0 +1,19 @@
+{#- Waar het weggelaten detail staat (variabele `nc` of `imp`).
+
+    Zonder deze regel is inkorten weglaten. Met deze regel is het een verwijzing, en kan wie het
+    naadje wil weten precies vinden waar het ligt. Dat verschil is het hele punt.
+
+    De eerste paar brondocumenten blijven klikbaar. Een memo waarin je niet één keer kunt
+    doorklikken naar het bewijs, dwingt elke lezer naar de bijlage voor de eerste vraag die hij
+    stelt — en dan is de memo geen bespreekstuk meer.
+-#}
+{% set blok = nc if nc is defined else imp %}
+<p class="detailref">
+  Onderbouwing, normtekst en volledige bronvermelding: <em>{{ memo.detail_report_ref or "detailrapport" }}</em>, {{ blok.code or blok.title }}.
+  {%- if blok.bronnen %} Brondocumenten:
+  {%- for b in blok.bronnen[:BRONNEN_IN_MEMO] %}
+  {%- if b.url %} <a href="{{ b.url }}">{{ b.doc_naam or b.doc_id }}</a>{% else %} {{ b.doc_naam or b.doc_id }}{% endif %}{{ "," if not loop.last }}
+  {%- endfor %}
+  {%- if blok.bronnen | length > BRONNEN_IN_MEMO %} en {{ blok.bronnen | length - BRONNEN_IN_MEMO }} andere{% endif %}.
+  {%- endif %}
+</p>

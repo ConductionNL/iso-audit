@@ -1,47 +1,32 @@
-{#- Eén NC-blok (variabele `nc`) -#}
-<h2>{{ nc.title }}</h2>
+{#- Eén NC-blok (variabele `nc`).
+
+    Bewust kort: dit is een managementmemo van 1-3 A4 die in een vergadering besproken moet
+    kunnen worden. Wat hier staat is wat de NC is, waarom, wie er wat aan doet en voor wanneer.
+
+    Wat hier *niet* staat en in het detailrapport hoort: de volledige normtekst, de onderbouwing
+    per clausule en de volledige bronlijst. Dat is geen weglating maar een verwijzing — de laatste
+    regel van elk blok zegt waar het staat.
+-#}
+<h2>{{ nc.code }}{% if nc.code %} — {% endif %}{{ nc.title }}</h2>
+
+<p class="norm-ref">
+{%- for c in nc.citations %}{% if not loop.first %} · {% endif %}{{ c.standard }} §{{ c.clause }} — {{ c.title }}{% endfor -%}
+</p>
 
 {% if nc.triage_status == "open" %}
 <div class="triage">
   <strong>Nog te beoordelen (auditor):</strong> <span class="opties">☐ valide · ☐ niet valide</span>
-  <div class="triage-note">Bewijs kan binnen de organisatie bestaan maar buiten de tool-scope (Drive/Miro) vallen — beoordeel in de auditsessie.</div>
 </div>
 {% endif %}
 
-<h4>Norm</h4>
-{% for c in nc.citations %}
-<p class="norm-ref">{{ c.standard }} §{{ c.clause }} — {{ c.title }}</p>
-<div class="norm-quote">"{{ c.text }}"</div>
-{% endfor %}
-
-{# De synthese vóór de details: één zin die zegt wat het gemeenschappelijke gebrek is. Zo
-   leest het handgemaakte Q2-memo, en dat is wat drie A4 leesbaar houdt. Ontbreekt hij (geen
-   review gedraaid), dan valt het blok stil terug op de afwijking zelf. #}
 {% if nc.kern %}
 <p class="kern"><strong>{{ nc.kern }}</strong></p>
 {% endif %}
 
-{# Is er een kern, dan staat de synthese hierboven en hoort de onderbouwing per clausule in
-   het detailrapport thuis. Anders wordt het blok net zo dik als het aantal bevindingen. #}
 {% if nc.deviation %}
-<h4>Waar de praktijk afwijkt</h4>
 <div>{{ nc.deviation | safe }}</div>
-{% else %}
-<p class="detailref">Onderbouwing per clausule: zie <em>{{ memo.detail_report_ref }}</em>.</p>
 {% endif %}
-{% if nc.bronnen %}
-<p class="reasoning"><em>Brondocumenten:</em></p>
-<ul class="reasoning">
-{% for b in nc.bronnen %}
-<li>[{{ b.herkomst }}] {% if b.url %}<a href="{{ b.url }}">{{ b.doc_naam or b.doc_id or b.herkomst }}</a>{% else %}{{ b.doc_naam or b.doc_id }}{% endif %}{% if b.beschrijving %} — {{ b.beschrijving }}{% endif %}</li>
-{% endfor %}
-</ul>
-{% elif nc.reasoning %}
-<p class="reasoning"><em>Waarop gebaseerd (wat de tool aantrof):</em></p>
-<ul class="reasoning">
-{% for r in nc.reasoning %}<li>{{ r }}</li>{% endfor %}
-</ul>
-{% endif %}
+
 {% if nc.pattern_note %}<p class="pattern">{{ nc.pattern_note }}</p>{% endif %}
 
 <div class="recommendation">
@@ -63,3 +48,5 @@
 </tbody>
 </table>
 {% endif %}
+
+{% include "management-memo/partials/bijlage-verwijzing.html.j2" %}

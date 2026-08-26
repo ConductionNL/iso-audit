@@ -10,15 +10,18 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from iso_audit.api import overzicht as ov
 from iso_audit.api import runs as runs_mod
+from iso_audit.api import uitlevering
 from iso_audit.api.audit_log import log_event
 from iso_audit.api.auth_gate import identiteit_van
 from iso_audit.api.deps import Audits
 from iso_audit.api.registry import MANIFEST, RegistryError, run_code
+from iso_audit.api.routes_memo import MEMO_PDF
 from iso_audit.api.session import RunLooptError, SessionError
 
 
@@ -74,6 +77,36 @@ class RunStartRequest(BaseModel):
 def maak_router(audits: Audits) -> APIRouter:
     """Router voor `/audits/{audit_id}` en de run-routes daaronder."""
     router = APIRouter(prefix="/audits/{audit_id}")
+
+    @router.get("/download")
+    def download(
+        audit_id: str,
+        scope: str = Query("memo", pattern="^(memo|bewijslast)$"),
+    ) -> Response:
+        """Lever de output als zip, zodat de auditor er daadwerkelijk bij kan.
+
+        De export meldde eerder alleen een serverpad in een pod met een read-only filesystem,
+        achter een oauth-proxy. Niemand kon daarbij, en dat gold ook voor de bewijslast-rapporten.
+        """
+        sessie = audits.sessie(audit_id)
+        normen = audits.registry.normen_van(audit_id)
+        try:
+            inhoud = uitlevering.bouw_zip(
+                audit_id,
+                sessie.dir,
+                scope=scope,
+                run_code=run_code(normen),
+                memo_pdf=MEMO_PDF,
+            )
+        except uitlevering.UitleveringError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return Response(
+            content=inhoud,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{audit_id}_{scope}.zip"',
+            },
+        )
 
     @router.get("")
     def audit_detail(audit_id: str, request: Request) -> dict[str, object]:

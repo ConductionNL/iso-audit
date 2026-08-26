@@ -12,9 +12,12 @@
 </ul>
 
 <h3>Geraadpleegde bronnen</h3>
+{# Met de aanduiding erbij: "Google Drive" zegt niet wélke map. Zonder die identificatie is
+   de scope van de audit niet na te trekken en is de regel decoratie. #}
 <ul>
 {% for bron in memo.context.sources %}
-  <li>{{ bron }}</li>
+  <li>{{ bron.naam }}{% if bron.url %} — <a href="{{ bron.url }}">{{ bron.identificatie or bron.url }}</a>
+  {%- elif bron.identificatie %} — {{ bron.identificatie }}{% endif %}</li>
 {% endfor %}
 {% if memo.context.dataset_counts %}
   <li>Bevindingen-dataset —

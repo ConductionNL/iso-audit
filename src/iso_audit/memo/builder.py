@@ -102,6 +102,7 @@ def _nc_block(
     norm_db: NormDatabase,
     detector: DefaultPatternDetector,
     language: str,
+    code: str,
 ) -> NCBlock:
     """Eén blok per thema. De titel is het thema; bij `Overig` is dat er niet, dus de bevinding."""
     eerste = groep.bevindingen[0]
@@ -109,6 +110,7 @@ def _nc_block(
     acties = [a for f in groep.bevindingen for a in f.actions]
     maatregelen = [f.corrective_measure for f in groep.bevindingen if f.corrective_measure]
     return NCBlock(
+        code=code,
         title=titel,
         citations=_groep_citations(groep, norm_db, language),
         kern=groep.kern,
@@ -124,7 +126,9 @@ def _nc_block(
     )
 
 
-def _improvement_block(groep: Themagroep, norm_db: NormDatabase, language: str) -> ImprovementBlock:
+def _improvement_block(
+    groep: Themagroep, norm_db: NormDatabase, language: str, code: str
+) -> ImprovementBlock:
     """Eén verbeterblok per thema, met alle waarnemingen erin.
 
     Niet één representant per cluster, zoals het was: van drie waarnemingen op hetzelfde thema
@@ -140,6 +144,7 @@ def _improvement_block(groep: Themagroep, norm_db: NormDatabase, language: str) 
     ]
     suggesties = [f.suggestion.strip() for f in groep.bevindingen if f.suggestion]
     return ImprovementBlock(
+        code=code,
         title=titel,
         citations=_groep_citations(groep, norm_db, language),
         kern=groep.kern,
@@ -203,13 +208,15 @@ def build_memo(
     # pagina's (gemeten 2026-08-26), terwijl het handgemaakte Q2-memo er twee had. Zie
     # `memo/groepering.py` voor waarom op thema en niet op clausule gebundeld wordt.
     nc_blocks = [
-        _nc_block(groep, findings, norm_db, detector, lang) for groep in groepeer_ncs(findings)
+        _nc_block(groep, findings, norm_db, detector, lang, f"NC {i}")
+        for i, groep in enumerate(groepeer_ncs(findings), start=1)
     ]
     # Verbeterpunten bundelen op thema en niet op clausule: op de werkset van 2026-08-25 haalde
     # geen enkele clausule de drempel, terwijl de 53 OFI's zich over 16 thema's verdeelden.
     # Daar zitten de patronen, en een verbeteradvies gaat over een patroon.
     improvements = [
-        _improvement_block(groep, norm_db, lang) for groep in groepeer_ofis(findings, threshold)
+        _improvement_block(groep, norm_db, lang, f"OFI {i}")
+        for i, groep in enumerate(groepeer_ofis(findings, threshold), start=1)
     ]
 
     stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")

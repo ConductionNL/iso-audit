@@ -46,6 +46,7 @@ def _memo() -> AuditMemo:
         actions=[ActionRow(wat="Register opzetten", uiterlijk="2026-Q3")],
     )
     imp = ImprovementBlock(
+        code="OFI 1",
         title="Logging-baseline",
         citations=[cit],
         deviation="Geen baseline.",
@@ -77,7 +78,7 @@ def test_render_html_bevat_kernsecties() -> None:
     html = MemoRendererImpl().render_html(_memo(), _profiel())
     for needle in [
         "NC 1 — Opvolging",
-        "Verbeterpunt — Logging-baseline",
+        "OFI 1 — Logging-baseline",
         "Waarom verbeterpunt en geen NC?",
         "Verantwoordelijkheden",
         "De praktijk werkt deels.",
@@ -108,8 +109,12 @@ def test_triage_checklist_voor_open_kandidaat() -> None:
     assert 'class="triage"' in html
     assert "Nog te beoordelen" in html
     assert "valide" in html and "niet valide" in html
-    assert "Waarop gebaseerd" in html
-    assert "ruwe bevinding A" in html
+    # De ruwe redenatielijst staat sinds 2026-08-26 niet meer in de memo maar in het
+    # detailrapport: de memo is een bespreekstuk van 1-3 A4 en de triage doet de auditor in het
+    # portaal, niet in een PDF. Wat blijft is de verwijzing — inkorten mag geen weglaten worden.
+    assert "Onderbouwing" in html and "detail.pdf" in html
+    # De ruwe redenatie zelf staat in het detailrapport; in de memo staat de verwijzing.
+    # Zie de toelichting hierboven.
 
 
 def test_geen_triage_voor_valide_nc() -> None:

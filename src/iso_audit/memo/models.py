@@ -7,9 +7,9 @@ strikte velden, geen impliciete defaults waar een keuze betekenis heeft.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 Severity = Literal["NC", "OFI", "POSITIVE", "UNCLASSIFIED"]
 HistoricalStatus = Literal["open", "in_progress", "closed"]
@@ -113,6 +113,9 @@ class ActionRow(BaseModel):
 class NCBlock(BaseModel):
     """Eén NC-blok: kan meerdere clausules citeren en meerdere evidence-items bundelen."""
 
+    code: str = ""
+    """"NC 1", "NC 2", … — zodat een blok in een vergadering aan te wijzen is en in het
+    detailrapport terug te vinden. Zo deed het handgemaakte Q2-memo het ook."""
     title: str
     citations: list[ClauseCitation]
     kern: str = ""
@@ -138,6 +141,7 @@ class NCBlock(BaseModel):
 class ImprovementBlock(BaseModel):
     """Verbeterpunt met verplichte classificatie-rationale."""
 
+    code: str = ""  # "OFI 1", "OFI 2", … — zie NCBlock.code
     title: str
     citations: list[ClauseCitation]
     kern: str = ""  # synthese-zin uit de review; zie NCBlock.kern
@@ -147,12 +151,32 @@ class ImprovementBlock(BaseModel):
     bronnen: list[BronRef] = Field(default_factory=list)  # brondocumenten met links
 
 
+class Bronaanduiding(BaseModel):
+    """Eén geraadpleegde bron, met de aanduiding waarmee je hem terugvindt.
+
+    "Google Drive" zegt niets — wélke map? Zonder identificatie kan een externe auditor de scope
+    van de audit niet natrekken en is de regel decoratie. `identificatie` is de map-id, het
+    projectsleutelwoord of het pad; `url` is de klikbare vorm als die bestaat.
+    """
+
+    naam: str
+    identificatie: str = ""
+    url: str | None = None
+
+
+def _als_bronaanduiding(waarde: object) -> object:
+    """Een kale string blijft werken: bestaande `memo-input.yaml` heeft `sources: [str]`."""
+    if isinstance(waarde, str):
+        return {"naam": waarde}
+    return waarde
+
+
 class MemoContext(BaseModel):
     """Context-sectie: data-gedreven, niet hardcoded."""
 
     audit_cycle: str
     scope: dict[str, str]  # norm-slug -> geauditeerde hoofdstukken
-    sources: list[str]
+    sources: list[Annotated[Bronaanduiding, BeforeValidator(_als_bronaanduiding)]]
     dataset_counts: dict[str, int]  # totaal + per severity
     scope_caveat: str
     independence_caveat: str | None = None

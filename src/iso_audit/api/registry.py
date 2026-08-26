@@ -271,6 +271,18 @@ class AuditRegistry:
 
     # --- activiteit ---------------------------------------------------------
 
+    def normen_van(self, aid: str) -> list[str]:
+        """De normcodes van een audit, uit het manifest.
+
+        Niet uit het id afleiden: `audit_id` verbindt de codes met een `_` en is nadrukkelijk
+        niet terug te parsen. Het manifest houdt ze expliciet, en dat is de enige waarheid.
+        """
+        import json
+
+        ruw = json.loads((self.eis(aid) / MANIFEST).read_text(encoding="utf-8"))
+        codes = ruw.get("normen") or []
+        return [str(c) for c in codes]
+
     def archiveer(self, aid: str, *, door: str, reden: str) -> Path:
         """Haal een audit uit het overzicht door hem naar het archief te verplaatsen.
 

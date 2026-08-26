@@ -6,6 +6,59 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — de output is te downloaden
+
+De export meldde alleen een serverpad:
+`PDF: /var/lib/iso-audit/audits/27001_9001-2026-Q3/Auditmemo_management.pdf`. Dat is een pad in
+een pod met een read-only filesystem, achter een oauth-proxy. Niemand kan daarbij. Er was in de
+hele API **geen enkele download-route** — ook de bewijslast-rapporten van 8 MB waren
+onbereikbaar. Een tool dat bewijs produceert dat niemand kan ophalen, heeft geen bewijs
+geproduceerd.
+
+`GET /audits/{id}/download?scope=memo|bewijslast` levert een zip. `memo` is alleen het
+managementmemo, om te bespreken; `bewijslast` is het hele pakket — memo, werkset, runs,
+triage-trail en de auditrapporten — om te archiveren en te overleggen.
+
+Elke zip draagt een `INHOUD.md` met per bestand waar het vandaan komt. Dat is geen beleefdheid:
+de auditrapporten in `rapporten/` zijn **niet** audit-gescoped in het datamodel, dus de selectie
+berust op een afleidbare regel (de normcode in de bestandsnaam) en die hoort leesbaar in het
+pakket te staan in plaats van alleen in de broncode. Wat de regel niet vangt, zit er niet in en
+het manifest zegt dat.
+
+### Changed — 2026-08-26 — de memo is een bespreekstuk geworden
+
+Drie dingen, alle drie gemeld door de auditor.
+
+**Bronnen met een identificatie.** "Geraadpleegde bronnen: Google Drive, Jira, Planning,
+Nextcloud" is decoratie — wélke Drive-map, wélk Jira-project? Zonder die aanduiding kan een
+externe auditor de scope van de audit niet natrekken. Elke bron krijgt nu zijn map-id,
+projectsleutel of pad, met een klikbare URL waar die bestaat. Afgeleid uit de instellingen
+waarmee de run draaide (`os.environ` na `naar_omgeving()`), niet uit wat er nú gekoppeld is:
+de memo hoort te zeggen waar de audit op rustte. Geheime velden komen er niet in.
+
+**Codes voor de blokken.** "NC 1 — Back-up & continuïteit", "OFI 1 — Logging & monitoring". Zo is
+een blok in een vergadering aan te wijzen en in het detailrapport terug te vinden — precies zoals
+het handgemaakte Q2-memo het deed.
+
+**Korter.** Normtekst, onderbouwing per clausule en de volledige bronlijst staan nu in het
+detailrapport; elk blok sluit af met een regel die zegt wáár. De eerste drie brondocumenten
+blijven klikbaar in de memo zelf, met "en N andere" erachter — een memo waarin je niet één keer
+kunt doorklikken naar het bewijs, dwingt elke lezer naar de bijlage voor zijn eerste vraag.
+
+Gemeten op de werkset van 2026-08-25, met dezelfde 47 NC's:
+
+| | pagina's |
+|---|---|
+| bij aanvang van de dag | 35 |
+| na bundelen per thema | 27 |
+| na kern in plaats van afwijkingsteksten | 24 |
+| na bronnaam zonder omschrijving | 20 |
+| na deze inkorting (incl. 7 verbeterblokken) | **15** |
+
+Op het formaat van het handgemaakte Q2-memo — twee thema's van drie clausules — past het nu in
+**3 A4**, met een test die daarop staat. Mét alle zeven verbeterblokken erbij is het er vier;
+de drempel (`THEMA_DREMPEL`, nu 3) is de knop daarvoor.
+
 ### Changed — 2026-08-26 — auto-triage doet ook OFI's af
 
 Auto-triage raakte alleen positieve bevindingen. Op de run van 2026-08-25 stonden 136 OFI's en
