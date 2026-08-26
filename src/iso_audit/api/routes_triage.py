@@ -28,6 +28,20 @@ class TriageUpdate(BaseModel):
     reason: str = ""
 
 
+class ActieUpdate(BaseModel):
+    """Wat een auditor aan één actierij mag wijzigen.
+
+    Alleen de vier kolommen van de tabel. `None` betekent "niet aanraken" — een leeg tekstveld
+    in de UI mag geen ingevulde eigenaar wissen zonder dat iemand dat bedoelt.
+    """
+
+    wat: str | None = None
+    wie: str | None = None
+    waar: str | None = None
+    uiterlijk: str | None = None
+    reason: str = ""
+
+
 class FindingSummary(BaseModel):
     id: str
     severity: Severity
@@ -91,6 +105,32 @@ def maak_router(audits: Audits) -> APIRouter:
             and _bron_matcht(f, source)
             and _clausule_matcht(f, clause)
         ]
+
+    @router.get("/acties")
+    def lijst_acties(audit_id: str) -> list[dict[str, object]]:
+        """Alle actierijen, zodat eigenaren en deadlines in het portaal ingevuld worden."""
+        return audits.sessie(audit_id).acties()
+
+    @router.post("/findings/{finding_id}/acties/{index}")
+    def actie_bijwerken(
+        audit_id: str, finding_id: str, index: int, update: ActieUpdate, request: Request
+    ) -> dict[str, object]:
+        """Vul een eigenaar, locatie of datum in — mét trail, net als bij triage."""
+        sessie = audits.sessie(audit_id)
+        wie = audits.muteert(audit_id, request)
+        try:
+            return sessie.apply_actie(
+                finding_id,
+                index,
+                wat=update.wat,
+                wie=update.wie,
+                waar=update.waar,
+                uiterlijk=update.uiterlijk,
+                reason=update.reason,
+                actor=wie,
+            )
+        except SessionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     @router.get("/findings/{finding_id}", response_model=Finding)
     def finding_detail(audit_id: str, finding_id: str) -> Finding:

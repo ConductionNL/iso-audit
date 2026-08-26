@@ -6,6 +6,34 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — eigenaren invullen in het portaal, met een besprekingsmodal
+
+De memo levert per NC een actietabel met "wat", en "wie", "waar" en "uiterlijk" stonden er als
+placeholder. De vraag was of die in een los .docx naast het systeem ingevuld mochten worden.
+
+Nee, en dat is geen smaakkwestie: dan bewerkt iemand buiten het systeem en weet de audit-trail
+niet wie wat heeft toegezegd. Een managementmemo waarvan de toezeggingen niet herleidbaar zijn,
+is precies het soort document waar een externe auditor een NC op schrijft.
+
+Dus in het portaal, via dezelfde weg als de triage — onder hetzelfde slot, append-only, met de
+echte actor uit de auth-gate:
+
+- `GET /audits/{id}/acties` — elke actierij met zijn bevinding, clausule en thema.
+- `POST /audits/{id}/findings/{fid}/acties/{index}` — wat, wie, waar of uiterlijk invullen.
+  Een veld dat niet wordt meegestuurd, blijft ongemoeid: een leeg tekstveld in de UI mag geen
+  ingevulde eigenaar wissen zonder dat iemand dat bedoelt. Een wijziging die niets verandert,
+  schrijft geen regel in de trail.
+- `GET /audits/{id}/memo/pdf` — de memo inline, voor de modal. Inline en niet als bijlage; wie
+  hem wil meenemen gebruikt `/download`, dat een zip met manifest levert.
+
+In de UI: een knop **Bespreken** die het memo naast zijn eigen actietabel zet, gegroepeerd op
+thema zodat de indeling gelijk is aan de blokken in het memo. Elke rij bewaart apart en meldt
+dat.
+
+Getest in een echte browser (`tests/e2e/test_bespreekmodal.py`), inclusief de controle dat een
+ingevulde eigenaar na opnieuw openen uit de wérkset komt en niet uit het invoerveld. Het patroon
+dat vandaag drie keer terugkwam is dat de route het al kon en de bediening ontbrak.
+
 ### Added — 2026-08-26 — de output is te downloaden
 
 De export meldde alleen een serverpad:

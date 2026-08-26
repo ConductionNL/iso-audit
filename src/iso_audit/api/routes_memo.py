@@ -8,7 +8,7 @@ niet heeft gegeven.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from iso_audit.api.deps import Audits
 from iso_audit.api.session import AuditSession, SessionError
@@ -66,5 +66,24 @@ def maak_router(audits: Audits) -> APIRouter:
         _eis_triage_compleet(sessie)
         audits.muteert(audit_id, request)
         return {"pdf": str(sessie.export_pdf(sessie.dir / MEMO_PDF))}
+
+    @router.get("/pdf")
+    def memo_pdf(audit_id: str) -> Response:
+        """De geëxporteerde memo, inline — voor de besprekingsmodal in het portaal.
+
+        Inline en niet als bijlage: dit is de bespreekweergave. Wie hem wil meenemen gebruikt
+        `/download`, dat een zip met een manifest levert.
+        """
+        pad = audits.sessie(audit_id).dir / MEMO_PDF
+        if not pad.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail="Het memo is nog niet geëxporteerd; draai eerst de export.",
+            )
+        return Response(
+            content=pad.read_bytes(),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{MEMO_PDF}"'},
+        )
 
     return router

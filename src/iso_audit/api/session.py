@@ -369,6 +369,97 @@ class AuditSession:
         )
         return doel
 
+    def acties(self) -> list[dict[str, object]]:
+        """Elke actierij over alle bevindingen, met genoeg context om hem te plaatsen.
+
+        Plat en niet per memo-blok: het blok-nummer wordt door de memo-builder bepaald en zou
+        hier een tweede waarheid worden. De UI groepeert zelf op thema.
+        """
+        rijen: list[dict[str, object]] = []
+        for f in self.findings():
+            for i, actie in enumerate(f.actions):
+                rijen.append(
+                    {
+                        "finding_id": f.id,
+                        "index": i,
+                        "severity": f.severity,
+                        "clause": f.clause,
+                        "thema": f.thema or "",
+                        "triage_status": f.triage_status,
+                        "wat": actie.wat,
+                        "wie": actie.wie,
+                        "waar": actie.waar,
+                        "uiterlijk": actie.uiterlijk,
+                    }
+                )
+        return rijen
+
+    def apply_actie(
+        self,
+        finding_id: str,
+        index: int,
+        *,
+        wat: str | None = None,
+        wie: str | None = None,
+        waar: str | None = None,
+        uiterlijk: str | None = None,
+        reason: str,
+        actor: str = "auditor",
+        now: datetime | None = None,
+    ) -> dict[str, object]:
+        """Vul een eigenaar, locatie of datum in bij één actierij.
+
+        Waarom dit in het portaal hoort en niet in een los .docx: anders bewerkt iemand buiten
+        het systeem en weet de audit-trail niet wie wat heeft toegezegd. Een managementmemo
+        waarvan de toezeggingen niet herleidbaar zijn, is precies waar een externe auditor een
+        NC op schrijft.
+
+        Zelfde discipline als `apply_triage`: onder het slot, append-only, met de echte actor.
+        """
+        with werkset.slot(self.findings_path):
+            findings = self.findings()
+            doel = next((f for f in findings if f.id == finding_id), None)
+            if doel is None:
+                raise SessionError(f"Finding {finding_id!r} niet gevonden.")
+            if not 0 <= index < len(doel.actions):
+                raise SessionError(
+                    f"Finding {finding_id!r} heeft geen actierij {index}; "
+                    f"er zijn er {len(doel.actions)}."
+                )
+            rij = doel.actions[index]
+            stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            wijzigingen: list[tuple[str, str, str]] = []
+            for veld, waarde in (
+                ("wat", wat),
+                ("wie", wie),
+                ("waar", waar),
+                ("uiterlijk", uiterlijk),
+            ):
+                if waarde is None:
+                    continue
+                oud = getattr(rij, veld) or ""
+                if waarde != oud:
+                    wijzigingen.append((f"actions[{index}].{veld}", str(oud)[:120], waarde[:120]))
+                    setattr(rij, veld, waarde)
+            if not wijzigingen:
+                return {"finding_id": finding_id, "index": index, "gewijzigd": 0}
+            self._save(findings)
+            self._log(
+                [
+                    {
+                        "timestamp": stamp,
+                        "actor": actor,
+                        "finding_id": finding_id,
+                        "field": veld,
+                        "from": oud,
+                        "to": nieuw,
+                        "reason": reason,
+                    }
+                    for veld, oud, nieuw in wijzigingen
+                ]
+            )
+            return {"finding_id": finding_id, "index": index, "gewijzigd": len(wijzigingen)}
+
     def counts(self) -> dict[str, int]:
         """Tel findings per severity."""
         telling: dict[str, int] = {}

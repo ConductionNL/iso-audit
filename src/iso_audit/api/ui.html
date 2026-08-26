@@ -36,6 +36,21 @@
   tr.sevrow-OFI td:first-child { border-left:4px solid #b8860b; }
   tr.sevrow-POSITIVE td:first-child { border-left:4px solid #1a7d46; }
   #triage-filter { margin:.4rem 0; display:flex; gap:.4rem; align-items:center; }
+  /* Besprekingsmodal: memo links, actietabel rechts. Eigenaren invullen hoort in het portaal
+     en niet in een los .docx — anders weet de trail niet wie wat heeft toegezegd. */
+  #bespreek-modal { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; display:flex; }
+  #bespreek-modal[hidden] { display:none; }
+  .modal-vlak { background:var(--bg,#fff); margin:auto; width:min(96vw,1400px); height:min(94vh,900px);
+                border-radius:6px; display:flex; flex-direction:column; overflow:hidden; }
+  .modal-kop { display:flex; gap:.6rem; align-items:center; padding:.5rem .8rem; border-bottom:1px solid var(--border); }
+  .modal-kop button { margin-left:auto; }
+  .modal-body { display:flex; flex:1; min-height:0; }
+  #bespreek-pdf { flex:1 1 55%; border:0; border-right:1px solid var(--border); }
+  #bespreek-acties { flex:1 1 45%; overflow:auto; padding:.6rem; }
+  #bespreek-acties table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  #bespreek-acties th, #bespreek-acties td { border-bottom:1px solid var(--border); padding:.25rem; text-align:left; vertical-align:top; }
+  #bespreek-acties input { width:100%; box-sizing:border-box; }
+  #bespreek-acties .thema-kop td { background:var(--soft-bg,#f4f4f4); font-weight:600; }
   .flt[aria-pressed="true"] { outline:2px solid var(--blue); font-weight:600; }
   .exp { cursor:pointer; user-select:none; color:var(--blue); font-weight:700; margin-right:.2rem; }
   tr.detail > td { background:#f6f8fa; font-size:.85rem; padding:.5rem .7rem; }
@@ -94,6 +109,20 @@
 </style>
 </head>
 <body onload="boot()">
+<div id="bespreek-modal" hidden>
+  <div class="modal-vlak">
+    <div class="modal-kop">
+      <strong>Memo bespreken</strong>
+      <span class="note">Vul hier de eigenaar en de datum in; elke wijziging gaat met je naam de audit-trail in.</span>
+      <button class="alt" onclick="sluitBespreking()">Sluiten</button>
+    </div>
+    <div class="modal-body">
+      <iframe id="bespreek-pdf" title="Managementmemo"></iframe>
+      <div id="bespreek-acties"></div>
+    </div>
+  </div>
+</div>
+
 <div id="tip"></div>
 
 <h1>iso-audit — auditorportaal</h1>
@@ -289,6 +318,8 @@
     <div id="memo-editor"></div>
     <button id="btn-preview" onclick="preview()">Genereer preview</button>
     <button id="btn-export" class="alt" onclick="exportPdf()">Exporteer PDF</button>
+    <button id="btn-bespreken" class="alt" onclick="openBespreking()"
+            data-tip="Het memo naast de actietabel, om in de bespreking eigenaren en data vast te leggen.">Bespreken</button>
     <span id="memo-msg" class="ok"></span>
     <div id="memo-frame"></div>
   </div>
@@ -1386,6 +1417,68 @@ async function exportPdf(){
     `<a href="${A("/download?scope=bewijslast")}">download volledige bewijslast (zip)</a>`;
   await loadRuns();
 }
+// --- Besprekingsmodal -------------------------------------------------------
+// Het memo naast zijn eigen actietabel. Eigenaren en data worden hier ingevuld en niet in een
+// los .docx: dan bewerkt iemand buiten het systeem en weet de trail niet wie wat heeft
+// toegezegd. Een memo waarvan de toezeggingen niet herleidbaar zijn, is precies waar een
+// externe auditor een NC op schrijft.
+async function openBespreking(){
+  document.getElementById("bespreek-pdf").src = A("/memo/pdf");
+  document.getElementById("bespreek-modal").hidden = false;
+  await laadActies();
+}
+function sluitBespreking(){
+  document.getElementById("bespreek-modal").hidden = true;
+  document.getElementById("bespreek-pdf").src = "";
+}
+async function laadActies(){
+  const rijen = await j(A("/acties"));
+  const wrap = document.getElementById("bespreek-acties");
+  if(!rijen.length){
+    wrap.innerHTML = `<p class="note">Geen acties. Die komen uit de review; draai die eerst.</p>`;
+    return;
+  }
+  // Op thema groeperen, zodat de tabel dezelfde indeling heeft als de blokken in het memo.
+  const perThema = {};
+  for(const r of rijen){ (perThema[r.thema || "Overig"] ||= []).push(r); }
+  let html = `<table><thead><tr><th>Wat</th><th>Wie</th><th>Waar</th><th>Uiterlijk</th><th></th></tr></thead><tbody>`;
+  for(const [thema, lijst] of Object.entries(perThema)){
+    html += `<tr class="thema-kop"><td colspan="5">${esc(thema)} — ${lijst.length} actie(s)</td></tr>`;
+    for(const r of lijst){
+      const sleutel = `${r.finding_id}|${r.index}`;
+      html += `<tr data-rij="${esc(sleutel)}">
+        <td>${esc(r.wat || "")} <span class="note">${esc(r.severity)} §${esc(r.clause)}</span></td>
+        <td><input class="a-wie" value="${esc(r.wie || "")}" placeholder="rol"></td>
+        <td><input class="a-waar" value="${esc(r.waar || "")}" placeholder="waar"></td>
+        <td><input class="a-uiterlijk" value="${esc(r.uiterlijk || "")}" placeholder="jjjj-mm-dd"></td>
+        <td><button class="alt" onclick="bewaarActie('${esc(sleutel)}',this)">Bewaar</button>
+            <span class="ok"></span></td>
+      </tr>`;
+    }
+  }
+  wrap.innerHTML = html + `</tbody></table>`;
+}
+async function bewaarActie(sleutel, knop){
+  const rij = document.querySelector(`#bespreek-acties tr[data-rij="${CSS.escape(sleutel)}"]`);
+  const [fid, index] = sleutel.split("|");
+  const melding = rij.querySelector(".ok");
+  try {
+    await j(A(`/findings/${encodeURIComponent(fid)}/acties/${index}`), {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        wie: rij.querySelector(".a-wie").value,
+        waar: rij.querySelector(".a-waar").value,
+        uiterlijk: rij.querySelector(".a-uiterlijk").value,
+        reason: "ingevuld tijdens de bespreking",
+      }),
+    });
+    melding.textContent = "✓";
+  } catch(e) {
+    melding.textContent = "⚠ " + (e.message || "mislukt");
+  }
+}
+
 // Eigen hover-tooltip (betrouwbaarder dan native title): toont data-tip bij hover.
 const _tip = document.getElementById("tip");
 document.addEventListener("mouseover", e=>{
