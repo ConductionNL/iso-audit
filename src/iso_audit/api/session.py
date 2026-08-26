@@ -20,6 +20,7 @@ from pathlib import Path
 import yaml
 
 from iso_audit.api import werkset
+from iso_audit.classification.auto_triage import AUTO_ACTOR
 from iso_audit.memo.builder import build_memo
 from iso_audit.memo.models import Finding, MemoInput, Severity, TriageStatus
 from iso_audit.memo.norm_lookup import laad_norm_db
@@ -193,6 +194,15 @@ class _RunState:
     log: list[str] = field(default_factory=list)
 
 
+MACHINE_ACTOREN = frozenset({AUTO_ACTOR})
+"""Actoren die geen mens zijn, en daarom geen NC mogen trieeren.
+
+Een expliciete lijst en geen slimmigheid als "bevat een @": die zou elke bestaande aanroep met
+een generieke actornaam (`"auditor"`, de default, en elke test) omverwerpen, en dat maakt de
+regel eerder uit dan af. Een nieuwe machine-actor moet hier bewust bij — en wie dat vergeet,
+zet zijn eigen naam in de trail, wat een externe auditor meteen ziet."""
+
+
 class AuditSession:
     """Bestand-gebaseerde auditsessie (reproduceerbaar, hervatbaar)."""
 
@@ -284,6 +294,21 @@ class AuditSession:
         doel = next((f for f in findings if f.id == finding_id), None)
         if doel is None:
             raise SessionError(f"Finding {finding_id!r} niet gevonden.")
+        # Een NC trieeren is een auditoordeel en hoort bij een mens-account. Zonder dat is de
+        # beslissing niet te verantwoorden in een externe audit: de trail zegt wie wat besloot,
+        # en daar hoort geen machine te staan. Beide richtingen: bevestigen laat de organisatie
+        # een correctie dragen, `niet_valide` laat een geconstateerd gebrek uit het dossier
+        # verdwijnen. Even zwaar. De regel stond al in `auto_triage`, maar alleen bij het
+        # voorstellen; hier ligt de enige schrijfweg.
+        if (
+            triage_status is not None
+            and (severity or doel.severity) == "NC"
+            and actor in MACHINE_ACTOREN
+        ):
+            raise SessionError(
+                f"Triage van een NC vraagt een mens-account; {actor!r} is er geen. "
+                f"Finding {finding_id!r} blijft {doel.triage_status!r}."
+            )
         stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
         wijzigingen: list[tuple[str, str, str]] = []
 

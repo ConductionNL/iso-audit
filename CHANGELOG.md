@@ -6,6 +6,30 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Security — 2026-08-26 — een NC trieeren vraagt een mens-account, afgedwongen op de schrijfweg
+
+De regel "auto-triage raakt nooit een NC" stond in de docstring van
+`classification/auto_triage.py` en werd daar ook netjes gevolgd — maar alleen bij het
+*voorstellen*. Op de schrijfweg lag niets.
+
+En de schrijfweg is precies wat een externe auditor leest: de trail zegt wie wat besloot. Staat
+daar bij een bevestigde NC een machine-actor, dan is die bevestiging niet te verantwoorden,
+ongeacht hoe zorgvuldig de agent was die het voorstel deed.
+
+`AuditSession.apply_triage()` weigert nu elke triage-beslissing over een NC door een actor uit
+`MACHINE_ACTOREN`, en laat niets half doorgevoerd achter. **Beide richtingen**, niet alleen
+bevestigen: een NC afserveren als `niet_valide` laat een geconstateerd gebrek uit het dossier
+verdwijnen, en dat is even zwaar een auditoordeel als hem dragen. Ook de omweg — in dezelfde
+aanroep iets tot NC promoveren en meteen bevestigen — is dicht.
+
+`MACHINE_ACTOREN` is een expliciete lijst en geen slimmigheid als "de actor bevat een @": die
+zou elke bestaande aanroep met een generieke actornaam omverwerpen en de regel eerder uit dan
+aan zetten. Een nieuwe machine-actor moet er bewust bij; wie dat vergeet, zet zijn eigen naam in
+de trail en dat ziet een auditor meteen.
+
+Gemeten in het cluster: de trail van de huidige audit bevat 33 regels, alle van `auto-triage` en
+alle op positieve bevindingen. Alle 47 NC's staan `open` — zoals het hoort.
+
 ### Added — 2026-08-26 — filteren op triage-status, bron en clausule
 
 De auditor kon in de bevindingentabel alleen op classificatie filteren (NC / OFI / POSITIVE).
