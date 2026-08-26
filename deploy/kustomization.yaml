@@ -7,6 +7,9 @@ resources:
   - serviceaccount.yaml
   - pvc.yaml
   - deployment.yaml
+  # PreSync-gate: wacht tot het image pullbaar is voordat de oude pod wordt vervangen.
+  # Zie image-gate-job.yaml voor waarom (2026-08-26: negen minuten downtime).
+  - image-gate-job.yaml
   - service.yaml
   - ingress.yaml
   - networkpolicy.yaml
@@ -49,4 +52,4 @@ configMapGenerator:
 # eerst publiceren en pas daarna deze regel wijzigen.
 images:
   - name: ghcr.io/conductionnl/iso-audit
-    newTag: "0.2.0a58"
+    newTag: "0.2.0a59"

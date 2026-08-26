@@ -134,6 +134,38 @@ wachten tot Argo gesynct is, het cookie-secret roteren, herstarten en verifiëre
 Het rotteert alléén de key `cookie-secret` met een patch, dus het
 Keycloak-clientsecret dat al in het cluster staat blijft ongemoeid.
 
+### Doe het via een branch, niet rechtstreeks op main
+
+Dit is geen stijlvoorkeur maar het verschil tussen twintig seconden en negen minuten downtime.
+
+Argo synct de nieuwe `newTag` zodra de commit op main staat, terwijl het image dán pas gebouwd
+wordt. De Deployment gebruikt `Recreate` — verplicht bij een RWO-volume — dus de oude pod is al
+weg voordat de nieuwe iets kan pullen. Op 2026-08-26 duurde een build elf minuten (wachttijd op
+een GitHub-runner; de testjob zelf deed 1m43) en lag het portaal er negen minuten uit met
+`ImagePullBackOff`.
+
+Via een branch bestaat dat venster niet: `.github/workflows/image.yml` draait óók op
+`pull_request` en pusht daar al de **versietag**. Het image staat dus op ghcr voordat de merge
+de tag op main brengt, en Argo vindt meteen wat hij zoekt.
+
+    git switch -c fix/iets
+    ./scripts/rollout-portal.sh              # pusht, wacht op het image, merget, wacht op Argo
+
+Een directe push naar main werkt nog steeds, en `deploy/image-gate-job.yaml` zorgt dat het
+portaal daar niet meer van omvalt — maar dan wacht je alsnog op de build met een sync die
+stilstaat. De branch-route is sneller én rustiger.
+
+### De PreSync-gate
+
+`deploy/image-gate-job.yaml` is een Argo-hook die niets doet behalve bestaan: zijn container is
+precies het image dat straks uitgerold wordt. Kan de kubelet dat niet pullen, dan blijft de hook
+onvoltooid, wacht Argo met de sync, en **blijft de oude pod draaien**. Zodra het image
+verschijnt gaat de uitrol verder; na twintig minuten faalt de sync zichtbaar in plaats van
+eindeloos te wachten.
+
+Bewust geen skopeo of crane en geen registry-credentials: de kubelet-pull ís de controle, en die
+test exact wat de echte pod straks ook doet.
+
 ## Verifiëren
 
     kubectl -n iso-platform rollout status deploy/iso-audit-portal

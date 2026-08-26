@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-26 — een uitrol haalt het portaal niet meer onderuit
+
+De uitrol van a58 legde het portaal negen minuten plat. Argo synct de nieuwe `newTag` zodra de
+commit op main staat, terwijl het image pas dáárna gebouwd wordt. Die build duurde deze keer elf
+minuten — wachttijd op een GitHub-runner, de testjob zelf deed 1m43 — en omdat de Deployment
+`Recreate` gebruikt (verplicht bij een RWO-volume) was de oude pod al weg. Resultaat:
+`ImagePullBackOff` op een tag die nog niet bestond. De kubelet herstelde vanzelf zodra het image
+verscheen, maar de downtime was er.
+
+Twee maatregelen, en ze doen iets verschillends.
+
+**De branch-route haalt het venster weg.** `.github/workflows/image.yml` draait óók op
+`pull_request` en pusht daar al de versietag. Via een branch staat het image dus op ghcr vóórdat
+de merge de tag op main brengt, en vindt Argo meteen wat hij zoekt. Dat was al zo; het stond
+alleen nergens als de aangewezen weg. Nu wel, in `deploy/README.md`.
+
+**De PreSync-gate haalt de downtime weg.** `deploy/image-gate-job.yaml` is een Argo-hook die
+niets doet behalve bestaan: zijn container is precies het image dat straks uitgerold wordt
+(kustomize herschrijft de tag mee, met een test die dat bewaakt). Kan de kubelet dat image niet
+pullen, dan blijft de hook onvoltooid, wacht Argo met de sync, en blijft de oude pod draaien.
+Zodra het image verschijnt gaat de uitrol verder; na twintig minuten faalt de sync zichtbaar in
+plaats van eindeloos te wachten.
+
+Bewust geen skopeo of crane en geen registry-credentials: de kubelet-pull ís de controle, en die
+test exact wat de echte pod straks ook doet. Het package is publiek, dus er is niets in te
+richten.
+
+De vorige gate-Job blijft staan tot de volgende sync (`BeforeHookCreation`, niet
+`HookSucceeded`), zodat achteraf te zien is of een uitrol op het image heeft staan wachten.
+
 ### Changed — 2026-08-26 — de memo kort nergens tekst af
 
 Het paginabudget is een **richtgetal**, geen kap. Een paar regels uitlopen voor de netheid mag;
