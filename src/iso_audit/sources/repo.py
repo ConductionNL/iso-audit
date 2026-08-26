@@ -56,6 +56,8 @@ De pipeline bouwt een adapter zonder argumenten (`sources.get(naam)()`), dus dit
 de configuratie binnenkomt: het configuratiescherm schrijft de env-var via `Settings`."""
 
 BEWIJSPADEN: tuple[str, ...] = (
+    "README.md",
+    "profile/README.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
     "CODEOWNERS",
@@ -69,7 +71,12 @@ BEWIJSPADEN: tuple[str, ...] = (
 
 Kort en bekend, want dat is wat een repository aan bewijs oplevert: §5.2 rollen (CODEOWNERS),
 §8.28 veilig programmeren (pre-commit, CONTRIBUTING), §8.8 kwetsbaarheden (dependabot/renovate)
-en 9001 §7.5 gedocumenteerde informatie (README, LICENSE)."""
+en 9001 §7.5 gedocumenteerde informatie (README, LICENSE).
+
+`profile/README.md` is het **org-profiel**: in de speciale repo `<org>/.github` staat de tekst
+die GitHub op de organisatiepagina toont. Daar staat wat een organisatie over zichzelf zegt te
+zijn en te maken, en dat is 9001 §4.1-materiaal. Tot 2026-08-26 stond `README.md` zelfs helemaal
+niet in deze lijst terwijl de tekst hierboven al beweerde van wel."""
 
 WORKFLOWMAPPEN: tuple[str, ...] = (".github/workflows", ".forgejo/workflows")
 """Geautomatiseerde poorten: §8.25 en §8.31. Beide forges, want de mapnaam verschilt."""

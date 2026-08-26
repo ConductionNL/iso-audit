@@ -301,3 +301,9 @@ def test_een_onleesbare_repository_komt_in_de_dekking() -> None:
     assert list(bron.list_documents()) == []
     assert "github:ConductionNL/hydra" in bron.overgeslagen
     assert "404" in bron.overgeslagen["github:ConductionNL/hydra"]
+
+
+def test_de_readme_en_het_org_profiel_staan_in_de_bewijspaden() -> None:
+    """De docstring beweerde dat README meetelde; de lijst had hem niet."""
+    assert "README.md" in BEWIJSPADEN
+    assert "profile/README.md" in BEWIJSPADEN

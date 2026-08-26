@@ -165,3 +165,24 @@ def test_andere_bronnen_krijgen_geen_vaste_koppeling() -> None:
     doc = {"id": "d1", "naam": "SECURITY.md", "herkomst": "Drive", "tekst": "niets herkenbaars"}
     gekoppeld, niet = _koppel([doc])
     assert not gekoppeld and len(niet) == 1
+
+
+# --- wat de organisatie over zichzelf zegt ----------------------------------
+
+
+def test_het_org_profiel_hangt_aan_context_van_de_organisatie() -> None:
+    """`<org>/.github` → `profile/README.md` is de tekst die GitHub op de organisatiepagina toont.
+
+    Daar staat wat een organisatie zegt te zijn en te maken; of dat strookt met het interne
+    beleid is 9001 §4.1. Er wordt niets ingevuld — alleen gelezen wat er staat.
+    """
+    assert voor_repo_document("profile/README.md") == (("4.1", "9001"),)
+
+
+def test_de_readme_telt_als_gedocumenteerde_informatie() -> None:
+    """Stond tot 2026-08-26 niet eens in de bewijspaden, terwijl de docstring beweerde van wel."""
+    assert voor_repo_document("README.md") == (("7.5", "9001"),)
+
+
+def test_de_over_ons_pagina_hangt_aan_context() -> None:
+    assert voor_webpagina("https://www.conduction.nl/about/") == (("4.1", "9001"),)

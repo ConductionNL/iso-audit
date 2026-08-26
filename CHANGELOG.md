@@ -6,6 +6,30 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — wat de organisatie over zichzelf zegt, als bewijs
+
+Er wordt **niets ingevuld** — alleen gelezen wat er staat. Drie plekken waar een organisatie
+zichzelf beschrijft, hangen nu aan 9001 §4.1 (context van de organisatie) en §7.5
+(gedocumenteerde informatie):
+
+- `profile/README.md` in de speciale repo `<org>/.github` — de tekst die GitHub op de
+  organisatiepagina toont. Voor ConductionNL 3.034 tekens over wat het bedrijf is en maakt.
+- `README.md` van een repository.
+- `/about/` op de website.
+
+**En een fout in eigen werk:** `README.md` stond helemaal niet in de bewijspaden, terwijl de
+docstring eronder al beweerde dat hij meetelde voor 9001 §7.5. Een lijst en een toelichting die
+elkaar tegenspreken — precies het soort stille onwaarheid waar dit tool bevindingen over schrijft.
+
+De proefrun met de `.github`-repo erbij: 44 documenten, alle 44 gekoppeld. En de API-limiet sloeg
+toe, wat meteen de melding van vanmiddag onder echte omstandigheden toetste:
+
+> github ConductionNL/iso-audit: de API-limiet is bereikt (60 aanroepen per uur); zonder token is
+> die 60, met token 5000
+
+Die repository staat daarmee in de dekking als overgeslagen, met reden — in plaats van stil te
+verdwijnen.
+
 ### Fixed — 2026-08-26 — twee gaten die de proefrun blootlegde
 
 De eerste proefrun zonder token over drie publieke repo's en drie webpagina's leverde 26

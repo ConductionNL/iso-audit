@@ -27,6 +27,8 @@ Koppeling = tuple[tuple[str, str], ...]
 """Paren van (clausule, normcode)."""
 
 REPO_BESTANDEN: Final[dict[str, Koppeling]] = {
+    "README.md": (("7.5", "9001"),),
+    "profile/README.md": (("4.1", "9001"),),
     "SECURITY.md": (("8.8", "27001"), ("5.24", "27001")),
     "CONTRIBUTING.md": (("8.28", "27001"),),
     "CODEOWNERS": (("5.2", "27001"), ("8.32", "27001")),
@@ -40,7 +42,13 @@ REPO_BESTANDEN: Final[dict[str, Koppeling]] = {
 
 §8.8 technische kwetsbaarheden, §5.24 incidentplanning (een SECURITY.md zegt waar een melding
 heen gaat), §8.28 veilig programmeren, §5.2 rollen, §8.32 wijzigingsbeheer, §5.32 intellectueel
-eigendom."""
+eigendom, 9001 §7.5 gedocumenteerde informatie.
+
+`profile/README.md` — het org-profiel in `<org>/.github` — hangt aan 9001 §4.1, context van de
+organisatie. Daar staat wat een organisatie publiek zegt te zijn en te maken; of dat strookt met
+het interne beleid is precies wat een auditor wil kunnen leggen.
+
+Hier wordt niets ingevuld of verondersteld: er wordt alleen gelezen wat er staat."""
 
 REPO_WORKFLOWS: Final[Koppeling] = (
     ("8.25", "27001"),
@@ -60,6 +68,7 @@ REPO_INSTELLINGEN: Final[Koppeling] = (
 rolverdeling die hier wel of niet is afgedwongen."""
 
 WEBSITE_PADEN: Final[dict[str, Koppeling]] = {
+    "/about": (("4.1", "9001"),),
     "/privacy": (("5.34", "27001"),),
     "/terms": (("5.31", "27001"), ("8.2", "9001")),
     "/quality": (("5.1", "27001"), ("5.2", "9001")),
@@ -69,7 +78,8 @@ WEBSITE_PADEN: Final[dict[str, Koppeling]] = {
 """Publieke toezeggingen per padprefix.
 
 §5.34 privacy, §5.31 wettelijke en contractuele eisen, 9001 §8.2 eisen aan producten en
-diensten, §5.1 beleid, 9001 §5.2 kwaliteitsbeleid, §5.5 contact met autoriteiten.
+diensten, §5.1 beleid, 9001 §5.2 kwaliteitsbeleid, §5.5 contact met autoriteiten, 9001 §4.1
+context van de organisatie (`/about/` — wat de organisatie publiek zegt te zijn).
 
 Padprefix en geen volledige URL: `/privacy/` en `/privacy/cookies/` gaan over hetzelfde."""
 
