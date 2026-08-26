@@ -83,6 +83,7 @@ class ForgeClient(Protocol):
     forge: str
 
     def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens: ...
+    def repositories(self, eigenaar: str) -> tuple[list[str], str]: ...
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand: ...
     def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]: ...
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen: ...
@@ -195,6 +196,29 @@ class GitHubClient:
         d = antwoord.json()
         return True, bool(d.get("required_pull_request_reviews")), ""
 
+    def repositories(self, eigenaar: str) -> tuple[list[str], str]:
+        """Alle niet-gearchiveerde repositories van een organisatie.
+
+        Gearchiveerde vallen af: die tonen hoe er ooit gewerkt werd, niet hoe er nu gewerkt
+        wordt, en een audit gaat over het heden. Hoeveel er afvielen komt in de dekking.
+        """
+        namen: list[str] = []
+        gearchiveerd = 0
+        for pagina in range(1, 11):
+            antwoord = self._get(f"/orgs/{eigenaar}/repos?per_page=100&page={pagina}")
+            if antwoord.status_code != 200:
+                return namen, duiding(antwoord)
+            blok = antwoord.json()
+            if not blok:
+                break
+            for repo in blok:
+                if repo.get("archived"):
+                    gearchiveerd += 1
+                    continue
+                namen.append(str(repo.get("name", "")))
+        reden = f"{gearchiveerd} gearchiveerde repository(s) overgeslagen" if gearchiveerd else ""
+        return namen, reden
+
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
         antwoord = self._get(f"/repos/{eigenaar}/{naam}/contents/{pad}")
         if antwoord.status_code == 404:
@@ -289,6 +313,27 @@ class CodebergClient:
             bool(d.get("enable_approvals_whitelist") or d.get("required_approvals", 0) > 0),
             "",
         )
+
+    def repositories(self, eigenaar: str) -> tuple[list[str], str]:
+        """Zie `GitHubClient.repositories`. Forgejo pagineert met `limit`/`page`."""
+        namen: list[str] = []
+        gearchiveerd = 0
+        for pagina in range(1, 11):
+            antwoord = _haal(
+                self._sessie, f"{self.basis}/orgs/{eigenaar}/repos?limit=50&page={pagina}"
+            )
+            if antwoord.status_code != 200:
+                return namen, duiding(antwoord)
+            blok = antwoord.json()
+            if not blok:
+                break
+            for repo in blok:
+                if repo.get("archived"):
+                    gearchiveerd += 1
+                    continue
+                namen.append(str(repo.get("name", "")))
+        reden = f"{gearchiveerd} gearchiveerde repository(s) overgeslagen" if gearchiveerd else ""
+        return namen, reden
 
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
         antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/contents/{pad}")

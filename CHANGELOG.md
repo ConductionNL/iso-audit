@@ -6,6 +6,35 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — een hele organisatie als scope: `github:ConductionNL/*`
+
+De API heeft er inderdaad iets voor: `GET /orgs/{org}/repos`. 414 namen intypen is geen
+configuratie maar een overschrijffout die wacht om te gebeuren. Een `*` als naam betekent nu:
+alle repository's van die eigenaar op het moment van de run. Live getoetst: **385 repository's
+in 8,2 seconden**.
+
+Gearchiveerde vallen af — die tonen hoe er ooit gewerkt werd, niet hoe er nu gewerkt wordt, en
+een audit gaat over het heden. Hoeveel er afvielen komt in de dekking te staan (29 bij
+ConductionNL), en de opgeloste lijst ook: "alle repository's van de organisatie" is een prima
+auditscope, maar alleen als achteraf vaststaat welke dat op dat moment waren.
+
+**Correctie op een eerder getal in deze changelog:** het zijn geen 183 repository's maar **414**
+(385 actief, 29 gearchiveerd, 37 privé). `gh repo list --limit 200` kapte de lijst af en ik nam
+de uitkomst over zonder te controleren of hij compleet was.
+
+**De rem zit in het PR-aggregaat.** Gemeten kosten voor 385 actieve repository's:
+
+| | aanroepen | tijd |
+|---|---|---|
+| listing | 5 pagina's | 10s |
+| alles behalve PR-aggregaat | 1.540 | ~12 min |
+| mét PR-aggregaat op 20 | 9.625 | ~72 min |
+
+Die laatste is bijna twee keer de limiet van 5.000 per uur. Voor een org-brede run hoort
+`REPO_MAX_PR` daarom op 0 (of laag); dat staat nu bij de constante en in het configuratiescherm.
+Het aggregaat blijft waardevol voor een handvol repository's — daar is het waargenomen gedrag
+juist het sterkste §8.32-bewijs.
+
 ### Fixed — 2026-08-26 — "niet gekoppeld" zegt nu wat er ontbreekt
 
 Het configuratiescherm toonde bij `website` en `repo`: *"De verbinding kon niet worden gelegd.

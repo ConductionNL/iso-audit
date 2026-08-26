@@ -86,7 +86,19 @@ MAX_PR = 20
 
 Twintig en niet honderd: gemeten 0,45s per API-aanroep, en elke PR kost een extra aanroep voor
 zijn reviews. Twintig is genoeg om een patroon te zien en houdt een repo onder de tien seconden.
-Instelbaar via `REPO_MAX_PR` — een hardgecodeerde grens is niet te testen."""
+Instelbaar via `REPO_MAX_PR` — een hardgecodeerde grens is niet te testen.
+
+**Let op bij een hele organisatie.** Gemeten op 2026-08-26 telt ConductionNL 414 repository's
+(385 actief). Zonder PR-aggregaat kost dat 1.540 aanroepen, ongeveer twaalf minuten. Mét, op 20,
+wordt het 9.625 aanroepen en dat is bijna twee keer de limiet van 5.000 per uur. Zet `REPO_MAX_PR`
+op 0 voor een org-brede run, of kies een handvol repository's."""
+
+ALLE = "*"
+"""Wildcard voor "alle repository's van deze eigenaar", bv. `github:ConductionNL/*`.
+
+414 namen intypen is geen configuratie maar een overschrijffout die wacht om te gebeuren. De
+scope wordt daarmee "alle repository's van deze organisatie op het moment van de run", en welke
+dat waren komt in de dekking te staan — anders is achteraf niet te zeggen wat er geauditeerd is."""
 
 MAX_BESTAND = 200_000
 """Tekens per opgehaald bestand. Een CODEOWNERS van 200 kB is geen bewijs maar een ongeluk."""
@@ -244,9 +256,35 @@ class RepoSource:
             self._clients[forge] = CLIENTS[forge](token=os.environ.get(CODEBERG_TOKEN_ENV, ""))
         return self._clients[forge]
 
+    def _uitgevouwen(self) -> list[RepoVerwijzing]:
+        """Vervang elke `*` door de repository's die de forge noemt.
+
+        De opgeloste lijst komt in de dekking. "Alle repository's van de organisatie" is een
+        prima auditscope, maar alleen als achteraf vaststaat welke dat op dat moment waren.
+        """
+        uitgevouwen: list[RepoVerwijzing] = []
+        for verwijzing in self._verwijzingen:
+            if verwijzing.naam != ALLE:
+                uitgevouwen.append(verwijzing)
+                continue
+            namen, reden = self._client(verwijzing.forge).repositories(verwijzing.eigenaar)
+            if reden:
+                self.overgeslagen[f"{verwijzing.forge}:{verwijzing.eigenaar}/*"] = reden
+            logger.info(
+                "Organisatie %s:%s leverde %d repository(s)",
+                verwijzing.forge,
+                verwijzing.eigenaar,
+                len(namen),
+            )
+            uitgevouwen.extend(
+                RepoVerwijzing(forge=verwijzing.forge, eigenaar=verwijzing.eigenaar, naam=n)
+                for n in namen
+            )
+        return uitgevouwen
+
     def list_documents(self, filter: dict[str, object] | None = None) -> Iterator[Document]:
         """Per repository: één document met de instellingen, plus de aanwezige bewijspaden."""
-        for verwijzing in self._verwijzingen:
+        for verwijzing in self._uitgevouwen():
             client = self._client(verwijzing.forge)
             try:
                 gegevens = client.repository(verwijzing.eigenaar, verwijzing.naam)

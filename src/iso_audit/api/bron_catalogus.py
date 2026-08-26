@@ -230,7 +230,9 @@ STANDAARD: list[BronDefinitie] = [
                 hint=(
                     "Eén per regel, als forge:eigenaar/naam — bijvoorbeeld "
                     "github:ConductionNL/iso-audit of codeberg:conduction/conduction-website. "
-                    "De forge staat er bewust bij: die wordt nooit uit de naam geraden."
+                    "Een * als naam betekent alle repository's van die organisatie "
+                    "(github:ConductionNL/*); gearchiveerde vallen af. De forge staat er "
+                    "bewust bij: die wordt nooit uit de naam geraden."
                 ),
             ),
             Veld(
@@ -286,7 +288,9 @@ STANDAARD: list[BronDefinitie] = [
                 verplicht=False,
                 hint=(
                     "Over hoeveel recent samengevoegde wijzigingen het aandeel zonder review "
-                    "wordt geteld. Standaard 20; elke wijziging kost een extra aanroep."
+                    "wordt geteld. Standaard 20; elke wijziging kost een extra aanroep. Zet dit "
+                    "op 0 bij een hele organisatie: 385 repository's x 20 is 9.625 aanroepen, "
+                    "bijna twee keer de limiet van 5.000 per uur."
                 ),
             ),
         ],

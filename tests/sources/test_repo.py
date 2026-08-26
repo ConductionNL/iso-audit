@@ -307,3 +307,67 @@ def test_de_readme_en_het_org_profiel_staan_in_de_bewijspaden() -> None:
     """De docstring beweerde dat README meetelde; de lijst had hem niet."""
     assert "README.md" in BEWIJSPADEN
     assert "profile/README.md" in BEWIJSPADEN
+
+
+# --- een hele organisatie ---------------------------------------------------
+
+
+def test_een_ster_staat_voor_alle_repositories_van_de_eigenaar() -> None:
+    """414 namen intypen is geen configuratie maar een overschrijffout die wacht."""
+    verwijzingen = lees_verwijzingen([{"forge": "github", "eigenaar": "ConductionNL", "naam": "*"}])
+    assert verwijzingen[0].sleutel == "github:ConductionNL/*"
+
+
+class _OrgClient:
+    forge = "github"
+
+    def __init__(self, namen: list[str], reden: str = "") -> None:
+        self._namen = namen
+        self._reden = reden
+
+    def repositories(self, eigenaar: str) -> tuple[list[str], str]:
+        return self._namen, self._reden
+
+    def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens:
+        return Repositoriegegevens(
+            naam=f"{eigenaar}/{naam}",
+            forge="github",
+            url="",
+            prive=False,
+            gearchiveerd=False,
+            hoofdbranch="main",
+        )
+
+    def bestand(self, eigenaar: str, naam: str, pad: str) -> object: ...
+
+    def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
+        return [], ""
+
+    def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
+        return Wijzigingen()
+
+
+def _bron_met(namen: list[str], reden: str = "") -> RepoSource:
+    bron = RepoSource([{"forge": "github", "eigenaar": "ConductionNL", "naam": "*"}])
+    bron._clients["github"] = _OrgClient(namen, reden)  # type: ignore[assignment]
+    return bron
+
+
+def test_de_ster_wordt_uitgevouwen_tot_echte_repositories() -> None:
+    docs = list(_bron_met(["iso-audit", "hydra"]).list_documents())
+    titels = {d.titel for d in docs if d.type == "repository-instellingen"}
+    assert titels == {
+        "ConductionNL/iso-audit — repository-instellingen",
+        "ConductionNL/hydra — repository-instellingen",
+    }
+
+
+def test_gearchiveerde_repositories_worden_gemeld() -> None:
+    """Ze vallen af omdat ze tonen hoe er ooit gewerkt werd — maar stil weglaten mag niet."""
+    bron = _bron_met(["iso-audit"], "29 gearchiveerde repository(s) overgeslagen")
+    list(bron.list_documents())
+    assert "29 gearchiveerde" in bron.overgeslagen["github:ConductionNL/*"]
+
+
+def test_een_lege_organisatie_levert_geen_documenten() -> None:
+    assert list(_bron_met([]).list_documents()) == []
