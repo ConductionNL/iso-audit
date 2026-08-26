@@ -171,9 +171,11 @@ def metadata_tekst(gegevens: Repositoriegegevens, wijzigingen: Wijzigingen) -> s
     Een onbekende instelling als bevinding rapporteren is een verzonnen bevinding.
     """
 
+    onbekend = gegevens.bescherming_reden or "niet vast te stellen met het gebruikte token"
+
     def ja_nee(waarde: bool | None, ja: str, nee: str) -> str:
         if waarde is None:
-            return "niet vast te stellen met het gebruikte token"
+            return onbekend
         return ja if waarde else nee
 
     regels = [
@@ -189,7 +191,11 @@ def metadata_tekst(gegevens: Repositoriegegevens, wijzigingen: Wijzigingen) -> s
         + ".",
     ]
     if wijzigingen.onbekend:
-        regels.append("Recente samenvoegingen: niet vast te stellen met het gebruikte token.")
+        regels.append(
+            "Recente samenvoegingen: "
+            + (wijzigingen.reden or "niet vast te stellen met het gebruikte token")
+            + "."
+        )
     elif wijzigingen.bekeken:
         regels.append(
             f"Van de laatste {wijzigingen.bekeken} samengevoegde wijzigingen zijn er "
@@ -214,6 +220,8 @@ class RepoSource:
         self._max_pr = int(os.environ.get("REPO_MAX_PR") or MAX_PR)
         self._clients: dict[str, ForgeClient] = {}
         self._gegevens: dict[str, Repositoriegegevens] = {}
+        self.overgeslagen: dict[str, str] = {}
+        """Wat er niet gelezen kon worden en waarom — gaat mee in de dekking."""
 
     def _client(self, forge: str) -> ForgeClient:
         if forge in self._clients:
@@ -259,9 +267,18 @@ class RepoSource:
                 )
 
     def _paden(self, client: ForgeClient, verwijzing: RepoVerwijzing) -> list[str]:
+        """De op te halen paden. Een map die niet gelezen kon worden, wordt gemeld.
+
+        Zonder die melding ziet "geen workflows" er identiek uit als "ik mocht de workflowmap
+        niet lezen" — het eerste is een bevinding, het tweede een gat in de dekking.
+        """
         paden = list(BEWIJSPADEN)
         for map_ in WORKFLOWMAPPEN:
-            paden.extend(client.bestanden_in_map(verwijzing.eigenaar, verwijzing.naam, map_))
+            gevonden, reden = client.bestanden_in_map(verwijzing.eigenaar, verwijzing.naam, map_)
+            paden.extend(gevonden)
+            if reden:
+                self.overgeslagen[f"{verwijzing.sleutel}:{map_}"] = reden
+                logger.warning("Map %s van %s niet gelezen: %s", map_, verwijzing.sleutel, reden)
         return paden
 
     def fetch_content(self, doc: Document) -> str:

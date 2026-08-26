@@ -216,3 +216,58 @@ def test_een_regel_zonder_eigenaar_is_een_fout() -> None:
 
     with pytest.raises(RepoConfigError, match="forge:eigenaar/naam"):
         uit_tekst("github:iso-audit")
+
+
+# --- wat niet gelezen kon worden, zegt waarom -------------------------------
+
+
+def test_de_instellingstekst_noemt_de_reden_uit_de_forge() -> None:
+    """Niet een vaste zin, maar wat er werkelijk misging — 401, 403 of een limiet."""
+    tekst = metadata_tekst(
+        Repositoriegegevens(
+            naam="x/y",
+            forge="github",
+            url="",
+            prive=False,
+            gearchiveerd=False,
+            hoofdbranch="main",
+            branch_beschermd=None,
+            review_verplicht=None,
+            bescherming_reden="het token mist het recht hiervoor (403)",
+        ),
+        Wijzigingen(onbekend=True, reden="de API-limiet is bereikt (60 aanroepen per uur)"),
+    )
+    assert "403" in tekst
+    assert "API-limiet" in tekst
+
+
+def test_een_onleesbare_workflowmap_komt_in_de_dekking() -> None:
+    """"Geen workflows" en "ik mocht de map niet lezen" zien er anders identiek uit."""
+
+    class _Client:
+        forge = "github"
+
+        def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens:
+            return Repositoriegegevens(
+                naam=f"{eigenaar}/{naam}",
+                forge="github",
+                url="",
+                prive=False,
+                gearchiveerd=False,
+                hoofdbranch="main",
+            )
+
+        def bestand(self, eigenaar: str, naam: str, pad: str) -> object:
+            raise AssertionError("niet nodig voor deze test")
+
+        def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
+            return [], "het token mist het recht hiervoor (403)"
+
+        def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
+            return Wijzigingen()
+
+    bron = RepoSource([{"forge": "github", "eigenaar": "x", "naam": "y"}])
+    bron._clients["github"] = _Client()  # type: ignore[assignment]
+    list(bron.list_documents())
+    assert bron.overgeslagen
+    assert all("403" in r for r in bron.overgeslagen.values())

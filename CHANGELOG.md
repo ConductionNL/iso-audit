@@ -6,6 +6,33 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-26 — wat niet gelezen kon worden, zegt waarom
+
+Een bron die stilzwijgend niets teruggeeft, laat "geen workflows gevonden" en "ik mocht de
+workflowmap niet lezen" er identiek uitzien. Het eerste is een bevinding, het tweede een gat in
+de dekking. Op vier plekken gebeurde precies dat: branch-bescherming, bestandsinhoud,
+pull-request-aggregaat en — het ergst — `bestanden_in_map`, dat een lege lijst teruggaf zonder
+enig onderscheid.
+
+Vier statussen, vier betekenissen, en ze staan nu in de melding:
+
+- **401** — het token is niet meegestuurd of niet geldig.
+- **403 met een lege limiet** — de API-limiet is op. Zonder token is dat 60 per uur, en dan
+  stopt een run halverwege op iets wat als "bron leeg" leest.
+- **403** — het token bestaat maar mist dit recht; voor branch-bescherming is dat
+  `Administration: read`.
+- **404** — bestaat niet, of het token mag het niet zien. GitHub geeft beide zo terug, en die
+  dubbelzinnigheid hoort in de melding in plaats van weggepoetst te worden.
+
+Eén uitzondering, met reden: bij een **bestand** staat er "bestaat niet" zonder tokenvoorbehoud.
+Dat pad wordt alleen opgehaald nadat de repo-aanroep 200 gaf, dus de repo is leesbaar en
+contents kennen geen rechten per pad. Een 404 is dan echte afwezigheid — en juist dát is de
+bevinding: 6 van de 12 repo's hebben geen `SECURITY.md`.
+
+Live getoetst zonder token: de instellingentekst meldt nu letterlijk *"het token is niet
+meegestuurd of niet geldig (401); zonder geldig token is dit niet te lezen"* in plaats van de
+vaste zin "niet vast te stellen met het gebruikte token".
+
 ### Added — 2026-08-26 — een GitHub App als bron-credential
 
 Een fijnmazig PAT is altijd van een persoon. Vertrekt die persoon, dan valt de bron stil en staat

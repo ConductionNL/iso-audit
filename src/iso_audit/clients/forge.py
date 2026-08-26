@@ -50,6 +50,8 @@ class Repositoriegegevens:
     """`None` betekent: niet vast te stellen met dit token, en dat is iets anders dan `False`.
     Een onbekende instelling als "niet beschermd" rapporteren is een verzonnen bevinding."""
     branch_beschermd: bool | None = None
+    bescherming_reden: str = ""
+    """Waarom de bescherming niet vast te stellen was."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +62,8 @@ class Wijzigingen:
     zonder_review: int = 0
     onbekend: bool = False
     """Kon niet worden vastgesteld; dan is 0-van-0 misleidend."""
+    reden: str = ""
+    """Waarom niet — inclusief of het aan het token lag."""
 
 
 @dataclass
@@ -80,12 +84,47 @@ class ForgeClient(Protocol):
 
     def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens: ...
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand: ...
-    def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> list[str]: ...
+    def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]: ...
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen: ...
 
 
 class ForgeError(Exception):
     """De forge antwoordde niet zoals verwacht."""
+
+
+def duiding(antwoord: Any) -> str:
+    """Waarom deze aanroep niets opleverde, in auditor-taal.
+
+    Een bron die stilzwijgend niets teruggeeft, laat "geen workflows gevonden" en "ik mocht de
+    workflowmap niet lezen" er identiek uitzien. Het eerste is een bevinding, het tweede een gat
+    in de dekking.
+
+    De 404 is bewust dubbelzinnig geformuleerd: GitHub geeft die óók terug voor iets dat je niet
+    mág zien. Dat wegpoetsen tot "bestaat niet" zou een rechtenprobleem als bevinding
+    presenteren.
+    """
+    status = int(getattr(antwoord, "status_code", 0))
+    koppen = getattr(antwoord, "headers", {}) or {}
+    if status == 401:
+        return (
+            "het token is niet meegestuurd of niet geldig (401); zonder geldig token is dit "
+            "niet te lezen"
+        )
+    if status == 403:
+        resterend = str(koppen.get("x-ratelimit-remaining", "")).strip()
+        if resterend == "0":
+            limiet = str(koppen.get("x-ratelimit-limit", "?"))
+            return (
+                f"de API-limiet is bereikt ({limiet} aanroepen per uur); zonder token is die 60, "
+                "met token 5000"
+            )
+        return (
+            "het token mist het recht hiervoor (403) — voor branch-bescherming is dat "
+            "'Administration: read'"
+        )
+    if status == 404:
+        return "bestaat niet, of het token mag het niet zien (404) — GitHub geeft beide zo terug"
+    return f"de forge gaf een onverwacht antwoord ({status})"
 
 
 def _haal(sessie: requests.Session, url: str) -> requests.Response:
@@ -129,7 +168,7 @@ class GitHubClient:
             raise ForgeError(f"github: {eigenaar}/{naam} gaf {antwoord.status_code}")
         d = antwoord.json()
         branch = d.get("default_branch") or "main"
-        beschermd, review = self._bescherming(eigenaar, naam, branch)
+        beschermd, review, reden = self._bescherming(eigenaar, naam, branch)
         return Repositoriegegevens(
             naam=f"{eigenaar}/{naam}",
             forge=self.forge,
@@ -140,49 +179,63 @@ class GitHubClient:
             beschrijving=d.get("description") or "",
             branch_beschermd=beschermd,
             review_verplicht=review,
+            bescherming_reden=reden,
         )
 
     def _bescherming(
         self, eigenaar: str, naam: str, branch: str
-    ) -> tuple[bool | None, bool | None]:
+    ) -> tuple[bool | None, bool | None, str]:
         """404 = geen bescherming; 403 = geen recht om het te zien, en dat is niet hetzelfde."""
         antwoord = self._get(f"/repos/{eigenaar}/{naam}/branches/{branch}/protection")
         if antwoord.status_code == 404:
-            return False, False
+            # Met voldoende rechten betekent 404 hier echt "geen bescherming ingesteld".
+            return False, False, ""
         if antwoord.status_code != 200:
-            return None, None
+            return None, None, duiding(antwoord)
         d = antwoord.json()
-        return True, bool(d.get("required_pull_request_reviews"))
+        return True, bool(d.get("required_pull_request_reviews")), ""
 
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
         antwoord = self._get(f"/repos/{eigenaar}/{naam}/contents/{pad}")
         if antwoord.status_code == 404:
+            # Hier bewust "bestaat niet" zonder tokenvoorbehoud: dit pad wordt alleen opgehaald
+            # nadat `repository()` 200 gaf, dus de repo is leesbaar en contents kennen geen
+            # rechten per pad. Een 404 is dan echte afwezigheid — en juist dát is de bevinding
+            # (6 van 12 repo's zonder SECURITY.md, gemeten 2026-08-26).
             return Bestand(pad=pad, aanwezig=False, reden="bestaat niet")
         if antwoord.status_code != 200:
-            return Bestand(pad=pad, aanwezig=False, reden=f"forge gaf {antwoord.status_code}")
+            return Bestand(pad=pad, aanwezig=False, reden=duiding(antwoord))
         return Bestand(pad=pad, inhoud=_decodeer(antwoord.json()))
 
-    def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> list[str]:
+    def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
+        """De bestanden in een map, plus waarom er geen zijn.
+
+        Een map die niet gelezen mócht worden ziet er anders uit dan een lege map, en dat
+        verschil hoort in de dekking terecht te komen. 404 is hier geen fout: veel repo's
+        hebben simpelweg geen workflows.
+        """
         antwoord = self._get(f"/repos/{eigenaar}/{naam}/contents/{map_}")
+        if antwoord.status_code == 404:
+            return [], ""
         if antwoord.status_code != 200:
-            return []
+            return [], duiding(antwoord)
         d = antwoord.json()
         if not isinstance(d, list):
-            return []
-        return [str(x.get("path", "")) for x in d if x.get("type") == "file"]
+            return [], ""
+        return [str(x.get("path", "")) for x in d if x.get("type") == "file"], ""
 
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
         """Aggregaat over de laatste gesloten pull requests. Geen namen — zie de spec."""
         antwoord = self._get(f"/repos/{eigenaar}/{naam}/pulls?state=closed&per_page={aantal}")
         if antwoord.status_code != 200:
-            return Wijzigingen(onbekend=True)
+            return Wijzigingen(onbekend=True, reden=duiding(antwoord))
         gemerged = [p for p in antwoord.json() if p.get("merged_at")]
         zonder = 0
         for pr in gemerged:
             nummer = pr.get("number")
             rev = self._get(f"/repos/{eigenaar}/{naam}/pulls/{nummer}/reviews")
             if rev.status_code != 200:
-                return Wijzigingen(onbekend=True)
+                return Wijzigingen(onbekend=True, reden=duiding(rev))
             if not [r for r in rev.json() if r.get("state") == "APPROVED"]:
                 zonder += 1
         return Wijzigingen(bekeken=len(gemerged), zonder_review=zonder)
@@ -206,7 +259,7 @@ class CodebergClient:
             raise ForgeError(f"codeberg: {eigenaar}/{naam} gaf {antwoord.status_code}")
         d = antwoord.json()
         branch = d.get("default_branch") or "main"
-        beschermd, review = self._bescherming(eigenaar, naam, branch)
+        beschermd, review, reden = self._bescherming(eigenaar, naam, branch)
         return Repositoriegegevens(
             naam=f"{eigenaar}/{naam}",
             forge=self.forge,
@@ -217,37 +270,49 @@ class CodebergClient:
             beschrijving=d.get("description") or "",
             branch_beschermd=beschermd,
             review_verplicht=review,
+            bescherming_reden=reden,
         )
 
     def _bescherming(
         self, eigenaar: str, naam: str, branch: str
-    ) -> tuple[bool | None, bool | None]:
+    ) -> tuple[bool | None, bool | None, str]:
         antwoord = _haal(
             self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/branch_protections/{branch}"
         )
         if antwoord.status_code == 404:
-            return False, False
+            return False, False, ""
         if antwoord.status_code != 200:
-            return None, None
+            return None, None, duiding(antwoord)
         d = antwoord.json()
-        return True, bool(d.get("enable_approvals_whitelist") or d.get("required_approvals", 0) > 0)
+        return (
+            True,
+            bool(d.get("enable_approvals_whitelist") or d.get("required_approvals", 0) > 0),
+            "",
+        )
 
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
         antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/contents/{pad}")
         if antwoord.status_code == 404:
+            # Hier bewust "bestaat niet" zonder tokenvoorbehoud: dit pad wordt alleen opgehaald
+            # nadat `repository()` 200 gaf, dus de repo is leesbaar en contents kennen geen
+            # rechten per pad. Een 404 is dan echte afwezigheid — en juist dát is de bevinding
+            # (6 van 12 repo's zonder SECURITY.md, gemeten 2026-08-26).
             return Bestand(pad=pad, aanwezig=False, reden="bestaat niet")
         if antwoord.status_code != 200:
-            return Bestand(pad=pad, aanwezig=False, reden=f"forge gaf {antwoord.status_code}")
+            return Bestand(pad=pad, aanwezig=False, reden=duiding(antwoord))
         return Bestand(pad=pad, inhoud=_decodeer(antwoord.json()))
 
-    def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> list[str]:
+    def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
+        """Zie `GitHubClient.bestanden_in_map`."""
         antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/contents/{map_}")
+        if antwoord.status_code == 404:
+            return [], ""
         if antwoord.status_code != 200:
-            return []
+            return [], duiding(antwoord)
         d = antwoord.json()
         if not isinstance(d, list):
-            return []
-        return [str(x.get("path", "")) for x in d if x.get("type") == "file"]
+            return [], ""
+        return [str(x.get("path", "")) for x in d if x.get("type") == "file"], ""
 
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
         antwoord = _haal(
@@ -255,7 +320,7 @@ class CodebergClient:
             f"{self.basis}/repos/{eigenaar}/{naam}/pulls?state=closed&limit={aantal}",
         )
         if antwoord.status_code != 200:
-            return Wijzigingen(onbekend=True)
+            return Wijzigingen(onbekend=True, reden=duiding(antwoord))
         gemerged = [p for p in antwoord.json() if p.get("merged")]
         zonder = 0
         for pr in gemerged:
@@ -264,7 +329,7 @@ class CodebergClient:
                 self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/pulls/{nummer}/reviews"
             )
             if rev.status_code != 200:
-                return Wijzigingen(onbekend=True)
+                return Wijzigingen(onbekend=True, reden=duiding(rev))
             if not [r for r in rev.json() if r.get("state") == "APPROVED"]:
                 zonder += 1
         return Wijzigingen(bekeken=len(gemerged), zonder_review=zonder)
