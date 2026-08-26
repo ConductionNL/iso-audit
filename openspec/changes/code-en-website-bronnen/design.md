@@ -40,6 +40,19 @@ telt hoeveel wijzigingen zonder tweede paar ogen zijn gemerged; het noemt niet w
 NC gaat over een proces dat niet werkt, niet over een collega. Dezelfde regel staat al in de
 review-prompt: *wie* is een rol en nooit een persoon.
 
+## Welke repositories?
+
+Van Codeberg hoort er **één** in scope: `conduction/conduction-website`, de code achter de site.
+De overige 62 zijn spiegels van GitHub; die twee keer auditen levert twee keer hetzelfde bewijs
+en een dekkingscijfer dat nergens op slaat.
+
+Dat is organisatiekennis en geen API-feit: van de 50 opgevraagde Codeberg-repo's staat er op
+2026-08-26 **geen enkele** als `mirror` gemarkeerd. Het tool kan het dus niet afleiden, en dat is
+precies waarom de configuratie een expliciete lijst is en geen "alles van de organisatie".
+
+Van GitHub gaat het om een selectie uit 183 actieve repo's — welke, is een auditkeuze die de
+auditor maakt en niet een die uit een teller volgt.
+
 ## Wat lezen we van een website?
 
 Sitemap eerst (`/sitemap.xml`), en anders de opgegeven URL-lijst. Geen crawler die links volgt:
