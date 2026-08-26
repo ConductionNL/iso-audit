@@ -148,3 +148,85 @@ def test_de_suggesties_van_alle_waarnemingen_blijven_staan() -> None:
     tekst = _blokken(fs)[0].suggestion or ""
     for clausule in ("8.15", "8.16", "8.17"):
         assert f"suggestie voor {clausule}" in tekst
+
+
+# --- hoeveel thema's komen er in de memo ------------------------------------
+
+_ECHTE = [f"8.{n}" for n in range(1, 16)]
+"""Bestaande 27001-clausules. Verzonnen nummers laat `norm_lookup` terecht falen: een memo mag
+geen verzonnen citaat bevatten."""
+
+
+def _vijf_themas() -> list[Finding]:
+    fs: list[Finding] = []
+    for n in range(5):
+        fs += [_ofi(f"o{n}{i}", _ECHTE[n * 3 + i], f"Thema {n}") for i in range(3)]
+    return fs
+
+
+def test_hoogstens_drie_verbeterblokken_in_de_memo() -> None:
+    """Een kwartaal met zeven verbeterrichtingen is geen agenda maar een lijst.
+
+    Twee losse knoppen, en dat onderscheid is het punt: `THEMA_DREMPEL` bepaalt hoe groot een
+    thema moet zijn om te tellen (3 waarnemingen), `MAX_VERBETERBLOKKEN` bepaalt hoeveel er in
+    de memo komen (3). Op de werkset van 2026-08-25 haalden zeven thema's de drempel.
+    """
+    assert len(_blokken(_vijf_themas())) == 3
+
+
+def test_de_grootste_themas_komen_erin() -> None:
+    """Daar ligt het meeste bewijs; een lezer die na één blok stopt heeft het zwaarste gezien."""
+    fs = [_ofi(f"g{i}", _ECHTE[i], "Groot") for i in range(6)]
+    fs += [_ofi(f"m{i}", _ECHTE[6 + i], "Middel") for i in range(4)]
+    fs += [_ofi(f"k{i}", _ECHTE[10 + i], "Klein") for i in range(3)]
+    fs += [_ofi(f"kl{i}", _ECHTE[i], "Kleiner") for i in range(3)]
+    assert [b.title for b in _blokken(fs)] == ["Groot", "Middel", "Klein"]
+
+
+def _memo(findings: list[Finding], drempel: int = 3):
+    from pathlib import Path
+
+    import yaml
+
+    from iso_audit.memo.builder import build_memo
+    from iso_audit.memo.models import MemoInput
+    from iso_audit.memo.norm_lookup import laad_norm_db
+    from iso_audit.memo.theme.profile import laad_profiel
+
+    ruw = Path("examples/auditmemo/memo-input.yaml").read_text(encoding="utf-8")
+    return build_memo(
+        findings=findings,
+        historical_ncs=[],
+        profile=laad_profiel("examples/auditmemo/conduction.profile.yaml"),
+        norm_db=laad_norm_db("examples/norms"),
+        memo_input=MemoInput(**yaml.safe_load(ruw)),
+        threshold=drempel,
+    )
+
+
+def test_wat_niet_in_de_memo_komt_wordt_genoemd() -> None:
+    """Weglaten zonder het te zeggen is de fout die dit project het vaakst heeft gemaakt.
+
+    Als eigen regel onder de sectie en niet weggestopt in het laatste blok: de lezer moet zien
+    dát er meer is, zonder ernaar te zoeken.
+    """
+    notitie = _memo(_vijf_themas()).improvements_note
+    assert "2" in notitie
+    assert "detail" in notitie.lower() or "bijlage" in notitie.lower()
+
+
+def test_de_melding_staat_in_de_gerenderde_memo() -> None:
+    from iso_audit.memo.renderer.html import MemoRendererImpl
+    from iso_audit.memo.theme.profile import laad_profiel
+
+    html = MemoRendererImpl().render_html(
+        _memo(_vijf_themas()), laad_profiel("examples/auditmemo/conduction.profile.yaml")
+    )
+    assert "2 andere thema" in html
+
+
+def test_minder_dan_het_maximum_verandert_niets() -> None:
+    fs = [_ofi(f"e{i}", _ECHTE[i], "Enige") for i in range(3)]
+    memo = _memo(fs)
+    assert len(memo.improvements) == 1
+    assert memo.improvements_note == ""

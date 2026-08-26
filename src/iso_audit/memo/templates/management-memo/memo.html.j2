@@ -75,6 +75,9 @@
 {% for imp in memo.improvements %}
 {% include "management-memo/partials/improvement.html.j2" %}
 {% endfor %}
+{% if memo.improvements_note %}
+<p class="detailref">{{ memo.improvements_note }}</p>
+{% endif %}
 
 {% include "management-memo/partials/historical.html.j2" %}
 

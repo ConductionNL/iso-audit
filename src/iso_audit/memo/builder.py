@@ -157,6 +157,16 @@ def _improvement_block(
     )
 
 
+MAX_VERBETERBLOKKEN = 3
+"""Hoeveel verbeterthema's er ten hoogste in de memo komen.
+
+Drie per kwartaal, want een memo is een agenda en geen inventaris. Wat afvalt staat compleet in
+het detailrapport, en de memo zegt hoeveel het er zijn — een cap zonder melding leest als "dit
+was alles".
+
+Los van `THEMA_DREMPEL`: die bepaalt of een thema meetelt, deze hoeveel er getoond worden."""
+
+
 THEMA_DREMPEL = 3
 """Vanaf hoeveel OFI's op één thema het een verbeterpunt wordt.
 
@@ -214,10 +224,23 @@ def build_memo(
     # Verbeterpunten bundelen op thema en niet op clausule: op de werkset van 2026-08-25 haalde
     # geen enkele clausule de drempel, terwijl de 53 OFI's zich over 16 thema's verdeelden.
     # Daar zitten de patronen, en een verbeteradvies gaat over een patroon.
+    # Twee losse knoppen, en dat onderscheid is het punt: `THEMA_DREMPEL` bepaalt hoe groot een
+    # thema moet zijn om te tellen, `MAX_VERBETERBLOKKEN` hoeveel er in de memo komen. Op de
+    # werkset van 2026-08-25 haalden zeven thema's de drempel, en zeven verbeterrichtingen in
+    # één kwartaal is geen agenda maar een lijst.
+    ofi_groepen = groepeer_ofis(findings, threshold)
+    getoond = ofi_groepen[:MAX_VERBETERBLOKKEN]
     improvements = [
         _improvement_block(groep, norm_db, lang, f"OFI {i}")
-        for i, groep in enumerate(groepeer_ofis(findings, threshold), start=1)
+        for i, groep in enumerate(getoond, start=1)
     ]
+    rest = len(ofi_groepen) - len(getoond)
+    improvements_note = (
+        f"Nog {rest} andere thema('s) haalden de drempel voor een verbeterpunt; die staan met "
+        f"hun waarnemingen in het detailrapport."
+        if rest
+        else ""
+    )
 
     stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
     metadata = {
@@ -238,6 +261,7 @@ def build_memo(
         context=memo_input.context,
         nc_blocks=nc_blocks,
         improvements=improvements,
+        improvements_note=improvements_note,
         historical_ncs=historical_ncs,
         detail_report_ref=memo_input.detail_report_ref,
         metadata=metadata,

@@ -6,6 +6,24 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — hoogstens drie verbeterthema's in de memo
+
+Twee losse knoppen, en dat onderscheid is het punt:
+
+- `THEMA_DREMPEL` (3) bepaalt hoe groot een thema moet zijn om als verbeterpunt te tellen: drie
+  waarnemingen op hetzelfde thema zijn een patroon, één is een waarneming.
+- `MAX_VERBETERBLOKKEN` (3) bepaalt hoeveel er in de memo komen. Op de werkset van 2026-08-25
+  haalden zeven thema's de drempel, en zeven verbeterrichtingen in één kwartaal is geen agenda
+  maar een inventaris.
+
+Wat afvalt staat compleet in het detailrapport, en de memo zegt hoeveel het er zijn — als eigen
+regel onder de sectie, niet weggestopt in het laatste blok. Een cap zonder melding leest als
+"dit was alles".
+
+**Eerlijk over het effect:** dit levert géén pagina op. Het Q2-formaat bleef 4 pagina's, want
+deze verbeterblokken zijn dun; de OFI-sectie kost één pagina of er nu drie of zeven blokken in
+staan. De winst zit in leesbaarheid, niet in omvang.
+
 ### Added — 2026-08-26 — vaste clausule-koppeling voor repository- en websitedocumenten
 
 `koppel_documenten` matcht Nederlandse normtermen op de documenttekst. Voor beleid en notulen

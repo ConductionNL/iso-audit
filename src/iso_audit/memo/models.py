@@ -206,6 +206,11 @@ class AuditMemo(BaseModel):
     context: MemoContext
     nc_blocks: list[NCBlock]
     improvements: list[ImprovementBlock]
+    improvements_note: str = ""
+    """Welke thema's het niet in de memo haalden, en waar ze staan.
+
+    Een cap zonder melding leest als "dit was alles". Als eigen regel onder de sectie en niet
+    in het laatste blok: de lezer moet zien dát er meer is zonder ernaar te zoeken."""
     historical_ncs: list[HistoricalNC]
     detail_report_ref: str
     # Audit-trail: profile-slug/-versie, tool-versie, render-timestamp,
