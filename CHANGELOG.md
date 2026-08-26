@@ -6,6 +6,45 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Removed — 2026-08-26 — de PreSync-gate mocht niet van het Argo-project
+
+De gate uit a59 is er weer uit, en niet omdat het idee niet deugde. Argo weigerde hem:
+`resource batch:Job is not permitted in project iso-platform`. De `AppProject` staat negen kinds
+toe — ServiceAccount, Service, ConfigMap, PVC, Deployment, Ingress, NetworkPolicy, Role,
+RoleBinding — en `Job` en `Pod` staan er geen van beide bij.
+
+Die lijst is bewust minimaal voor een platform onder ISO 27001-scope. Hem oprekken voor een
+gemaksvoorziening is de verkeerde ruil: dan versoepel je een beveiligingsgrens op gedeelde
+infrastructuur om een werkwijze te ondersteunen die al een nette oplossing heeft. Het venster
+hoort weg via de branch-route (`image.yml` draait ook op `pull_request` en pusht daar al de
+versietag), niet via een extra resource-kind.
+
+**Gevolg dat wel telt:** de sync liep vijf pogingen vast op een manifest dat het project niet
+toestaat, dus a60 rolde niet uit terwijl de oude pod bleef draaien. Een uitrol die stilstaat is
+beter dan een portaal dat omvalt, maar het is niet niets. `deploy/README.md` noemt nu de
+controle die dit had voorkomen:
+
+    kubectl get appproject iso-platform -n argocd -o yaml | grep -A20 ResourceWhitelist
+
+### Added — 2026-08-26 — de nieuwe bronnen zijn in het portaal te configureren
+
+`repo` en `website` staan nu in de broncatalogus, dus ze verschijnen in het configuratiescherm
+met dezelfde velden, opslag en wijzigingstrail als Drive, Jira en Nextcloud. Geen tweede
+configuratiemechanisme naast het bestaande — dat is de reden dat `bronnen.yaml` uit de spec er
+niet is gekomen: de catalogus deed dit al, en twee plekken om hetzelfde in te stellen is precies
+wat een auditor niet kan volgen.
+
+Repositories worden ingevoerd als `forge:eigenaar/naam` (bijvoorbeeld
+`github:ConductionNL/iso-audit`), in de UI als losse rijen. Een regel zonder forge of zonder
+`eigenaar/naam` is een fout en geen overslag: een stil overgeslagen repository is een bron die de
+auditor dénkt te hebben.
+
+**Een ontbrekend token is een waarschuwing en geen fout.** Publieke repositories zijn zonder
+token leesbaar — gemeten tegen `codeberg/conduction` op 2026-08-26. Wat er dan niet uitkomt is de
+branch-bescherming, en die blijft eerlijk op "niet vast te stellen" staan. Bij GitHub meldt de
+waarschuwing er de limiet van 60 aanroepen per uur bij, want dát loopt een run stuk op iets wat
+als "de bron doet niets" leest.
+
 ### Added — 2026-08-26 — repositories en de website als auditbron
 
 De vijf bestaande bronnen zijn alle vijf **documentbronnen**: wat de organisatie over zichzelf

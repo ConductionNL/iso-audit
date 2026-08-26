@@ -45,6 +45,14 @@ logger = logging.getLogger(__name__)
 
 GITHUB_TOKEN_ENV = "GITHUB_TOKEN"
 CODEBERG_TOKEN_ENV = "CODEBERG_TOKEN"
+REPOS_ENV = "AUDIT_REPOS"
+"""Komma-gescheiden `forge:eigenaar/naam`, bv. `github:ConductionNL/iso-audit`.
+
+De komma is het opslagformaat van de env-var, niet iets dat een auditor intypt — in de UI staan
+de repositories als losse rijen, net als de Drive-mappen en de Nextcloud-paden.
+
+De pipeline bouwt een adapter zonder argumenten (`sources.get(naam)()`), dus dit is de weg waarlangs
+de configuratie binnenkomt: het configuratiescherm schrijft de env-var via `Settings`."""
 
 BEWIJSPADEN: tuple[str, ...] = (
     "SECURITY.md",
@@ -114,6 +122,27 @@ def lees_verwijzingen(ruw: list[dict[str, str]]) -> list[RepoVerwijzing]:
     return verwijzingen
 
 
+def uit_tekst(ruw: str) -> list[dict[str, str]]:
+    """Parseer `forge:eigenaar/naam` uit de env-var naar de configuratievorm.
+
+    Strikt: een regel zonder forge of zonder `eigenaar/naam` is een fout en geen overslag. Een
+    stil overgeslagen repository is een bron die de auditor dénkt te hebben.
+    """
+    regels: list[dict[str, str]] = []
+    for stuk in (s.strip() for s in ruw.split(",")):
+        if not stuk:
+            continue
+        forge, scheider, pad = stuk.partition(":")
+        if not scheider or "/" not in pad:
+            raise RepoConfigError(
+                f"repository {stuk!r} moet de vorm forge:eigenaar/naam hebben, "
+                "bijvoorbeeld github:ConductionNL/iso-audit"
+            )
+        eigenaar, _, naam = pad.partition("/")
+        regels.append({"forge": forge.strip(), "eigenaar": eigenaar.strip(), "naam": naam.strip()})
+    return regels
+
+
 def metadata_tekst(gegevens: Repositoriegegevens, wijzigingen: Wijzigingen) -> str:
     """De repository-instellingen als leesbare tekst, zodat de classificatie ze kan wegen.
 
@@ -161,8 +190,9 @@ class RepoSource:
 
     naam = "repo"
 
-    def __init__(self, repositories: list[dict[str, str]] | None = None) -> None:
-        self._verwijzingen = lees_verwijzingen(repositories or [])
+    def __init__(self, repositories: list[dict[str, str]] | str | None = None) -> None:
+        ruw = repositories if repositories is not None else os.environ.get(REPOS_ENV, "")
+        self._verwijzingen = lees_verwijzingen(ruw if isinstance(ruw, list) else uit_tekst(ruw))
         self._max_pr = int(os.environ.get("REPO_MAX_PR") or MAX_PR)
         self._clients: dict[str, ForgeClient] = {}
         self._gegevens: dict[str, Repositoriegegevens] = {}
@@ -242,6 +272,13 @@ class RepoSource:
                 "naam": self.naam,
                 "reden": "geen repositories geconfigureerd",
             }
+        # Een ontbrekend token is een **waarschuwing** en geen fout: publieke repositories zijn
+        # zonder token gewoon leesbaar — gemeten op 2026-08-26 tegen codeberg/nldesign. Wat er
+        # dan níet uitkomt is de branch-bescherming, en die blijft eerlijk op "niet vast te
+        # stellen" staan in plaats van als "niet ingesteld" te worden gerapporteerd.
+        #
+        # Bij GitHub komt er een tweede reden bij: zonder token 60 aanroepen per uur, en dat
+        # loopt een run stuk op iets wat als "bron doet niets" leest.
         ontbrekend = sorted(
             {
                 v.forge
@@ -251,14 +288,15 @@ class RepoSource:
                 )
             }
         )
-        if ontbrekend:
-            return {
-                "status": "fout",
-                "naam": self.naam,
-                "reden": f"geen token voor: {', '.join(ontbrekend)}",
-            }
-        return {
+        gezondheid: dict[str, object] = {
             "status": "ok",
             "naam": self.naam,
             "locaties": [{"naam": v.sleutel} for v in self._verwijzingen],
         }
+        if ontbrekend:
+            gezondheid["waarschuwing"] = (
+                f"geen token voor {', '.join(ontbrekend)}: publieke repositories worden gelezen, "
+                "maar branch-bescherming blijft 'niet vast te stellen'"
+                + (" en GitHub beperkt tot 60 aanroepen per uur" if "github" in ontbrekend else "")
+            )
+        return gezondheid

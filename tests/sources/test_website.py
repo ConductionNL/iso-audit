@@ -59,7 +59,7 @@ def test_script_en_style_tellen_niet_mee_als_tekst() -> None:
 def test_de_bron_volgt_geen_links() -> None:
     """Een crawler is niet te begrenzen, niet te herhalen en niet uit te leggen."""
     bron = Path("src/iso_audit/sources/website.py").read_text(encoding="utf-8")
-    for verdacht in ("findall(r'<a", 'href=', "urljoin(url"):
+    for verdacht in ("findall(r'<a", "href=", "urljoin(url"):
         assert verdacht not in bron.replace("Links volgen", ""), verdacht
 
 

@@ -162,16 +162,57 @@ def test_zonder_repositories_is_de_bron_niet_gekoppeld() -> None:
     assert RepoSource().healthcheck()["status"] == "niet_gekoppeld"
 
 
-def test_zonder_token_meldt_de_health_welke_forge(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Een stil overgeslagen bron is erger dan een bron die zegt wat hij mist."""
+def test_zonder_token_werkt_de_bron_maar_waarschuwt_hij(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Publieke repositories zijn zonder token leesbaar — gemeten tegen codeberg/nldesign.
+
+    "Fout" zou hier onwaar zijn en de auditor laten denken dat de bron niets doet. Wat er wél
+    ontbreekt is de branch-bescherming, en die blijft eerlijk op "niet vast te stellen" staan.
+    """
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("CODEBERG_TOKEN", raising=False)
-    bron = RepoSource([{"forge": "github", "eigenaar": "x", "naam": "y"}])
-    gezondheid = bron.healthcheck()
-    assert gezondheid["status"] == "fout"
-    assert "github" in str(gezondheid["reden"])
+    gezondheid = RepoSource([{"forge": "github", "eigenaar": "x", "naam": "y"}]).healthcheck()
+    assert gezondheid["status"] == "ok"
+    assert "geen token voor github" in str(gezondheid["waarschuwing"])
+    assert "niet vast te stellen" in str(gezondheid["waarschuwing"])
+
+
+def test_met_token_waarschuwt_de_health_niet(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_TOKEN", "geheim")
+    gezondheid = RepoSource([{"forge": "github", "eigenaar": "x", "naam": "y"}]).healthcheck()
+    assert "waarschuwing" not in gezondheid
 
 
 def test_de_bron_levert_geen_kant_en_klare_bevindingen() -> None:
     """Deze bron levert bewijs; de classificatie weegt het."""
     assert list(RepoSource().list_findings("sessie-1")) == []
+
+
+# --- configuratie uit de omgeving -------------------------------------------
+
+
+def test_de_pipeline_kan_de_bron_zonder_argumenten_bouwen(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`sources.get(naam)()` geeft geen argumenten mee; de env-var is de weg naar binnen."""
+    monkeypatch.setenv(
+        "AUDIT_REPOS",
+        "github:ConductionNL/iso-audit, codeberg:conduction/conduction-website",
+    )
+    gezondheid = RepoSource().healthcheck()
+    assert [x["naam"] for x in gezondheid["locaties"]] == [  # type: ignore[index,union-attr]
+        "github:ConductionNL/iso-audit",
+        "codeberg:conduction/conduction-website",
+    ]
+
+
+def test_een_regel_zonder_forge_is_een_fout() -> None:
+    """Een stil overgeslagen repository is een bron die de auditor dénkt te hebben."""
+    from iso_audit.sources.repo import uit_tekst
+
+    with pytest.raises(RepoConfigError, match="forge:eigenaar/naam"):
+        uit_tekst("ConductionNL/iso-audit")
+
+
+def test_een_regel_zonder_eigenaar_is_een_fout() -> None:
+    from iso_audit.sources.repo import uit_tekst
+
+    with pytest.raises(RepoConfigError, match="forge:eigenaar/naam"):
+        uit_tekst("github:iso-audit")

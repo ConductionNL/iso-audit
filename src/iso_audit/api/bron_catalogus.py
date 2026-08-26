@@ -214,6 +214,87 @@ STANDAARD: list[BronDefinitie] = [
             ),
         ],
     ),
+    BronDefinitie(
+        naam="repo",
+        label="Code-repositories",
+        uitleg=(
+            "Repositories op GitHub of Codeberg. Voor ISO 27001 is dit de plek waar §8.4, "
+            "§8.9, §8.25, §8.28, §8.31 en §8.32 aantoonbaar zijn: vier-ogen is geen belofte "
+            "in een handboek maar een instelling op een branch."
+        ),
+        velden=[
+            Veld(
+                naam="AUDIT_REPOS",
+                label="Repositories",
+                lijst=True,
+                hint=(
+                    "Eén per regel, als forge:eigenaar/naam — bijvoorbeeld "
+                    "github:ConductionNL/iso-audit of codeberg:conduction/conduction-website. "
+                    "De forge staat er bewust bij: die wordt nooit uit de naam geraden."
+                ),
+            ),
+            Veld(
+                naam="GITHUB_TOKEN",
+                label="GitHub-token",
+                geheim=True,
+                verplicht=False,
+                hint=(
+                    "Alleen leesrechten. Een fijnmazig token met Contents: read, Metadata: "
+                    "read, Pull requests: read en Administration: read — dat laatste alleen "
+                    "om te kunnen zien of een branch beschermd is."
+                ),
+            ),
+            Veld(
+                naam="CODEBERG_TOKEN",
+                label="Codeberg-token",
+                geheim=True,
+                verplicht=False,
+                hint=(
+                    "Alleen leesrechten. Zonder token blijft de branch-bescherming op "
+                    "'niet vast te stellen' staan — dat is iets anders dan 'niet ingesteld'."
+                ),
+            ),
+            Veld(
+                naam="REPO_MAX_PR",
+                label="Aantal wijzigingen om te bekijken",
+                verplicht=False,
+                hint=(
+                    "Over hoeveel recent samengevoegde wijzigingen het aandeel zonder review "
+                    "wordt geteld. Standaard 20; elke wijziging kost een extra aanroep."
+                ),
+            ),
+        ],
+    ),
+    BronDefinitie(
+        naam="website",
+        label="Website",
+        uitleg=(
+            "Gepubliceerde pagina's. Wat een organisatie publiek belooft — een "
+            "privacyverklaring, een claim over certificering — is een verplichting die "
+            "tegen de interne praktijk hoort (§5.31, §5.34, en 9001 §8.2)."
+        ),
+        velden=[
+            Veld(
+                naam="WEBSITE_URLS",
+                label="Websites",
+                lijst=True,
+                hint=(
+                    "Eén adres per regel, bijvoorbeeld https://www.conduction.nl. De "
+                    "sitemap van de site bepaalt welke pagina's gelezen worden; er worden "
+                    "nooit links gevolgd."
+                ),
+            ),
+            Veld(
+                naam="WEBSITE_MAX_PAGINAS",
+                label="Maximum aantal pagina's",
+                verplicht=False,
+                hint=(
+                    "Standaard 200. Wat er boven valt wordt niet gelezen en staat als "
+                    "overgeslagen in de dekking — nooit stil afgekapt."
+                ),
+            ),
+        ],
+    ),
 ]
 
 

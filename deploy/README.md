@@ -151,20 +151,28 @@ de tag op main brengt, en Argo vindt meteen wat hij zoekt.
     git switch -c fix/iets
     ./scripts/rollout-portal.sh              # pusht, wacht op het image, merget, wacht op Argo
 
-Een directe push naar main werkt nog steeds, en `deploy/image-gate-job.yaml` zorgt dat het
-portaal daar niet meer van omvalt — maar dan wacht je alsnog op de build met een sync die
-stilstaat. De branch-route is sneller én rustiger.
+Een directe push naar main werkt nog steeds, maar dan wacht je op de build met de oude pod al
+weg. De branch-route is sneller én rustiger.
 
-### De PreSync-gate
+### Waarom er geen PreSync-gate is
 
-`deploy/image-gate-job.yaml` is een Argo-hook die niets doet behalve bestaan: zijn container is
-precies het image dat straks uitgerold wordt. Kan de kubelet dat niet pullen, dan blijft de hook
-onvoltooid, wacht Argo met de sync, en **blijft de oude pod draaien**. Zodra het image
-verschijnt gaat de uitrol verder; na twintig minuten faalt de sync zichtbaar in plaats van
-eindeloos te wachten.
+Op 2026-08-26 stond hier kort een Argo-hook die niets deed behalve bestaan, met het nieuwe image
+als container: kon de kubelet dat niet pullen, dan wachtte de sync en bleef de oude pod draaien.
 
-Bewust geen skopeo of crane en geen registry-credentials: de kubelet-pull ís de controle, en die
-test exact wat de echte pod straks ook doet.
+Argo weigerde hem: `resource batch:Job is not permitted in project iso-platform`. De
+`AppProject` staat negen kinds toe — ServiceAccount, Service, ConfigMap, PVC, Deployment,
+Ingress, NetworkPolicy, Role, RoleBinding — en `Job` en `Pod` staan daar geen van beide bij.
+
+Die lijst is bewust minimaal voor een platform onder ISO 27001-scope, en oprekken voor een
+gemaksvoorziening is de verkeerde ruil: dan versoepel je een beveiligingsgrens op gedeelde
+infrastructuur om een werkwijze te ondersteunen die al een nette oplossing heeft. Het venster
+hoort weg via de branch-route, niet via een extra resource-kind.
+
+Wat het incident wel opleverde: de sync liep vijf pogingen vast op een manifest dat het project
+niet toestaat. Een uitrol die stilstaat is beter dan een portaal dat omvalt, maar het is niet
+niets — controleer bij een nieuw manifest eerst de whitelist:
+
+    kubectl get appproject iso-platform -n argocd -o yaml | grep -A20 ResourceWhitelist
 
 ## Verifiëren
 
