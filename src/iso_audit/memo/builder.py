@@ -47,22 +47,39 @@ def _groep_citations(
 
 
 def _groep_bronnen(groep: Themagroep) -> list[BronRef]:
-    """Elke bron van elke bevinding, ontdubbeld. Bundelen mag geen bewijs verstoppen."""
+    """Elke bron van elke bevinding, ontdubbeld. Bundelen mag geen bewijs verstoppen.
+
+    Met een kern blijft de documentnaam staan maar vervalt de omschrijving: die was 45% van de
+    memo-tekst (4.993 van 11.028 tekens op de werkset van 2026-08-26) en staat per bevinding al
+    in het detailrapport. Wat de memo natrekbaar maakt is *welk* document — dat blijft.
+    """
     gezien: dict[tuple[str, str, str], BronRef] = {}
     for f in groep.bevindingen:
         for bron in f.bronnen:
             # Ook `doc_naam` in de sleutel: twee bronnen met hetzelfde id maar een andere naam
             # zijn allebei tonen beter dan er stilletjes één weglaten.
             gezien.setdefault((bron.herkomst, bron.doc_id or "", bron.doc_naam), bron)
-    return list(gezien.values())
+    bronnen = list(gezien.values())
+    if groep.kern:
+        return [b.model_copy(update={"beschrijving": ""}) for b in bronnen]
+    return bronnen
 
 
 def _groep_afwijking(groep: Themagroep) -> str:
-    """De afwijkingen van het blok onder elkaar, met clausule ervoor.
+    """De afwijkingen van het blok onder elkaar, met clausule ervoor — of leeg bij een kern.
 
-    Eén bullet per bevinding en niet één samengesmolten alinea: de lezer moet kunnen zien welke
-    constatering bij welke eis hoort, anders is het blok niet meer na te trekken.
+    Is er een synthesezin, dan is die de blok-tekst en verhuist de onderbouwing per clausule naar
+    het detailrapport, waar ze toch al staat (de memo verwijst ernaar in de voettekst). Zonder die
+    regel groeit een thema-blok mee met zijn omvang: zeven bevindingen zijn zeven volledige
+    afwijkingsteksten onder elkaar, en dan levert bundelen niets op. Zo leest het handgemaakte
+    Q2-memo ook — één synthese in de memo, het detail in de bijlage.
+
+    Is er geen kern (review niet gedraaid), dan is de afwijking alles wat we hebben en blijft ze
+    staan. Eén bullet per bevinding en niet één samengesmolten alinea: de lezer moet kunnen zien
+    welke constatering bij welke eis hoort, anders is het blok niet meer na te trekken.
     """
+    if groep.kern:
+        return ""
     delen = [(f.clause, (f.deviation or f.description).strip()) for f in groep.bevindingen]
     delen = [(c, t) for c, t in delen if t]
     if not delen:

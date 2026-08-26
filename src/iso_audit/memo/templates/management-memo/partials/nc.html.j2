@@ -21,8 +21,14 @@
 <p class="kern"><strong>{{ nc.kern }}</strong></p>
 {% endif %}
 
+{# Is er een kern, dan staat de synthese hierboven en hoort de onderbouwing per clausule in
+   het detailrapport thuis. Anders wordt het blok net zo dik als het aantal bevindingen. #}
+{% if nc.deviation %}
 <h4>Waar de praktijk afwijkt</h4>
 <div>{{ nc.deviation | safe }}</div>
+{% else %}
+<p class="detailref">Onderbouwing per clausule: zie <em>{{ memo.detail_report_ref }}</em>.</p>
+{% endif %}
 {% if nc.bronnen %}
 <p class="reasoning"><em>Brondocumenten:</em></p>
 <ul class="reasoning">

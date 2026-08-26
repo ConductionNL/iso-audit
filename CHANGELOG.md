@@ -6,6 +6,37 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-26 — met een synthese verhuist het detail naar de bijlage
+
+Vervolg op de thema-bundeling van vanochtend. Zodra de review een kernzin levert, toont een blok
+zowel die synthese als alle onderliggende afwijkingsteksten én alle bronomschrijvingen — dus
+dikker in plaats van dunner, precies het tegendeel van wat bundelen moet doen.
+
+Nu geldt: **is er een kern, dan is die de blok-tekst.** De onderbouwing per clausule en de
+omschrijving per brondocument verhuizen naar het detailrapport, waar ze toch al staan; de memo
+verwijst er in de voettekst naar. Is er geen kern (review niet gedraaid), dan blijft alles staan,
+want dan is er niets om naar door te verwijzen.
+
+Wat blijft, blijft: **welk** document een bevinding draagt, staat gewoon in het blok. Dat is wat
+de memo natrekbaar maakt.
+
+**Gemeten op de werkset van 2026-08-25** (47 bevestigde NC's), stap voor stap:
+
+| | blokken | pagina's |
+|---|---|---|
+| één blok per bevinding (was) | 47 | 35 |
+| bundelen per thema | 25 | 27 |
+| + kern in plaats van afwijkingsteksten | 25 | 24 |
+| + bronnaam zonder omschrijving | 25 | 20 |
+
+En op realistisch formaat: 2 thema-blokken met 4 NC's passen nu in 3 A4; met 6 NC's is het er 4.
+Het handgemaakte Q2-memo doet 2 blokken van 3 op precies 3 A4 — we zitten er één naast.
+
+**Waar de dikte zat, en waar niet.** De bronomschrijvingen waren 45% van de memo-tekst (4.993 van
+11.028 tekens). De normcitaten kostten gemeten *nul* pagina's — die zijn niet het probleem en
+blijven dus staan. De grootste knop blijft de triage: pagina's schalen met het aantal
+onderliggende bevindingen, niet met het aantal blokken.
+
 ### Changed — 2026-08-26 — de memo bundelt NC's per thema in plaats van per bevinding
 
 `build_memo` maakte één NC-blok per bevinding. Op de werkset van vanochtend: 47 bevestigde NC's,

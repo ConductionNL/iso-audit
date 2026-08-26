@@ -28,7 +28,9 @@ def _nc(clausule: str, thema: str, kern: str = "", bron: str = "B.docx") -> Find
         thema=thema,
         kern=kern,
         triage_status="valide",
-        bronnen=[BronRef(herkomst="Drive", doc_id="d1", doc_naam=bron)],
+        bronnen=[
+            BronRef(herkomst="Drive", doc_id="d1", doc_naam=bron, beschrijving="wat erin staat")
+        ],
         actions=[ActionRow(wat=f"actie voor {clausule}")],
     )
 
@@ -90,3 +92,56 @@ def test_de_acties_van_alle_bevindingen_komen_samen() -> None:
 def test_verschillende_themas_blijven_aparte_blokken() -> None:
     blokken = _bouw([_nc("8.14", "Continuïteit"), _nc("5.12", "Informatieclassificatie")])
     assert len(blokken) == 2
+
+
+def test_met_kern_verhuist_het_detail_naar_de_bijlage() -> None:
+    """Is er een synthese, dan is die de blok-tekst.
+
+    Zonder deze regel groeit een thema-blok mee met zijn omvang: zeven bevindingen betekent
+    zeven volledige afwijkingsteksten onder elkaar, en dan levert bundelen niets op. Het
+    handgemaakte Q2-memo doet het andersom — één synthese in de memo, de onderbouwing per
+    clausule in het detailrapport, waar ze toch al staat.
+    """
+    blokken = _bouw(
+        [
+            _nc("8.14", "Continuïteit", kern="Continuïteit is niet aantoonbaar getest."),
+            _nc("5.29", "Continuïteit"),
+        ]
+    )
+    assert blokken[0].kern == "Continuïteit is niet aantoonbaar getest."
+    assert blokken[0].deviation == ""
+
+
+def test_zonder_kern_blijft_de_afwijking_staan() -> None:
+    """Geen synthese betekent niet: geen inhoud. Dan is de afwijking alles wat we hebben."""
+    blokken = _bouw([_nc("8.14", "Continuïteit"), _nc("5.29", "Continuïteit")])
+    assert "afwijking op 8.14" in blokken[0].deviation
+    assert "afwijking op 5.29" in blokken[0].deviation
+
+
+def test_het_bewijs_blijft_ook_met_kern_zichtbaar() -> None:
+    """Het detail verhuist, de bronvermelding niet — anders is de memo niet na te trekken."""
+    blokken = _bouw(
+        [
+            _nc("8.14", "Continuïteit", kern="Niet getest.", bron="Plan.docx"),
+            _nc("5.29", "Continuïteit", bron="Test.md"),
+        ]
+    )
+    assert {b.doc_naam for b in blokken[0].bronnen} == {"Plan.docx", "Test.md"}
+
+
+def test_met_kern_houdt_het_blok_de_bronnaam_maar_niet_de_omschrijving() -> None:
+    """De bron-omschrijvingen waren 45% van de memo-tekst (4.993 van 11.028 tekens, 2026-08-26).
+
+    Wat blijft is wat de memo natrekbaar maakt: welk document. Wat verhuist is wat het
+    detailrapport toch al per bevinding uitschrijft. Zonder kern blijft alles staan, want dan is
+    er geen bijlage-synthese om naar te verwijzen.
+    """
+    met = _bouw([_nc("8.14", "Continuïteit", kern="Niet getest."), _nc("5.29", "Continuïteit")])
+    assert [b.doc_naam for b in met[0].bronnen] == ["B.docx"]
+    assert all(not b.beschrijving for b in met[0].bronnen)
+
+
+def test_zonder_kern_blijft_de_bronomschrijving_staan() -> None:
+    zonder = _bouw([_nc("8.14", "Continuïteit"), _nc("5.29", "Continuïteit")])
+    assert any(b.beschrijving for b in zonder[0].bronnen)
