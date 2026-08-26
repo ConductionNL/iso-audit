@@ -244,6 +244,25 @@
       <button class="flt sev-OFI" data-sev="OFI" onclick="loadFindings('OFI')">OFI</button>
       <button class="flt sev-POSITIVE" data-sev="POSITIVE" onclick="loadFindings('POSITIVE')">POSITIVE</button>
     </div>
+    <div id="triage-filter2">
+      <label class="note">Triage
+        <select id="flt-triage" onchange="loadFindings()">
+          <option value="">alle</option>
+          <option value="open">open</option>
+          <option value="valide">valide</option>
+          <option value="niet_valide">niet_valide</option>
+          <option value="follow_up">follow_up</option>
+        </select></label>
+      <label class="note">Bron
+        <input id="flt-bron" placeholder="bv. drive · leeg = alles" style="width:11rem"
+               data-tip="Deel van de bronnaam; hoofdletters maken niet uit."></label>
+      <label class="note">Clausule
+        <input id="flt-clausule" placeholder="bv. 8 of 8.14" style="width:7rem"
+               data-tip="8 geeft het hele hoofdstuk §8.x; 8.14 alleen die clausule."></label>
+      <button class="alt" onclick="loadFindings()">Toepassen</button>
+      <button class="alt" onclick="wisFilters()">Wissen</button>
+      <span id="flt-telling" class="note"></span>
+    </div>
     <div id="bulk-bar">
       <span class="note">Bulk op selectie — triage</span>
       <select id="bulk-triage"><option value="">—</option>
@@ -1141,13 +1160,31 @@ async function startRun(){
   }, live?700:400);
 }
 let _activeFilter = "";
+function wisFilters(){
+  document.getElementById("flt-triage").value = "";
+  document.getElementById("flt-bron").value = "";
+  document.getElementById("flt-clausule").value = "";
+  loadFindings("");
+}
+// `severity` weglaten betekent: laat de classificatie-knop staan zoals hij stond. Zo hoeven
+// de drie nieuwe filters niet te weten welke classificatie actief is.
 async function loadFindings(severity){
-  _activeFilter = severity || "";
+  if(severity !== undefined) _activeFilter = severity || "";
   document.querySelectorAll("#triage-filter .flt").forEach(b=>b.setAttribute("aria-pressed", b.dataset.sev===_activeFilter));
-  const fs = await j(A("/findings") + (_activeFilter ? "?severity="+_activeFilter : ""));
+  const q = new URLSearchParams();
+  if(_activeFilter) q.set("severity", _activeFilter);
+  const triage = (document.getElementById("flt-triage")||{}).value || "";
+  const bron = ((document.getElementById("flt-bron")||{}).value || "").trim();
+  const clausule = ((document.getElementById("flt-clausule")||{}).value || "").trim();
+  if(triage) q.set("triage_status", triage);
+  if(bron) q.set("source", bron);
+  if(clausule) q.set("clause", clausule);
+  const fs = await j(A("/findings") + (q.toString() ? "?"+q.toString() : ""));
+  const telling = document.getElementById("flt-telling");
+  if(telling) telling.textContent = fs.length + " van de bevindingen";
   if(!fs.length){
     document.getElementById("triage-wrap").innerHTML =
-      `<p class="note">Geen bevindingen${_activeFilter?" met filter "+_activeFilter:""}. Start een run.</p>`;
+      `<p class="note">Geen bevindingen met dit filter. Pas het filter aan of start een run.</p>`;
     return;
   }
   let rows = fs.map(f => `

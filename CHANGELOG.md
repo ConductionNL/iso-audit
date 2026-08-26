@@ -6,6 +6,26 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — filteren op triage-status, bron en clausule
+
+De auditor kon in de bevindingentabel alleen op classificatie filteren (NC / OFI / POSITIVE).
+Met 271 bevindingen in één audit is "wat staat er nog open?" de eerste vraag van een
+triage-sessie, en het antwoord was scrollen.
+
+`GET /audits/{id}/findings` accepteert nu ook `triage_status`, `source` en `clause`; alles
+combineert met AND en met het bestaande `severity`. De bron matcht op deeltekst en
+hoofdletterongevoelig — je typt "drive", niet het hele pad. De clausule matcht exact óf het hele
+hoofdstuk eronder: `8` geeft §8.x, `8.14` alleen die clausule. Nadrukkelijk geen kale
+`startswith`, want dan zou `8.1` ook §8.14 opleveren en dat is een ander onderwerp.
+
+In de UI staan de drie bedieningen onder de bestaande knoppenrij, met een teller erachter zodat
+zichtbaar is hoeveel er nog over is. De classificatieknop blijft staan als je een van de nieuwe
+filters gebruikt.
+
+Getest in een echte browser (`tests/e2e/test_triage_filters.py`), niet alleen tegen de API. Het
+gat dat hier werd gemeld was precies dit: de route kón het al na tien regels, maar de knop zat er
+niet. Een contract-test ziet dat niet en een gebruiker meteen.
+
 ### Changed — 2026-08-26 — met een synthese verhuist het detail naar de bijlage
 
 Vervolg op de thema-bundeling van vanochtend. Zodra de review een kernzin levert, toont een blok

@@ -48,16 +48,48 @@ def _kort(f: Finding) -> FindingSummary:
     )
 
 
+def _bron_matcht(f: Finding, bron: str | None) -> bool:
+    """Deeltekst, hoofdletterongevoelig: de auditor typt "drive", niet het volledige pad."""
+    if not bron:
+        return True
+    return bron.lower() in (f.source or "").lower()
+
+
+def _clausule_matcht(f: Finding, clausule: str | None) -> bool:
+    """Exact, of het hele hoofdstuk eronder: `8` geeft §8.x, `8.14` alleen §8.14.
+
+    Nadrukkelijk geen kale `startswith`: dan zou `8.1` ook §8.14 opleveren, en dat is een ander
+    onderwerp. Alleen op een punt mag de match doorlopen.
+    """
+    if not clausule:
+        return True
+    return f.clause == clausule or f.clause.startswith(f"{clausule}.")
+
+
 def maak_router(audits: Audits) -> APIRouter:
     """Router voor de triage-routes onder `/audits/{audit_id}`."""
     router = APIRouter(prefix="/audits/{audit_id}")
 
     @router.get("/findings", response_model=list[FindingSummary])
-    def lijst_findings(audit_id: str, severity: Severity | None = None) -> list[FindingSummary]:
+    def lijst_findings(
+        audit_id: str,
+        severity: Severity | None = None,
+        triage_status: TriageStatus | None = None,
+        source: str | None = None,
+        clause: str | None = None,
+    ) -> list[FindingSummary]:
+        """De bevindingenlijst, gefilterd. Alle filters combineren met AND.
+
+        Met 271 bevindingen in één audit is "laat zien wat nog open staat" de eerste vraag van
+        een triage-sessie; zonder filter is het antwoord scrollen.
+        """
         return [
             _kort(f)
             for f in audits.sessie(audit_id).findings()
-            if severity is None or f.severity == severity
+            if (severity is None or f.severity == severity)
+            and (triage_status is None or f.triage_status == triage_status)
+            and _bron_matcht(f, source)
+            and _clausule_matcht(f, clause)
         ]
 
     @router.get("/findings/{finding_id}", response_model=Finding)
