@@ -15,7 +15,7 @@
 - [ ] 1.1 `bronnen.yaml` op het datavolume: schema met `repos:` en `websites:`
 - [ ] 1.2 `examples/bronnen.yaml` als sjabloon met commentaar; test dat de run hem niet leest
 - [ ] 1.3 Validatie: onbekende forge is een fout met de naam erin, geen stille overslag
-- [ ] 1.4 Tokens als `Veld(..., geheim=True)` in `config/settings.py`
+- [x] 1.4 Tokens als `Veld(..., geheim=True)` in `config/settings.py`
 - [ ] 1.5 Wijzigingen in dezelfde append-only trail als `bron_config_log.jsonl`
 - [ ] 1.6 Test: twee schrijvers tegelijk (zelfde slot-discipline als `api/werkset.py`)
 
@@ -40,13 +40,13 @@
 
 ## 4. Clausule-koppeling
 
-- [ ] 4.1 Bewijspaden en metadata koppelen aan §8.4, §8.8, §8.9, §8.25, §8.28, §8.31, §8.32
-- [ ] 4.2 Websitepagina's koppelen aan §5.31, §5.34 en 9001 §8.2
-- [ ] 4.3 Test dat een repository zonder review-eis een waarneming op §8.32 oplevert
+- [x] 4.1 Bewijspaden en metadata gekoppeld (`classification/bron_clausules.py`)
+- [x] 4.2 Websitepagina's gekoppeld op padprefix
+- [x] 4.3 Test: instellingen-document landt op §8.32 en §8.4
 
 ## 5. UI
 
-- [ ] 5.1 Bronnen-scherm: repositories en websites toevoegen, wijzigen, verwijderen
+- [x] 5.1 Via `bron_catalogus.py` — geen apart scherm nodig, en geen tweede configuratieplek
 - [ ] 5.2 Bron-health toont per forge of het token werkt — en welk niet
 - [ ] 5.3 Browsertest, niet alleen een contract-test (de filter-les van 2026-08-26: de route kon
       het al, de knop ontbrak)

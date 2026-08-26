@@ -6,6 +6,27 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-26 — vaste clausule-koppeling voor repository- en websitedocumenten
+
+`koppel_documenten` matcht Nederlandse normtermen op de documenttekst. Voor beleid en notulen
+werkt dat; voor wat de nieuwe bronnen leveren niet. Een `SECURITY.md` is Engels en bevat geen
+enkele zoekterm — en viel daarmee volledig buiten de boot, terwijl hij bewijs is voor §8.8
+vanwege *wat hij is*. "Branch-bescherming op de hoofdbranch: niet ingesteld" is de kern van
+§8.32 zonder één normterm erin.
+
+Die documenten koppelen nu op **soort**: bewijspad, workflowmap, instellingen-document of
+padprefix van een webpagina. §8.8 en §5.24 voor `SECURITY.md`, §5.2 en §8.32 voor `CODEOWNERS`,
+§8.25/§8.31/§8.32 voor workflows, §8.4/§8.32/§5.2 voor de repository-instellingen, §5.34 voor
+`/privacy/`, §5.31 plus 9001 §8.2 voor `/terms/`.
+
+**Erbij en niet in plaats van.** De zoektermen blijven draaien: een `SECURITY.md` die ook over
+back-ups gaat, krijgt die clausule er gewoon bij. Een onbekend pad levert niets op — liever geen
+koppeling dan een geraden koppeling.
+
+De belangrijkste test is dat elke gekoppelde clausule in de norm-DB bestaat. Een koppeling naar
+een clausule die er niet is, levert een bevinding op die nergens over gaat — dat is precies de
+fout die op 2026-08-24 448 van de 903 bevindingen verkeerd labelde.
+
 ### Removed — 2026-08-26 — de PreSync-gate mocht niet van het Argo-project
 
 De gate uit a59 is er weer uit, en niet omdat het idee niet deugde. Argo weigerde hem:

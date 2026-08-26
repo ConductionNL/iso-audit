@@ -236,6 +236,25 @@ def koppel_alle_normen(
             samen["clausule_normen"] = [*samen["clausule_normen"], *doc["clausule_normen"]]
             samen["sub_punt_matches"] = [*samen["sub_punt_matches"], *doc["sub_punt_matches"]]
 
+    # De vaste koppeling erbij, ná de zoektermen en niet in plaats daarvan. Een `SECURITY.md`
+    # is Engels en bevat geen enkele Nederlandse normterm; zonder dit valt hij volledig buiten
+    # de boot, terwijl hij bewijs is voor §8.8 vanwege wát hij is. Zie
+    # `classification/bron_clausules.py`.
+    for doc in documenten:
+        vast = _vaste_koppeling(doc)
+        if not vast:
+            continue
+        doc_id = str(doc["id"])
+        if doc_id not in per_doc:
+            per_doc[doc_id] = {**doc, "clausule_normen": [], "sub_punt_matches": []}
+            volgorde.append(doc_id)
+        samen = per_doc[doc_id]
+        bestaand = set(samen["clausule_normen"])
+        samen["clausule_normen"] = [
+            *samen["clausule_normen"],
+            *[paar for paar in vast if paar not in bestaand],
+        ]
+
     for samen in per_doc.values():
         # Afgeleid en niet apart bijgehouden: twee lijsten die hetzelfde beweren lopen uiteen.
         # Ontdubbeld met behoud van volgorde — hetzelfde nummer uit twee normen is één
@@ -251,6 +270,24 @@ def koppel_alle_normen(
     gekoppeld_samen = [per_doc[doc_id] for doc_id in volgorde]
     niet = [d for d in documenten if str(d["id"]) not in per_doc]
     return gekoppeld_samen, niet
+
+
+def _vaste_koppeling(doc: dict[str, Any]) -> list[tuple[str, str]]:
+    """De koppeling-op-soort voor bronnen waar zoektermen niet werken.
+
+    Alleen voor `repo` en `website`; alle andere bronnen leveren lopende tekst waar de
+    zoektermen op gemaakt zijn.
+    """
+    from iso_audit.classification import bron_clausules
+
+    herkomst = str(doc.get("herkomst") or "").lower()
+    doc_id = str(doc.get("id") or "")
+    if herkomst == "repo":
+        _, _, rest = doc_id.partition("#")
+        return list(bron_clausules.voor_repo_document(rest))
+    if herkomst == "website":
+        return list(bron_clausules.voor_webpagina(doc_id))
+    return []
 
 
 def ontbrekende_dekking(
