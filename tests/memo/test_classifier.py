@@ -28,30 +28,10 @@ def test_ncs_alleen_nc_in_volgorde() -> None:
     assert [f.id for f in out] == ["2", "4"]
 
 
-def test_improvements_expliciete_promotie() -> None:
-    fs = [_f("1", "OFI", "8.15", promote=True), _f("2", "OFI", "8.15")]
-    out = DefaultClassifier().improvements(fs, threshold=99)
-    assert [f.id for f in out] == ["1"]
-
-
-def test_improvements_drempel_een_representant() -> None:
-    fs = [_f(str(i), "OFI", "10.2") for i in range(3)] + [_f("x", "OFI", "5.11")]
-    out = DefaultClassifier().improvements(fs, threshold=3)
-    # 10.2 heeft 3 OFI's (>= drempel) → één representant; 5.11 heeft er 1 → niet.
-    assert [f.id for f in out] == ["0"]
-
-
-def test_improvements_geen_dubbeling_expliciet_en_drempel() -> None:
-    fs = [_f("a", "OFI", "10.2", promote=True)] + [_f(str(i), "OFI", "10.2") for i in range(3)]
-    out = DefaultClassifier().improvements(fs, threshold=2)
-    # clausule 10.2 al gedekt door expliciete promotie → geen extra representant.
-    assert [f.id for f in out] == ["a"]
-
-
-def test_improvements_threshold_nul_alleen_expliciet() -> None:
-    fs = [_f(str(i), "OFI", "10.2") for i in range(5)]
-    out = DefaultClassifier().improvements(fs, threshold=0)
-    assert out == []
+# De OFI-selectie zat hier als clausule-clustering met drempel 10. Sinds 2026-08-26 bundelt
+# `memo/groepering.py` op **thema**, want geen enkele clausule haalde die drempel terwijl de
+# 53 OFI's zich over 16 thema's verdeelden. Eén regel, één plek: de tests staan nu in
+# `tests/memo/test_verbeterpunten_thema.py`.
 
 
 # --- pattern detection ------------------------------------------------------

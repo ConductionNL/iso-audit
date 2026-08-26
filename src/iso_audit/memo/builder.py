@@ -13,8 +13,12 @@ import json
 from datetime import UTC, datetime
 
 from iso_audit.memo import __version__ as memo_version
-from iso_audit.memo.classifier import DefaultClassifier
-from iso_audit.memo.groepering import GEEN_THEMA, Themagroep, groepeer_ncs
+from iso_audit.memo.groepering import (
+    GEEN_THEMA,
+    Themagroep,
+    groepeer_ncs,
+    groepeer_ofis,
+)
 from iso_audit.memo.models import (
     ActionRow,
     AuditMemo,
@@ -120,17 +124,54 @@ def _nc_block(
     )
 
 
-def _improvement_block(f: Finding, norm_db: NormDatabase, language: str) -> ImprovementBlock:
+def _improvement_block(groep: Themagroep, norm_db: NormDatabase, language: str) -> ImprovementBlock:
+    """Eén verbeterblok per thema, met alle waarnemingen erin.
+
+    Niet één representant per cluster, zoals het was: van drie waarnemingen op hetzelfde thema
+    kwam er dan één in de memo en verdwenen er twee, en dat maakt van een patroon een anekdote.
+
+    De suggesties van álle waarnemingen blijven staan, ook als er een kern is. Bij een NC-blok
+    verhuist het detail naar de bijlage, maar hier ís het verbeteradvies waar het om gaat.
+    """
+    eerste = groep.bevindingen[0]
+    titel = eerste.title if groep.thema == GEEN_THEMA else groep.thema
+    rationales = [
+        f.classification_rationale for f in groep.bevindingen if f.classification_rationale
+    ]
+    suggesties = [f.suggestion.strip() for f in groep.bevindingen if f.suggestion]
     return ImprovementBlock(
-        title=f.title,
-        citations=_citations(f, norm_db, language),
-        deviation=f.deviation or f.description,
+        title=titel,
+        citations=_groep_citations(groep, norm_db, language),
+        kern=groep.kern,
+        deviation=_groep_afwijking(groep),
         classification_rationale=(
-            f.classification_rationale or "(classificatie-rationale in te vullen)"
+            rationales[0] if rationales else "(classificatie-rationale in te vullen)"
         ),
-        suggestion=f.suggestion,
-        bronnen=f.bronnen,
+        suggestion=_samengevoegde_suggestie(suggesties),
+        bronnen=_groep_bronnen(groep),
     )
+
+
+THEMA_DREMPEL = 3
+"""Vanaf hoeveel OFI's op één thema het een verbeterpunt wordt.
+
+Was 10, en telde toen clausules: op de werkset van 2026-08-25 haalde geen enkele clausule dat,
+dus kwam er geen enkel verbeterpunt uit. Nu telt het thema's, en dan is 10 ook te hoog — 3 geeft
+zeven samenhangende blokken (logging & monitoring, auditprogramma, back-up, privacy,
+cryptografie, rollen, verificatie), 5 geeft er nog twee.
+
+Drie losse waarnemingen op hetzelfde thema zijn een patroon; één is een waarneming, en die hoort
+in het detailrapport."""
+
+
+def _samengevoegde_suggestie(suggesties: list[str]) -> str | None:
+    """De suggesties onder elkaar; ontdubbeld want dezelfde zin drie keer leest als drang."""
+    uniek = list(dict.fromkeys(s for s in suggesties if s))
+    if not uniek:
+        return None
+    if len(uniek) == 1:
+        return uniek[0]
+    return "<ul>" + "".join(f"<li>{s}</li>" for s in uniek) + "</ul>"
 
 
 def _findings_hash(findings: list[Finding]) -> str:
@@ -148,11 +189,10 @@ def build_memo(
     norm_db: NormDatabase,
     memo_input: MemoInput,
     language: str | None = None,
-    threshold: int = 10,
+    threshold: int = THEMA_DREMPEL,
     now: datetime | None = None,
 ) -> AuditMemo:
     """Bouw het render-model. ``now`` injecteerbaar voor reproduceerbare tests."""
-    classifier = DefaultClassifier()
     detector = DefaultPatternDetector()
     lang = language or profile.defaults.language
 
@@ -165,8 +205,11 @@ def build_memo(
     nc_blocks = [
         _nc_block(groep, findings, norm_db, detector, lang) for groep in groepeer_ncs(findings)
     ]
+    # Verbeterpunten bundelen op thema en niet op clausule: op de werkset van 2026-08-25 haalde
+    # geen enkele clausule de drempel, terwijl de 53 OFI's zich over 16 thema's verdeelden.
+    # Daar zitten de patronen, en een verbeteradvies gaat over een patroon.
     improvements = [
-        _improvement_block(f, norm_db, lang) for f in classifier.improvements(findings, threshold)
+        _improvement_block(groep, norm_db, lang) for groep in groepeer_ofis(findings, threshold)
     ]
 
     stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")

@@ -14,7 +14,7 @@ import typer
 import yaml
 from rich.console import Console
 
-from iso_audit.memo.builder import build_memo
+from iso_audit.memo.builder import THEMA_DREMPEL, build_memo
 from iso_audit.memo.models import Finding, HistoricalNC, MemoInput
 from iso_audit.memo.norm_lookup import laad_norm_db
 from iso_audit.memo.renderer.html import MemoRendererImpl
@@ -59,7 +59,9 @@ def memo_cmd(
         None, "--historical-ncs", help="Historical-NCs (YAML)."
     ),
     language: str | None = typer.Option(None, "--language", help="Taal (default: profiel)."),
-    threshold: int = typer.Option(10, "--threshold", help="OFI-cluster-drempel voor verbeterpunt."),
+    threshold: int = typer.Option(
+        THEMA_DREMPEL, "--threshold", help="Aantal OFI's op één thema voor een verbeterpunt."
+    ),
 ) -> None:
     """Genereer de management-auditmemo (HTML + PDF) uit de findings-dataset."""
     try:

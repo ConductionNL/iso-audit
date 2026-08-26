@@ -8,8 +8,9 @@ maar capitulatie voor het aantal. Een lijst die te lang is om te wegen, wordt ni
 De uitweg is niet "de agent beslist" maar **de agent doet het onbetwiste voorwerk, expliciet
 gemarkeerd**:
 
-- **Alleen `bevestigen` op een positieve bevinding.** Dan betwist niemand iets: de review
-  bevestigt wat de classificatie al zei, en er valt geen oordeel te vellen.
+- **Alleen `bevestigen`, en alleen op een positieve bevinding of een OFI.** Dan betwist niemand
+  iets: de review bevestigt wat de classificatie al zei, en er valt geen oordeel te vellen dat
+  de certificering raakt.
 - **Nooit een NC.** Correctie, root-cause-analyse en formele verificatie zijn gevolgen die de
   certificering raken. Die beslissing is van de auditor, ook als de review de NC bevestigt.
 - **Nooit een verlaging.** Verlagen is juist wél een oordeel: de review vindt het bewijs
@@ -34,8 +35,17 @@ AUTO_ACTOR = "auto-triage"
 """De actor in de trail. Bewust geen mens-achtige naam: een auditor moet in één blik kunnen zien
 wat een mens heeft besloten en wat niet."""
 
-AUTOMATISCH_TE_AFFRONTEREN = "positief"
-"""De enige classificatie die automatisch mag worden afgedaan."""
+AUTOMATISCH_AF_TE_DOEN = frozenset({"positief", "OFI"})
+"""De classificaties die automatisch mogen worden afgedaan.
+
+`OFI` kwam er op 2026-08-26 bij. Er gold precies hetzelfde voor als voor een positieve
+bevinding: de review bevestigt wat de classificatie al zei, er valt geen oordeel te vellen dat
+de certificering raakt, en met 136 OFI's tegenover 108 NC's is dat de bulk die niemand weegt.
+
+`NC` staat er niet in en komt er niet in. Correctie, root-cause-analyse en formele verificatie
+zijn gevolgen die de organisatie draagt; de trail moet daar een mens-account tonen. Sinds a54
+wordt dat ook op de schrijfweg afgedwongen (`AuditSession.apply_triage`), zodat deze lijst niet
+de enige plek is waar het misgaat als iemand hem uitbreidt."""
 
 
 @dataclass(frozen=True)
@@ -61,10 +71,13 @@ def voorstellen(
             continue
         if advies.advies != "bevestigen":
             continue
-        if advies.voorgestelde_klasse != AUTOMATISCH_TE_AFFRONTEREN:
+        klasse = advies.voorgestelde_klasse
+        if klasse not in AUTOMATISCH_AF_TE_DOEN:
             continue
         for bev in groep.bevindingen:
-            if bev.get("classificatie") != AUTOMATISCH_TE_AFFRONTEREN:
+            # De voorgestelde klasse moet gelijk zijn aan wat er al staat. Anders is het geen
+            # bevestiging maar een wijziging, en die hoort bij de auditor.
+            if bev.get("classificatie") != klasse:
                 continue
             finding_id = str(bev.get("id") or "")
             if not finding_id:
@@ -74,14 +87,14 @@ def voorstellen(
                     finding_id=finding_id,
                     status="valide",
                     reden=(
-                        f"auto-triage: de review bevestigde deze positieve bevinding op "
+                        f"auto-triage: de review bevestigde deze bevinding ({klasse}) op "
                         f"{groep.norm} §{groep.clausule}. {advies.reden}"
                     ),
                 )
             )
     if voorstellen_lijst:
         logger.info(
-            "Auto-triage: %d positieve bevinding(en) automatisch op valide; "
+            "Auto-triage: %d bevinding(en) (positief/OFI) automatisch op valide; "
             "NC's en verlagingen blijven bij de auditor",
             len(voorstellen_lijst),
         )

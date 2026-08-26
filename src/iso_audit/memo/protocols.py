@@ -39,8 +39,6 @@ class FindingsClassifier(Protocol):
 
     def ncs(self, findings: list[Finding]) -> list[Finding]: ...
 
-    def improvements(self, findings: list[Finding], threshold: int) -> list[Finding]: ...
-
 
 @runtime_checkable
 class PatternDetector(Protocol):

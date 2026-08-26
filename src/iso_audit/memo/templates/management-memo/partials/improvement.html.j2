@@ -7,8 +7,18 @@
 <div class="norm-quote">"{{ c.text }}"</div>
 {% endfor %}
 
-<h4>Waar de praktijk afwijkt</h4>
+{# Zelfde regel als bij een NC-blok: is er een synthese, dan is die de blok-tekst en staat de
+   onderbouwing per clausule in het detailrapport. #}
+{% if imp.kern %}
+<p class="kern"><strong>{{ imp.kern }}</strong></p>
+{% endif %}
+
+{% if imp.deviation %}
+<h4>Wat er is waargenomen</h4>
 <div>{{ imp.deviation | safe }}</div>
+{% else %}
+<p class="detailref">Waarnemingen per clausule: zie <em>{{ memo.detail_report_ref }}</em>.</p>
+{% endif %}
 {% if imp.bronnen %}
 <p class="reasoning"><em>Brondocumenten:</em></p>
 <ul class="reasoning">

@@ -6,6 +6,45 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-26 — auto-triage doet ook OFI's af
+
+Auto-triage raakte alleen positieve bevindingen. Op de run van 2026-08-25 stonden 136 OFI's en
+171 positieve bevindingen tegenover 108 NC's; die 136 bleven met de hand te doen, terwijl er
+precies hetzelfde voor geldt: de review bevestigt wat de classificatie al zei, en er valt geen
+oordeel te vellen dat de certificering raakt.
+
+Voorwaarden ongewijzigd streng: alleen bij advies `bevestigen`, en alleen als de voorgestelde
+klasse **gelijk** is aan wat er al staat. Anders is het geen bevestiging maar een wijziging, en
+die hoort bij de auditor. Verlagingen blijven van de auditor.
+
+**Een NC blijft van de auditor**, en dat staat sinds a54 niet meer alleen in deze lijst maar ook
+op de schrijfweg (`AuditSession.apply_triage`) — zodat uitbreiden van deze lijst niet stilletjes
+die grens verschuift.
+
+### Changed — 2026-08-26 — verbeterpunten bundelen per thema
+
+Twee dingen werkten niet, allebei gemeten op dezelfde werkset:
+
+1. **Er kwam geen enkel verbeterpunt uit de memo.** De selectie clusterde op *clausule* met
+   drempel 10 en geen enkele clausule haalde dat. De 53 OFI's verdeelden zich intussen keurig
+   over 16 thema's: 7x logging & monitoring, 6x auditprogramma, 4x back-up, 4x privacy.
+2. **Eén representant per cluster.** Van drie waarnemingen op hetzelfde thema kwam er één in de
+   memo en verdwenen er twee. Dat maakt van een patroon een anekdote.
+
+Nu wordt een thema met genoeg OFI's één verbeterblok met álle waarnemingen erin, en telt de
+drempel thema's in plaats van clausules. Default van 10 naar **3** (`THEMA_DREMPEL`): dat geeft
+op deze werkset zeven samenhangende blokken; 5 geeft er nog twee, 10 nul.
+
+De suggesties van alle waarnemingen blijven staan, ook als er een kern is. Bij een NC-blok
+verhuist het detail naar de bijlage — hier ís het verbeteradvies waar het om gaat.
+
+`Overig` clustert nooit: drie ongerelateerde punten als één verbeteradvies presenteren wekt
+precies de verkeerde suggestie. Een expliciet gepromote OFI trekt wel zijn hele thema mee.
+
+**Opgeruimd:** `DefaultClassifier.improvements()` en zijn protocol-methode zijn weg. De
+selectieregel leefde daarna op twee plekken en dat is één te veel — hij staat nu in
+`memo/groepering.py`, met de tests in `tests/memo/test_verbeterpunten_thema.py`.
+
 ### Security — 2026-08-26 — een NC trieeren vraagt een mens-account, afgedwongen op de schrijfweg
 
 De regel "auto-triage raakt nooit een NC" stond in de docstring van

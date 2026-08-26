@@ -140,6 +140,7 @@ class ImprovementBlock(BaseModel):
 
     title: str
     citations: list[ClauseCitation]
+    kern: str = ""  # synthese-zin uit de review; zie NCBlock.kern
     deviation: str
     classification_rationale: str  # "waarom verbeterpunt en geen NC?"
     suggestion: str | None = None
