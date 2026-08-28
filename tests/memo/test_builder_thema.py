@@ -60,9 +60,9 @@ def _bouw(findings: list[Finding]) -> list:
 def test_drie_ncs_op_een_thema_geven_een_blok() -> None:
     blokken = _bouw(
         [
-            _nc("8.14", "Back-up & continuïteit", kern="Geen getest continuïteitsbeheer."),
-            _nc("5.29", "Back-up & continuïteit"),
-            _nc("5.30", "Back-up & continuïteit"),
+            _nc("A.8.14", "Back-up & continuïteit", kern="Geen getest continuïteitsbeheer."),
+            _nc("A.5.29", "Back-up & continuïteit"),
+            _nc("A.5.30", "Back-up & continuïteit"),
         ]
     )
     assert len(blokken) == 1
@@ -70,27 +70,30 @@ def test_drie_ncs_op_een_thema_geven_een_blok() -> None:
 
 
 def test_het_blok_citeert_alle_clausules() -> None:
-    """De normregel onder een NC-blok somt ze op: §8.14 / §5.29 / §5.30."""
-    blokken = _bouw([_nc("8.14", "Continuïteit"), _nc("5.29", "Continuïteit")])
-    assert sorted(c.clause for c in blokken[0].citations) == ["5.29", "8.14"]
+    """De normregel onder een NC-blok somt ze op: §A.8.14 / §A.5.29 / §5.30."""
+    blokken = _bouw([_nc("A.8.14", "Continuïteit"), _nc("A.5.29", "Continuïteit")])
+    assert sorted(c.clause for c in blokken[0].citations) == ["A.5.29", "A.8.14"]
 
 
 def test_elke_bron_blijft_zichtbaar() -> None:
     """Bundelen mag geen bewijs verstoppen."""
     blokken = _bouw(
-        [_nc("8.14", "Continuïteit", bron="Plan.docx"), _nc("5.29", "Continuïteit", bron="Test.md")]
+        [
+            _nc("A.8.14", "Continuïteit", bron="Plan.docx"),
+            _nc("A.5.29", "Continuïteit", bron="Test.md"),
+        ]
     )
     namen = {b.doc_naam for b in blokken[0].bronnen}
     assert namen == {"Plan.docx", "Test.md"}
 
 
 def test_de_acties_van_alle_bevindingen_komen_samen() -> None:
-    blokken = _bouw([_nc("8.14", "Continuïteit"), _nc("5.29", "Continuïteit")])
+    blokken = _bouw([_nc("A.8.14", "Continuïteit"), _nc("A.5.29", "Continuïteit")])
     assert len(blokken[0].actions) == 2
 
 
 def test_verschillende_themas_blijven_aparte_blokken() -> None:
-    blokken = _bouw([_nc("8.14", "Continuïteit"), _nc("5.12", "Informatieclassificatie")])
+    blokken = _bouw([_nc("A.8.14", "Continuïteit"), _nc("A.5.12", "Informatieclassificatie")])
     assert len(blokken) == 2
 
 
@@ -104,8 +107,8 @@ def test_met_kern_verhuist_het_detail_naar_de_bijlage() -> None:
     """
     blokken = _bouw(
         [
-            _nc("8.14", "Continuïteit", kern="Continuïteit is niet aantoonbaar getest."),
-            _nc("5.29", "Continuïteit"),
+            _nc("A.8.14", "Continuïteit", kern="Continuïteit is niet aantoonbaar getest."),
+            _nc("A.5.29", "Continuïteit"),
         ]
     )
     assert blokken[0].kern == "Continuïteit is niet aantoonbaar getest."
@@ -114,17 +117,17 @@ def test_met_kern_verhuist_het_detail_naar_de_bijlage() -> None:
 
 def test_zonder_kern_blijft_de_afwijking_staan() -> None:
     """Geen synthese betekent niet: geen inhoud. Dan is de afwijking alles wat we hebben."""
-    blokken = _bouw([_nc("8.14", "Continuïteit"), _nc("5.29", "Continuïteit")])
-    assert "afwijking op 8.14" in blokken[0].deviation
-    assert "afwijking op 5.29" in blokken[0].deviation
+    blokken = _bouw([_nc("A.8.14", "Continuïteit"), _nc("A.5.29", "Continuïteit")])
+    assert "afwijking op A.8.14" in blokken[0].deviation
+    assert "afwijking op A.5.29" in blokken[0].deviation
 
 
 def test_het_bewijs_blijft_ook_met_kern_zichtbaar() -> None:
     """Het detail verhuist, de bronvermelding niet — anders is de memo niet na te trekken."""
     blokken = _bouw(
         [
-            _nc("8.14", "Continuïteit", kern="Niet getest.", bron="Plan.docx"),
-            _nc("5.29", "Continuïteit", bron="Test.md"),
+            _nc("A.8.14", "Continuïteit", kern="Niet getest.", bron="Plan.docx"),
+            _nc("A.5.29", "Continuïteit", bron="Test.md"),
         ]
     )
     assert {b.doc_naam for b in blokken[0].bronnen} == {"Plan.docx", "Test.md"}
@@ -137,11 +140,11 @@ def test_met_kern_houdt_het_blok_de_bronnaam_maar_niet_de_omschrijving() -> None
     detailrapport toch al per bevinding uitschrijft. Zonder kern blijft alles staan, want dan is
     er geen bijlage-synthese om naar te verwijzen.
     """
-    met = _bouw([_nc("8.14", "Continuïteit", kern="Niet getest."), _nc("5.29", "Continuïteit")])
+    met = _bouw([_nc("A.8.14", "Continuïteit", kern="Niet getest."), _nc("A.5.29", "Continuïteit")])
     assert [b.doc_naam for b in met[0].bronnen] == ["B.docx"]
     assert all(not b.beschrijving for b in met[0].bronnen)
 
 
 def test_zonder_kern_blijft_de_bronomschrijving_staan() -> None:
-    zonder = _bouw([_nc("8.14", "Continuïteit"), _nc("5.29", "Continuïteit")])
+    zonder = _bouw([_nc("A.8.14", "Continuïteit"), _nc("A.5.29", "Continuïteit")])
     assert any(b.beschrijving for b in zonder[0].bronnen)

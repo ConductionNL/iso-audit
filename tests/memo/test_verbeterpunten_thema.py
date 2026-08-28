@@ -61,9 +61,9 @@ def _blokken(findings: list[Finding], drempel: int = 3) -> list:
 
 def test_een_thema_met_genoeg_ofis_wordt_een_verbeterblok() -> None:
     fs = [
-        _ofi("1", "8.15", "Logging & monitoring"),
-        _ofi("2", "8.16", "Logging & monitoring"),
-        _ofi("3", "8.17", "Logging & monitoring"),
+        _ofi("1", "A.8.15", "Logging & monitoring"),
+        _ofi("2", "A.8.16", "Logging & monitoring"),
+        _ofi("3", "A.8.17", "Logging & monitoring"),
     ]
     blokken = _blokken(fs)
     assert len(blokken) == 1
@@ -73,17 +73,17 @@ def test_een_thema_met_genoeg_ofis_wordt_een_verbeterblok() -> None:
 def test_het_blok_houdt_alle_waarnemingen_en_niet_een_representant() -> None:
     """Van drie waarnemingen één tonen maakt van een patroon een anekdote."""
     fs = [
-        _ofi("1", "8.15", "Logging & monitoring"),
-        _ofi("2", "8.16", "Logging & monitoring"),
-        _ofi("3", "8.17", "Logging & monitoring"),
+        _ofi("1", "A.8.15", "Logging & monitoring"),
+        _ofi("2", "A.8.16", "Logging & monitoring"),
+        _ofi("3", "A.8.17", "Logging & monitoring"),
     ]
     blokken = _blokken(fs)
-    assert sorted(c.clause for c in blokken[0].citations) == ["8.15", "8.16", "8.17"]
+    assert sorted(c.clause for c in blokken[0].citations) == ["A.8.15", "A.8.16", "A.8.17"]
     assert {b.doc_naam for b in blokken[0].bronnen} == {"1.docx", "2.docx", "3.docx"}
 
 
 def test_een_thema_onder_de_drempel_haalt_de_memo_niet() -> None:
-    fs = [_ofi("1", "8.15", "Logging & monitoring"), _ofi("2", "8.16", "Logging & monitoring")]
+    fs = [_ofi("1", "A.8.15", "Logging & monitoring"), _ofi("2", "A.8.16", "Logging & monitoring")]
     assert _blokken(fs) == []
 
 
@@ -93,28 +93,28 @@ def test_de_drempel_telt_themas_en_niet_clausules() -> None:
     Onder de oude clausule-drempel telde dit als 1+1+1 en haalde het niets.
     """
     fs = [
-        _ofi("1", "8.15", "Back-up & continuïteit"),
-        _ofi("2", "5.29", "Back-up & continuïteit"),
-        _ofi("3", "5.30", "Back-up & continuïteit"),
+        _ofi("1", "A.8.15", "Back-up & continuïteit"),
+        _ofi("2", "A.5.29", "Back-up & continuïteit"),
+        _ofi("3", "A.5.30", "Back-up & continuïteit"),
     ]
     assert len(_blokken(fs)) == 1
 
 
 def test_overig_clustert_nooit() -> None:
-    fs = [_ofi(str(i), f"8.{i}", "") for i in range(1, 6)]
+    fs = [_ofi(str(i), f"A.8.{i}", "") for i in range(1, 6)]
     assert _blokken(fs) == []
 
 
 def test_een_expliciet_gepromote_ofi_komt_er_altijd_in() -> None:
     """Ook alleen: de auditor heeft er zelf voor getekend."""
-    assert len(_blokken([_ofi("1", "8.15", "Toegangsbeheer", promote=True)])) == 1
+    assert len(_blokken([_ofi("1", "A.8.15", "Toegangsbeheer", promote=True)])) == 1
 
 
 def test_een_gepromote_ofi_verdubbelt_zijn_thema_niet() -> None:
     fs = [
-        _ofi("1", "8.15", "Logging & monitoring", promote=True),
-        _ofi("2", "8.16", "Logging & monitoring"),
-        _ofi("3", "8.17", "Logging & monitoring"),
+        _ofi("1", "A.8.15", "Logging & monitoring", promote=True),
+        _ofi("2", "A.8.16", "Logging & monitoring"),
+        _ofi("3", "A.8.17", "Logging & monitoring"),
     ]
     blokken = _blokken(fs)
     assert len(blokken) == 1
@@ -122,16 +122,16 @@ def test_een_gepromote_ofi_verdubbelt_zijn_thema_niet() -> None:
 
 
 def test_drempel_nul_betekent_alleen_expliciete_promotie() -> None:
-    fs = [_ofi(str(i), f"8.{i}", "Logging & monitoring") for i in range(1, 6)]
+    fs = [_ofi(str(i), f"A.8.{i}", "Logging & monitoring") for i in range(1, 6)]
     assert _blokken(fs, drempel=0) == []
 
 
 def test_met_een_kern_verhuist_het_detail_ook_hier_naar_de_bijlage() -> None:
     """Zelfde regel als bij de NC-blokken; anders groeit het blok mee met zijn omvang."""
     fs = [
-        _ofi("1", "8.15", "Logging & monitoring", kern="Logging is niet centraal belegd."),
-        _ofi("2", "8.16", "Logging & monitoring"),
-        _ofi("3", "8.17", "Logging & monitoring"),
+        _ofi("1", "A.8.15", "Logging & monitoring", kern="Logging is niet centraal belegd."),
+        _ofi("2", "A.8.16", "Logging & monitoring"),
+        _ofi("3", "A.8.17", "Logging & monitoring"),
     ]
     blokken = _blokken(fs)
     assert blokken[0].kern == "Logging is niet centraal belegd."
@@ -141,18 +141,18 @@ def test_met_een_kern_verhuist_het_detail_ook_hier_naar_de_bijlage() -> None:
 def test_de_suggesties_van_alle_waarnemingen_blijven_staan() -> None:
     """Het verbeteradvies is juist waar het om gaat; dat mag niet naar de bijlage."""
     fs = [
-        _ofi("1", "8.15", "Logging & monitoring"),
-        _ofi("2", "8.16", "Logging & monitoring"),
-        _ofi("3", "8.17", "Logging & monitoring"),
+        _ofi("1", "A.8.15", "Logging & monitoring"),
+        _ofi("2", "A.8.16", "Logging & monitoring"),
+        _ofi("3", "A.8.17", "Logging & monitoring"),
     ]
     tekst = _blokken(fs)[0].suggestion or ""
-    for clausule in ("8.15", "8.16", "8.17"):
+    for clausule in ("A.8.15", "A.8.16", "A.8.17"):
         assert f"suggestie voor {clausule}" in tekst
 
 
 # --- hoeveel thema's komen er in de memo ------------------------------------
 
-_ECHTE = [f"8.{n}" for n in range(1, 16)]
+_ECHTE = [f"A.8.{n}" for n in range(1, 16)]
 """Bestaande 27001-clausules. Verzonnen nummers laat `norm_lookup` terecht falen: een memo mag
 geen verzonnen citaat bevatten."""
 

@@ -102,8 +102,8 @@ def test_record_vorm_is_stabiel(conn: sqlite3.Connection) -> None:
 def test_titel_komt_uit_de_clause_map(conn: sqlite3.Connection) -> None:
     """`normteksten` heeft geen `titel` per clausule — nagemeten leeg voor élke 27001-clausule.
 
-    Een voorstel dat alleen "5.28" zegt, laat de auditor eerst opzoeken waar het over gaat.
+    Een voorstel dat alleen "A.5.28" zegt, laat de auditor eerst opzoeken waar het over gaat.
     """
     voorstellen = {v.clausule_id: v for v in iv.stel_voor(conn, "27001")}
 
-    assert voorstellen["5.28"].titel == "Verzamelen van bewijs"
+    assert voorstellen["A.5.28"].titel == "Verzamelen van bewijs"

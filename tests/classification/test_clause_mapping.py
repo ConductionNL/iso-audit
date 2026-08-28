@@ -37,8 +37,8 @@ def test_laad_9001(map_9001: dict[str, Any]) -> None:
 
 def test_laad_27001(map_27001: dict[str, Any]) -> None:
     assert "27001" in map_27001["norm"]
-    assert "6.5" in map_27001["clausules"]
-    assert "8.16" in map_27001["clausules"]
+    assert "A.6.5" in map_27001["clausules"]
+    assert "A.8.16" in map_27001["clausules"]
 
 
 def test_laad_beide(map_beide: dict[str, Any]) -> None:
@@ -47,7 +47,7 @@ def test_laad_beide(map_beide: dict[str, Any]) -> None:
     assert "27001" in map_beide["norm"]
     # Beide chapters moeten aanwezig zijn.
     assert "4.1" in map_beide["clausules"]
-    assert "6.5" in map_beide["clausules"]
+    assert "A.6.5" in map_beide["clausules"]
 
 
 def test_laad_onbekende_norm() -> None:
@@ -93,7 +93,7 @@ def test_koppel_documenten_match(map_beide: dict[str, Any]) -> None:
     gekoppeld, niet = koppel_documenten(docs, map_beide)
     assert len(gekoppeld) == 1
     assert len(niet) == 0
-    assert "5.11" in gekoppeld[0]["clausules"] or "6.5" in gekoppeld[0]["clausules"]
+    assert "A.5.11" in gekoppeld[0]["clausules"] or "A.6.5" in gekoppeld[0]["clausules"]
 
 
 def test_koppel_documenten_geen_match(map_beide: dict[str, Any]) -> None:

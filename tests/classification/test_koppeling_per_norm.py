@@ -4,7 +4,7 @@
 clausulenummers bestaan in beide normen, en bij een botsing won 27001 — dus in een gecombineerde
 audit werden 18 van de 28 ISO 9001-clausules nooit getoetst (§5.1 Leiderschap, §6.1 Risico's en
 kansen, §7.5 Gedocumenteerde informatie, §8.4 Externe processen en zo verder). De samengevoegde
-map had 103 ingangen waar er 121 horen.
+map had 103 ingangen waar er 148 horen (28 + 120).
 
 Daaruit volgde ook dat een bevinding zijn norm niet wist: `bevindingen.norm` stond op `beide` voor
 alle 800 rijen van de meting op 2026-08-24, en `run_job._resolve_standard()` moest achteraf raden
@@ -80,11 +80,18 @@ def test_zonder_norm_blijft_het_gedrag_gelijk() -> None:
 
 
 def test_de_echte_maps_verliezen_geen_enkele_clausule() -> None:
-    """Per norm koppelen betekent dat alle 121 clausules kandidaat zijn, niet 103."""
+    """Per norm koppelen betekent dat álle clausules kandidaat zijn, niet alleen de unieke.
+
+    28 (9001) + 120 (27001: 27 managementclausules + 93 Bijlage A) = 148. Samenvoegen op nummer
+    zou de overlappende nummers laten winnen door één norm — dat was de fout van 2026-08-24."""
     negen = laad_clause_map("9001")["clausules"]
     zevenentwintig = laad_clause_map("27001")["clausules"]
     assert len(negen) == 28
-    assert len(zevenentwintig) == 93
-    # 18 nummers komen in allebei voor; samen zijn het er 121 als je ze per norm telt.
-    assert len(negen) + len(zevenentwintig) == 121
-    assert len(set(negen) & set(zevenentwintig)) == 18
+    assert len(zevenentwintig) == 120
+    # Nummers komen in beide normen voor; per norm geteld zijn het er 148.
+    assert len(negen) + len(zevenentwintig) == 148
+    # 23 nummers komen in beide normen voor. Dat waren er 18 toen 27001 alleen Bijlage A kende;
+    # sinds de managementclausules erbij zijn, overlappen ook 4.x, 9.x en 10.x — beide normen
+    # volgen Annex SL. Precies daarom draagt een koppeling zijn norm mee en niet alleen een
+    # nummer: 9001 §8.2 is "Eisen voor producten en diensten", 27001 §8.2 is een risicobeoordeling.
+    assert len(set(negen) & set(zevenentwintig)) == 23

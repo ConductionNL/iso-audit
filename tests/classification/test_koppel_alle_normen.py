@@ -18,8 +18,17 @@ def _doc(id_: str, tekst: str) -> dict[str, Any]:
 
 
 def test_beide_normen_leveren_beide_koppelingen() -> None:
-    """Een document dat beide §7.5-onderwerpen raakt, krijgt twee koppelingen."""
-    doc = _doc("d1", "Onze processen en procedures staan vast; er is brandbescherming en een UPS.")
+    """Een document dat §7.5 in beide normen raakt, krijgt twee koppelingen.
+
+    De tekst raakte eerder 9001 §7.5 (processen en procedures) en A.7.5 (brandbescherming, UPS).
+    Sinds 27001 óók managementclausules kent, is 27001 §7.5 "Gedocumenteerde informatie" — net
+    als 9001 §7.5 — en zit de fysieke maatregel onder A.7.5. De tekst raakt nu beide §7.5'en.
+    """
+    doc = _doc(
+        "d1",
+        "Onze processen en procedures staan vast; gedocumenteerde informatie is in documentbeheer "
+        "opgenomen.",
+    )
 
     gekoppeld, _ = koppel_alle_normen([doc], "beide")
 

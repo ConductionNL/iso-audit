@@ -10,7 +10,7 @@ from typing import Any
 
 NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
     # ---- Organisatorische beheersmaatregelen (5.x) ----
-    "5.1": {
+    "A.5.1": {
         "normtekst": (
             "Beleid voor informatiebeveiliging en themaspecifieke beleidslijnen "
             "moeten worden vastgesteld, goedgekeurd door de directie, "
@@ -30,7 +30,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Versiehistorie en datum laatste beoordeling",
         ],
     },
-    "5.2": {
+    "A.5.2": {
         "normtekst": (
             "Rollen en verantwoordelijkheden voor informatiebeveiliging moeten "
             "worden gedefinieerd en toegewezen overeenkomstig de behoeften van "
@@ -48,7 +48,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Benoemingsbesluit CISO of equivalent",
         ],
     },
-    "5.3": {
+    "A.5.3": {
         "normtekst": (
             "Conflicterende taken en conflicterende verantwoordelijkheden moeten "
             "worden gescheiden om de kans op ongeautoriseerde of onbedoelde "
@@ -66,7 +66,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Compenserende maatregelen waar volledige scheiding niet mogelijk is",
         ],
     },
-    "5.4": {
+    "A.5.4": {
         "normtekst": (
             "Het management moet van alle medewerkers verlangen dat zij "
             "informatiebeveiliging toepassen in overeenstemming met het beleid "
@@ -84,7 +84,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Disciplinaire procedure bij schending beveiligingsbeleid",
         ],
     },
-    "5.5": {
+    "A.5.5": {
         "normtekst": (
             "De organisatie moet contacten onderhouden met relevante overheids- "
             "en regelgevende autoriteiten op het gebied van informatiebeveiliging."
@@ -101,7 +101,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van periodiek contact of deelname aan informatiedeling",
         ],
     },
-    "5.6": {
+    "A.5.6": {
         "normtekst": (
             "De organisatie moet contacten onderhouden met speciale "
             "belangengroepen, beveiligingsforums en professionele verenigingen "
@@ -119,7 +119,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor verwerking van ontvangen dreigingsinformatie",
         ],
     },
-    "5.7": {
+    "A.5.7": {
         "normtekst": (
             "Informatie over informatiebeveiligingsdreigingen moet worden "
             "verzameld en geanalyseerd om dreigingsinformatie te produceren die "
@@ -137,7 +137,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van aanpassing van maatregelen op basis van threat intel",
         ],
     },
-    "5.8": {
+    "A.5.8": {
         "normtekst": (
             "Informatiebeveiliging moet worden geïntegreerd in projectmanagement "
             "zodat informatiebeveiligingsrisico's worden geïdentificeerd en "
@@ -155,7 +155,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van beveiligingsbeoordeling bij oplevering projecten",
         ],
     },
-    "5.9": {
+    "A.5.9": {
         "normtekst": (
             "Een inventaris van informatie en andere daarmee samenhangende "
             "activa, inclusief eigenaren, moet worden opgesteld en onderhouden."
@@ -172,7 +172,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van periodieke actualisatie van het register",
         ],
     },
-    "5.10": {
+    "A.5.10": {
         "normtekst": (
             "Regels voor acceptabel gebruik en procedures voor de omgang met "
             "informatie en andere daarmee samenhangende activa moeten worden "
@@ -189,7 +189,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Specifieke regels voor mobiele apparaten, cloud en sociale media",
         ],
     },
-    "5.11": {
+    "A.5.11": {
         "normtekst": (
             "Procedures voor de teruggave of vernietiging van informatie en "
             "andere daarmee samenhangende activa bij beëindiging of wijziging "
@@ -208,7 +208,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Records van teruggave of vernietiging van activa",
         ],
     },
-    "5.12": {
+    "A.5.12": {
         "normtekst": (
             "Informatie moet worden geclassificeerd op basis van de "
             "informatiebeveiligingsbehoeften van de organisatie, rekening "
@@ -226,7 +226,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van gebruik van classificatielabels op documenten",
         ],
     },
-    "5.13": {
+    "A.5.13": {
         "normtekst": (
             "Een passende set procedures voor labeling van informatie moet worden "
             "ontwikkeld en geïmplementeerd in overeenstemming met het "
@@ -244,7 +244,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Technische implementatie van labels (DLP, Azure Information Protection)",
         ],
     },
-    "5.14": {
+    "A.5.14": {
         "normtekst": (
             "Regels voor informatieoverdracht moeten worden gedefinieerd voor "
             "alle soorten overdrachtsvoorzieningen en moeten overeenkomsten "
@@ -262,7 +262,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Technische maatregelen voor veilige overdracht (encryptie, VPN)",
         ],
     },
-    "5.15": {
+    "A.5.15": {
         "normtekst": (
             "Regels voor toegangsbeheersing tot informatie en andere "
             "daarmee samenhangende activa moeten worden vastgesteld en "
@@ -281,7 +281,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor aanvraag, goedkeuring en intrekking van toegangsrechten",
         ],
     },
-    "5.16": {
+    "A.5.16": {
         "normtekst": (
             "De volledige levenscyclus van identiteiten moet worden beheerd "
             "in overeenstemming met het toegangsbeheersingsbeleid."
@@ -298,7 +298,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Periodieke toegangsreview (user access review) resultaten",
         ],
     },
-    "5.17": {
+    "A.5.17": {
         "normtekst": (
             "Beheer van authenticatie-informatie moet worden beheerst door middel "
             "van een formeel beheersproces, inclusief advies aan gebruikers over "
@@ -316,7 +316,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor beheer van privileged accounts en service-accounts",
         ],
     },
-    "5.18": {
+    "A.5.18": {
         "normtekst": (
             "Toegangsrechten tot informatie en andere daarmee samenhangende "
             "activa moeten worden verstrekt, beoordeeld, gewijzigd en "
@@ -335,7 +335,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van prompte intrekking bij functiewijziging of vertrek",
         ],
     },
-    "5.19": {
+    "A.5.19": {
         "normtekst": (
             "Processen en procedures moeten worden gedefinieerd en "
             "geïmplementeerd om de informatiebeveiligingsrisico's die verband "
@@ -354,7 +354,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Contractuele beveiligingsvereisten voor leveranciers",
         ],
     },
-    "5.20": {
+    "A.5.20": {
         "normtekst": (
             "Informatiebeveiligingseisen moeten worden vastgesteld en "
             "overeengekomen met elke leverancier op basis van het type "
@@ -372,7 +372,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van beveiligingseisen in offertetraject (RFP/RFI)",
         ],
     },
-    "5.21": {
+    "A.5.21": {
         "normtekst": (
             "Procedures en eisen voor het beheer van informatiebeveiligingsrisico's "
             "in verband met de ICT-toeleveringsketen moeten worden vastgesteld "
@@ -390,7 +390,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van monitoring op kwetsbaarheden in gebruikte componenten",
         ],
     },
-    "5.22": {
+    "A.5.22": {
         "normtekst": (
             "De organisatie moet regelmatig de informatiebeveiligingspraktijken "
             "en dienstverlening van leveranciers monitoren, beoordelen, evalueren "
@@ -408,7 +408,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Proces voor beheer van leverancierswijzigingen (wijzigingsbeheer)",
         ],
     },
-    "5.23": {
+    "A.5.23": {
         "normtekst": (
             "Processen voor het verwerven, gebruiken, beheren en beëindigen van "
             "informatiebeveiligingsdiensten in de cloud moeten worden vastgesteld "
@@ -426,7 +426,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van configuratiebeheer cloudomgevingen (CIS benchmarks)",
         ],
     },
-    "5.24": {
+    "A.5.24": {
         "normtekst": (
             "De organisatie moet plannen en zich voorbereiden op het beheren van "
             "informatiebeveiligingsincidenten door rollen, verantwoordelijkheden "
@@ -444,7 +444,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van oefening of test van het incidentresponsplan",
         ],
     },
-    "5.25": {
+    "A.5.25": {
         "normtekst": (
             "De organisatie moet informatiebeveiligingsgebeurtenissen beoordelen "
             "en beslissen of ze als informatiebeveiligingsincidenten moeten worden "
@@ -462,7 +462,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van triageprocedure voor beveiligingsgebeurtenissen",
         ],
     },
-    "5.26": {
+    "A.5.26": {
         "normtekst": (
             "Op informatiebeveiligingsincidenten moet worden gereageerd "
             "overeenkomstig de gedocumenteerde procedures."
@@ -479,7 +479,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Post-incident review verslagen (lessons learned)",
         ],
     },
-    "5.27": {
+    "A.5.27": {
         "normtekst": (
             "Kennis opgedaan uit informatiebeveiligingsincidenten moet worden "
             "gebruikt om de kans op of gevolgen van toekomstige incidenten te "
@@ -497,7 +497,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Trendanalyse incidentenregister (periodiek)",
         ],
     },
-    "5.28": {
+    "A.5.28": {
         "normtekst": (
             "De organisatie moet procedures vaststellen voor de identificatie, "
             "verzameling, verwerving en bewaring van bewijsmateriaal dat "
@@ -515,7 +515,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor bewaring van forensisch bewijsmateriaal",
         ],
     },
-    "5.29": {
+    "A.5.29": {
         "normtekst": (
             "De organisatie moet plannen en maatregelen implementeren voor het "
             "handhaven van informatiebeveiliging tijdens verstoring."
@@ -532,7 +532,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "BCP-oefenverslagen inclusief beveiligingsaspecten",
         ],
     },
-    "5.30": {
+    "A.5.30": {
         "normtekst": (
             "ICT-gereedheid moet worden gepland, geïmplementeerd, onderhouden "
             "en getest op basis van bedrijfscontinuïteitsdoelstellingen en "
@@ -550,7 +550,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "DR-oefenverslagen (disaster recovery tests)",
         ],
     },
-    "5.31": {
+    "A.5.31": {
         "normtekst": (
             "Wettelijke, statutaire, regelgevende en contractuele eisen die "
             "relevant zijn voor informatiebeveiliging moeten worden "
@@ -568,7 +568,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Koppeling tussen wettelijke eisen en geïmplementeerde maatregelen",
         ],
     },
-    "5.32": {
+    "A.5.32": {
         "normtekst": (
             "De organisatie moet procedures implementeren om intellectuele "
             "eigendomsrechten te beschermen en het gebruik van propriëtaire "
@@ -586,7 +586,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor gebruik van open source componenten",
         ],
     },
-    "5.33": {
+    "A.5.33": {
         "normtekst": (
             "Registraties moeten worden beschermd tegen verlies, vernietiging, "
             "vervalsing en onbevoegde toegang en vrijgave, overeenkomstig "
@@ -604,7 +604,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor veilige verwijdering na verloop retentietermijn",
         ],
     },
-    "5.34": {
+    "A.5.34": {
         "normtekst": (
             "De organisatie moet de privacy en bescherming van persoonsgegevens "
             "waarborgen zoals vereist door relevante wet- en regelgeving."
@@ -621,7 +621,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van privacy by design bij nieuwe systemen",
         ],
     },
-    "5.35": {
+    "A.5.35": {
         "normtekst": (
             "Een onafhankelijke beoordeling van de aanpak van de organisatie "
             "voor het beheren van informatiebeveiliging en de implementatie "
@@ -640,7 +640,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Planning van periodieke onafhankelijke reviews",
         ],
     },
-    "5.36": {
+    "A.5.36": {
         "normtekst": (
             "Naleving van het informatiebeveiligingsbeleid, themaspecifieke "
             "beleidslijnen en technische normen van de organisatie moet "
@@ -658,7 +658,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van opvolging van non-compliant bevindingen",
         ],
     },
-    "5.37": {
+    "A.5.37": {
         "normtekst": (
             "Gedocumenteerde bedieningsprocedures voor informatie- "
             "verwerkingsfaciliteiten moeten beschikbaar worden gesteld aan "
@@ -676,7 +676,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
         ],
     },
     # ---- Mensgerichte beheersmaatregelen (6.x) ----
-    "6.1": {
+    "A.6.1": {
         "normtekst": (
             "Achtergrondverificaties van alle kandidaten voor een dienstverband "
             "moeten worden uitgevoerd voordat zij toetreden tot de organisatie "
@@ -695,7 +695,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor periodieke rescreening bij gevoelige functies",
         ],
     },
-    "6.2": {
+    "A.6.2": {
         "normtekst": (
             "Arbeidsovereenkomsten en contracten moeten de verantwoordelijkheden "
             "van de medewerkers en de organisatie voor informatiebeveiliging "
@@ -712,7 +712,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van acceptatie door medewerker",
         ],
     },
-    "6.3": {
+    "A.6.3": {
         "normtekst": (
             "Medewerkers en relevante contractanten moeten passend bewustzijn, "
             "onderwijs en opleiding ontvangen over informatiebeveiliging en "
@@ -730,7 +730,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Phishing simulatieresultaten en follow-up trainingen",
         ],
     },
-    "6.4": {
+    "A.6.4": {
         "normtekst": (
             "Er moet een formeel en gecommuniceerd disciplinair proces bestaan "
             "en worden geactiveerd om actie te ondernemen tegen medewerkers en "
@@ -749,7 +749,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van toepassing van procedure (geanonimiseerde cases)",
         ],
     },
-    "6.5": {
+    "A.6.5": {
         "normtekst": (
             "Informatiebeveiligingsverantwoordelijkheden en -verplichtingen die "
             "van kracht blijven na beëindiging of wijziging van het "
@@ -768,7 +768,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "NDA met expliciete doorlooptermijn na beëindiging dienstverband",
         ],
     },
-    "6.6": {
+    "A.6.6": {
         "normtekst": (
             "Informatiebeveiligingseisen moeten worden opgenomen in overeenkomsten "
             "met personeel en contractanten."
@@ -785,7 +785,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Onboarding-checklist voor externe medewerkers met beveiligingsvereisten",
         ],
     },
-    "6.7": {
+    "A.6.7": {
         "normtekst": (
             "Maatregelen voor informatiebeveiliging moeten worden geïmplementeerd "
             "wanneer medewerkers op afstand werken om de informatie die buiten "
@@ -804,7 +804,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van communicatie van regels voor thuiswerken",
         ],
     },
-    "6.8": {
+    "A.6.8": {
         "normtekst": (
             "De organisatie moet een mechanisme bieden waarmee medewerkers "
             "waargenomen of vermoede informatiebeveiligingsgebeurtenissen "
@@ -823,7 +823,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
         ],
     },
     # ---- Fysieke beheersmaatregelen (7.x) ----
-    "7.1": {
+    "A.7.1": {
         "normtekst": (
             "Beveiligde fysieke perimeters moeten worden gedefinieerd en gebruikt "
             "om gebieden die informatie en andere daarmee samenhangende activa "
@@ -841,7 +841,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor beheer van fysieke toegangsmiddelen",
         ],
     },
-    "7.2": {
+    "A.7.2": {
         "normtekst": (
             "Beveiligde zones moeten worden beschermd door passende "
             "toegangsbeheersmaatregelen en toegangspunten."
@@ -857,7 +857,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van periodieke review van fysieke toegangsrechten",
         ],
     },
-    "7.3": {
+    "A.7.3": {
         "normtekst": (
             "Fysieke beveiligingsmaatregelen voor kantoren, ruimtes en "
             "faciliteiten moeten worden ontworpen en geïmplementeerd."
@@ -874,7 +874,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van afdoende beveiliging vergaderruimtes voor vertrouwelijke gesprekken",
         ],
     },
-    "7.4": {
+    "A.7.4": {
         "normtekst": (
             "Fysieke locaties moeten continu worden gemonitord op onbevoegde fysieke toegang."
         ),
@@ -890,7 +890,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Toegangslogboeken en bewijs van periodieke review",
         ],
     },
-    "7.5": {
+    "A.7.5": {
         "normtekst": (
             "Bescherming tegen fysieke en omgevingsdreigingen, zoals "
             "natuurrampen en andere opzettelijke of onopzettelijke fysieke "
@@ -910,7 +910,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Klimaatbeheersingssysteem en monitoringrecords",
         ],
     },
-    "7.6": {
+    "A.7.6": {
         "normtekst": (
             "Maatregelen voor beveiliging in beveiligde zones of zones met een "
             "hoog risico moeten worden ontworpen en toegepast."
@@ -927,7 +927,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor duo-controle bij kritieke handelingen",
         ],
     },
-    "7.7": {
+    "A.7.7": {
         "normtekst": (
             "Medewerkers en externe partijen die gebruikmaken van of toegang "
             "hebben tot activa van de organisatie moeten een clean desk beleid "
@@ -946,7 +946,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Screensaver- en vergrendelbeleid technisch afgedwongen",
         ],
     },
-    "7.8": {
+    "A.7.8": {
         "normtekst": (
             "Apparatuur moet op geschikte locaties worden geplaatst en beschermd "
             "om de risico's van omgevingsdreigingen en -gevaren en de "
@@ -964,7 +964,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Datacenterinrichtingsdocumentatie",
         ],
     },
-    "7.9": {
+    "A.7.9": {
         "normtekst": (
             "Activa buiten het terrein moeten worden beschermd. Het risiconiveau "
             "van activa buiten het terrein van de organisatie moet in acht worden "
@@ -982,7 +982,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor melding en opvolging van verlies of diefstal",
         ],
     },
-    "7.10": {
+    "A.7.10": {
         "normtekst": (
             "Opslagmedia moeten worden beheerd gedurende hun levenscyclus van "
             "verwerving, gebruik, transport en verwijdering in overeenstemming "
@@ -1000,7 +1000,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van versleuteling van verwijderbare media",
         ],
     },
-    "7.11": {
+    "A.7.11": {
         "normtekst": (
             "Informatiefaciliteiten moeten worden beschermd tegen "
             "stroomonderbrekingen en andere storingen als gevolg van "
@@ -1018,7 +1018,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Meervoudige stroomvoeding documentatie voor kritieke systemen",
         ],
     },
-    "7.12": {
+    "A.7.12": {
         "normtekst": (
             "Bekabeling voor elektriciteit en telecommunicatie die gegevens "
             "transporteert of ondersteunende informatiediensten ondersteunt, "
@@ -1035,7 +1035,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Inspectierecords van bekabelingsinfrastructuur",
         ],
     },
-    "7.13": {
+    "A.7.13": {
         "normtekst": (
             "Apparatuur moet correct worden onderhouden om de continue "
             "beschikbaarheid en integriteit te waarborgen."
@@ -1052,7 +1052,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor beveiligingsbeheer bij extern onderhoud",
         ],
     },
-    "7.14": {
+    "A.7.14": {
         "normtekst": (
             "Onderdelen van apparatuur die opslagmedia bevatten, moeten worden "
             "geverifieerd om te waarborgen dat gevoelige gegevens en gelicentieerde "
@@ -1072,7 +1072,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
         ],
     },
     # ---- Technologische beheersmaatregelen (8.x) ----
-    "8.1": {
+    "A.8.1": {
         "normtekst": (
             "Informatie op gebruikerseindpuntapparaten moet worden beschermd. "
             "De organisatie moet beleid en ondersteunende technische maatregelen "
@@ -1090,7 +1090,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van encryptie op alle beheerde eindpunten",
         ],
     },
-    "8.2": {
+    "A.8.2": {
         "normtekst": (
             "Privileged access rights moeten worden beperkt en beheerd "
             "overeenkomstig het toegangsbeheersingsbeleid en de regels voor "
@@ -1109,7 +1109,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Periodieke review van privileged accounts",
         ],
     },
-    "8.3": {
+    "A.8.3": {
         "normtekst": (
             "Toegang tot informatie en andere daarmee samenhangende activa "
             "moet worden beperkt overeenkomstig het vastgestelde themaspecifieke "
@@ -1127,7 +1127,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van need-to-know principe in rechtenstructuur",
         ],
     },
-    "8.4": {
+    "A.8.4": {
         "normtekst": (
             "Toegang tot broncode, ontwikkelgereedschappen en software libraries "
             "moet op passende wijze worden beheerd."
@@ -1144,7 +1144,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs dat productie-credentials niet in broncode worden opgeslagen",
         ],
     },
-    "8.5": {
+    "A.8.5": {
         "normtekst": (
             "Veilige authenticatieprocedures en -technologieën moeten worden "
             "geïmplementeerd op basis van beperkingen voor informatiebeheer "
@@ -1163,7 +1163,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Wachtwoordbeleid technisch afgedwongen (complexity, length, history)",
         ],
     },
-    "8.6": {
+    "A.8.6": {
         "normtekst": (
             "Het gebruik van middelen moet worden gemonitord en aangepast "
             "overeenkomstig de actuele en verwachte capaciteitseisen."
@@ -1180,7 +1180,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Historische capaciteitsdata en trendanalyses",
         ],
     },
-    "8.7": {
+    "A.8.7": {
         "normtekst": (
             "Bescherming tegen malware moet worden geïmplementeerd en "
             "ondersteund door passend bewustzijn van gebruikers."
@@ -1197,7 +1197,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Security awareness training inclusief phishing-simulaties",
         ],
     },
-    "8.8": {
+    "A.8.8": {
         "normtekst": (
             "Informatie over technische kwetsbaarheden van gebruikte "
             "informatiesystemen moet tijdig worden verkregen, de blootstelling "
@@ -1216,7 +1216,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "SLA voor patchimplementatie op basis van risiconiveau",
         ],
     },
-    "8.9": {
+    "A.8.9": {
         "normtekst": (
             "Configuraties, inclusief beveiligingsconfiguraties, van hardware, "
             "software, diensten en netwerken moeten worden vastgesteld, "
@@ -1234,7 +1234,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van configuratiemonitoring en detectie van drift",
         ],
     },
-    "8.10": {
+    "A.8.10": {
         "normtekst": (
             "Informatie die is opgeslagen in informatiesystemen, apparaten of "
             "andere opslagmedia moet worden verwijderd wanneer deze niet langer "
@@ -1252,7 +1252,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Records van uitgevoerde dataverwijdering",
         ],
     },
-    "8.11": {
+    "A.8.11": {
         "normtekst": (
             "Maatregelen voor data masking moeten worden geïmplementeerd "
             "overeenkomstig het themaspecifieke beleid voor toegangsbeheersing "
@@ -1271,7 +1271,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor pseudonimisering of anonimisering",
         ],
     },
-    "8.12": {
+    "A.8.12": {
         "normtekst": (
             "Maatregelen voor preventie van datalekken moeten worden toegepast "
             "op systemen, netwerken en andere apparaten die gevoelige informatie "
@@ -1289,7 +1289,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van monitoring op uitvoer van gevoelige data",
         ],
     },
-    "8.13": {
+    "A.8.13": {
         "normtekst": (
             "Back-upkopieën van informatie, software en systemen moeten worden "
             "gemaakt en regelmatig worden getest overeenkomstig het overeengekomen "
@@ -1307,7 +1307,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van offsite of offline back-upopslag",
         ],
     },
-    "8.14": {
+    "A.8.14": {
         "normtekst": (
             "Informatiefaciliteiten moeten met voldoende redundantie worden "
             "geïmplementeerd om te voldoen aan beschikbaarheidseisen."
@@ -1324,7 +1324,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Failover-testresultaten",
         ],
     },
-    "8.15": {
+    "A.8.15": {
         "normtekst": (
             "Logboeken die activiteiten, uitzonderingen, fouten en andere "
             "relevante gebeurtenissen vastleggen, moeten worden geproduceerd, "
@@ -1343,7 +1343,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van periodieke loganalyse of alerting",
         ],
     },
-    "8.16": {
+    "A.8.16": {
         "normtekst": (
             "Netwerken en systemen moeten worden gemonitord op afwijkend "
             "gedrag en passende maatregelen moeten worden genomen om potentiële "
@@ -1361,7 +1361,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van opvolging van monitoringwaarschuwingen",
         ],
     },
-    "8.17": {
+    "A.8.17": {
         "normtekst": (
             "Klokken van informatieverwerkingssystemen die door de organisatie "
             "worden gebruikt, moeten worden gesynchroniseerd met goedgekeurde "
@@ -1379,7 +1379,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Monitoring op tijdafwijkingen",
         ],
     },
-    "8.18": {
+    "A.8.18": {
         "normtekst": (
             "Het gebruik van programma's met speciale beheerdersrechten "
             "die systeembeheersing kunnen omzeilen, moet worden beperkt "
@@ -1397,7 +1397,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van beperkte toegang tot systeembeheerhulpmiddelen",
         ],
     },
-    "8.19": {
+    "A.8.19": {
         "normtekst": (
             "Procedures en maatregelen voor de installatie van software op "
             "operationele systemen moeten worden geïmplementeerd."
@@ -1414,7 +1414,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van softwareinventarisatie en compliance",
         ],
     },
-    "8.20": {
+    "A.8.20": {
         "normtekst": (
             "Netwerken en netwerkapparaten moeten worden beveiligd, beheerd "
             "en bewaakt om informatie en informatiefaciliteiten te beschermen."
@@ -1432,7 +1432,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Netwerkmonitoringrapportages",
         ],
     },
-    "8.21": {
+    "A.8.21": {
         "normtekst": (
             "Beveiligingsmechanismen, service niveaus en beheersvereisten voor "
             "alle netwerkdiensten moeten worden geïdentificeerd, geïmplementeerd "
@@ -1451,7 +1451,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van monitoring op netwerkdienstenprestaties en beveiliging",
         ],
     },
-    "8.22": {
+    "A.8.22": {
         "normtekst": (
             "Groepen van informatiediensten, gebruikers en informatiesystemen "
             "moeten in netwerken worden gesegmenteerd."
@@ -1468,7 +1468,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Firewallregels tussen segmenten en audit van regelsets",
         ],
     },
-    "8.23": {
+    "A.8.23": {
         "normtekst": (
             "Toegang tot externe websites moet worden beheerd om blootstelling "
             "aan kwaadaardige content te verminderen."
@@ -1485,7 +1485,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor whitelist/blacklist uitzonderingen",
         ],
     },
-    "8.24": {
+    "A.8.24": {
         "normtekst": (
             "Regels voor het gebruik van cryptografie, inclusief beheer van "
             "cryptografische sleutels, moeten worden vastgesteld en geïmplementeerd."
@@ -1502,7 +1502,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van encryptie in transit (TLS-configuratie) en in rust",
         ],
     },
-    "8.25": {
+    "A.8.25": {
         "normtekst": (
             "Regels voor de veilige ontwikkeling van software en systemen moeten "
             "worden vastgesteld en toegepast op ontwikkelingen binnen de organisatie."
@@ -1519,7 +1519,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van security reviews in het ontwikkelproces",
         ],
     },
-    "8.26": {
+    "A.8.26": {
         "normtekst": (
             "Informatiebeveiligingseisen moeten worden geïdentificeerd, "
             "gespecificeerd en goedgekeurd bij het ontwikkelen of verwerven "
@@ -1537,7 +1537,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van beveiligingsbeoordeling bij aanschaf of oplevering",
         ],
     },
-    "8.27": {
+    "A.8.27": {
         "normtekst": (
             "Principes voor het ontwerpen van veilige systemen moeten worden "
             "vastgesteld, gedocumenteerd, onderhouden en toegepast op "
@@ -1555,7 +1555,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Security architecture review records voor nieuwe systemen",
         ],
     },
-    "8.28": {
+    "A.8.28": {
         "normtekst": ("Veilige codeerpraktijken moeten worden toegepast op softwareontwikkeling."),
         "interpretatie": (
             "OWASP Top 10 kwetsbaarheden (SQL-injectie, XSS, etc.) zijn "
@@ -1569,7 +1569,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Bewijs van code review voor beveiligingsgerelateerde wijzigingen",
         ],
     },
-    "8.29": {
+    "A.8.29": {
         "normtekst": (
             "Beveiligingstestprocessen moeten worden gedefinieerd en "
             "geïmplementeerd in de ontwikkellevenscyclus."
@@ -1586,7 +1586,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Security acceptance test criteria en resultaten",
         ],
     },
-    "8.30": {
+    "A.8.30": {
         "normtekst": (
             "Uitbestede ontwikkeling moet worden gesuperviseerd en gemonitord door de organisatie."
         ),
@@ -1602,7 +1602,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor acceptatietests bij uitbestede ontwikkeling",
         ],
     },
-    "8.31": {
+    "A.8.31": {
         "normtekst": (
             "Ontwikkel-, test- en productieomgevingen moeten van elkaar worden "
             "gescheiden en beveiligd."
@@ -1619,7 +1619,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Procedure voor promotie van code tussen omgevingen",
         ],
     },
-    "8.32": {
+    "A.8.32": {
         "normtekst": (
             "Wijzigingen in informatiefaciliteiten en informatiesystemen moeten "
             "worden beheerst door middel van wijzigingsbeheer procedures."
@@ -1637,7 +1637,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Rollback procedure per change",
         ],
     },
-    "8.33": {
+    "A.8.33": {
         "normtekst": ("Testinformatie moet worden geselecteerd, beschermd en beheerd."),
         "interpretatie": (
             "Testomgevingen bevatten vaak kopieën van productiedata. Als "
@@ -1651,7 +1651,7 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Toegangsbeheersing op testomgevingen met gevoelige data",
         ],
     },
-    "8.34": {
+    "A.8.34": {
         "normtekst": (
             "Informatiesystemen moeten worden beschermd tijdens audittests om "
             "verstoring van bedrijfsprocessen en gebruikte auditgereedschappen "
@@ -1667,6 +1667,276 @@ NORMTEKSTEN_27001: dict[str, dict[str, Any]] = {
             "Geautoriseerde scope en planning voor audittests",
             "Schriftelijke toestemming voor penetratietests",
             "Procedure voor beheer van audittools en -toegang",
+        ],
+    },
+    "4.1": {
+        "titel": "Inzicht verkrijgen in de organisatie en haar context",
+        "normtekst": "De organisatie moet externe en interne onderwerpen vaststellen die relevant zijn voor haar doelstelling en die haar vermogen beïnvloeden om het (de) beoogde resulta(a)t(en) van haar managementsysteem voor informatiebeveiliging te behalen.",
+        "interpretatie": "De organisatie moet weten waarin zij opereert voordat zij kan bepalen wat zij moet beschermen. Zonder vastgelegde context is de scope een aanname en zijn de risico's niet herleidbaar naar iets buiten de organisatie.",
+        "bewijslast": [
+            "Contextanalyse of SWOT met interne en externe onderwerpen",
+            "Vastlegging wanneer de analyse voor het laatst is herzien",
+            "Aantoonbare doorwerking naar de risicobeoordeling",
+        ],
+    },
+    "4.2": {
+        "titel": "Inzicht verkrijgen in de behoeften en verwachtingen van belanghebbenden",
+        "normtekst": "De organisatie moet vaststellen: a) welke belanghebbenden relevant zijn voor het managementsysteem voor informatiebeveiliging, en b) welke eisen van deze belanghebbenden relevant zijn voor informatiebeveiliging. Dit document is door NEN onder licentie verstrekt aan: / This document has been supplied under license by NEN to: European Certification Bureau B.V. H.J. Bloemers 2018/11/26 NEN-EN-ISO/IEC 27001:2017 9",
+        "interpretatie": "Belanghebbenden stellen eisen die de organisatie niet zelf kiest: klanten, toezichthouders, leveranciers. Wie ze niet in kaart heeft, ontdekt hun eisen pas bij een incident of een audit.",
+        "bewijslast": [
+            "Overzicht van belanghebbenden met hun eisen",
+            "Herleiding van contractuele en wettelijke eisen naar deze lijst",
+            "Datum van laatste actualisatie",
+        ],
+    },
+    "4.3": {
+        "titel": "Het toepassingsgebied van het managementsysteem voor informatiebeveiliging",
+        "normtekst": "vaststellen De organisatie moet de grenzen en toepasselijkheid van het managementsysteem voor informatiebeveiliging bepalen om het toepassingsgebied ervan vast te stellen. Bij het vaststellen van dit toepassingsgebied moet de organisatie: a) de in 4.1 genoemde externe en interne onderwerpen overwegen, evenals; b) de in 4.2 genoemde eisen, en c) raakvlakken en afhankelijkheden tussen de activiteiten die door de organisatie en de activiteiten die door andere organisaties worden verricht. Het toepassingsgebied moet als gedocumenteerde informatie beschikbaar zijn.",
+        "interpretatie": "Het toepassingsgebied bepaalt waarover het certificaat iets zegt. Een scope die te ruim is, belooft meer dan er wordt beheerst; een die te krap is, laat gaten waar niemand naar kijkt.",
+        "bewijslast": [
+            "Scope statement met wat erbinnen en erbuiten valt",
+            "Motivering van uitsluitingen",
+            "Overeenstemming met de contextanalyse en de belanghebbenden",
+        ],
+    },
+    "4.4": {
+        "titel": "Managementsysteem voor informatiebeveiliging",
+        "normtekst": "De organisatie moet een managementsysteem voor informatiebeveiliging inrichten, implementeren, onderhouden en continu verbeteren, in overeenstemming met de eisen van deze Internationale Norm. 5 Leiderschap",
+        "interpretatie": "Een managementsysteem is meer dan een map documenten: het zijn processen die op elkaar aansluiten en die aantoonbaar draaien. Losse procedures zonder samenhang vormen geen systeem.",
+        "bewijslast": [
+            "Procesbeschrijving of -kaart van het ISMS",
+            "Aantoonbare samenhang tussen processen",
+            "Bewijs dat de processen daadwerkelijk draaien",
+        ],
+    },
+    "5.1": {
+        "titel": "Leiderschap en betrokkenheid",
+        "normtekst": "De directie moet leiderschap en betrokkenheid tonen met betrekking tot het managementsysteem voor informatiebeveiliging door: a) te bewerkstelligen dat het informatiebeveiligingsbeleid en de informatiebeveiligingsdoelstellingen worden vastgesteld en aansluiten bij de strategische richting van de organisatie; b) te bewerkstelligen dat de eisen van het managementsysteem voor informatiebeveiliging in de processen van de organisatie worden geïntegreerd; c) te bewerkstelligen dat de voor het managementsysteem voor informatiebeveiliging benodigde middelen beschikbaar zijn; d) het belang van een doel",
+        "interpretatie": "De directie kan informatiebeveiliging niet delegeren en er verder van wegblijven. Zonder zichtbare betrokkenheid krijgt het onderwerp geen middelen en geen voorrang zodra het botst met iets anders.",
+        "bewijslast": [
+            "Notulen waarin de directie besluiten over informatiebeveiliging neemt",
+            "Toegewezen middelen en budget",
+            "Directiebeoordeling met aantoonbare opvolging",
+        ],
+    },
+    "5.2": {
+        "titel": "Beleid",
+        "normtekst": "De directie moet een informatiebeveiligingsbeleid vaststellen dat: a) passend is voor het doel van de organisatie; b) informatiebeveiligingsdoelstellingen bevat (zie 6.2) of het kader biedt voor het vaststellen van informatiebeveiligingsdoelstellingen; c) een verbintenis bevat om te voldoen aan van toepassing zijnde eisen in verband met informatiebeveiliging; en d) een verbintenis bevat tot continue verbetering van het managementsysteem voor informatiebeveiliging. Het beleid voor informatiebeveiliging moet: e) beschikbaar zijn als gedocumenteerde informatie; f) worden gecommuniceerd binnen de ",
+        "interpretatie": "Beleid is de plek waar de organisatie vastlegt wat zij wil. Een beleid dat niet is gecommuniceerd of jaren niet is herzien, stuurt niets aan.",
+        "bewijslast": [
+            "Vastgesteld informatiebeveiligingsbeleid met datum en eigenaar",
+            "Bewijs van communicatie naar medewerkers",
+            "Versiehistorie en datum van de laatste beoordeling",
+        ],
+    },
+    "5.3": {
+        "titel": "Rollen, verantwoordelijkheden en bevoegdheden binnen de organisatie",
+        "normtekst": "De directie moet bewerkstelligen dat de verantwoordelijkheden en bevoegdheden voor rollen die relevant zijn voor informatiebeveiliging worden toegekend en gecommuniceerd. De directie moet de verantwoordelijkheid en bevoegdheid toekennen met betrekking tot: a) het bewerkstelligen dat het managementsysteem voor informatiebeveiliging voldoet aan de eisen van deze Internationale Norm; en b) het rapporteren over de prestaties van het managementsysteem voor informatiebeveiliging aan de directie.",
+        "interpretatie": "Wie is waarvoor verantwoordelijk, en met welke bevoegdheid. Zonder die toewijzing valt werk tussen wal en schip en is achteraf niet vast te stellen wie had moeten handelen.",
+        "bewijslast": [
+            "Rollenoverzicht met verantwoordelijkheden en bevoegdheden",
+            "Aantoonbare communicatie van die rollen",
+            "Vervanging bij afwezigheid of vertrek",
+        ],
+    },
+    "6.1": {
+        "titel": "Maatregelen om risico’s te beperken en kansen te benutten",
+        "normtekst": "6.1.1 Algemeen Bij het plannen voor het managementsysteem voor informatiebeveiliging moet de organisatie de in 4.1 genoemde onderwerpen en de in 4.2 genoemde eisen overwegen, en de risico’s en kansen vaststellen die moeten worden aangepakt om: a) te bewerkstelligen dat het managementsysteem voor informatiebeveiliging zijn beoogde resulta(a)t(en) behaalt; Dit document is door NEN onder licentie verstrekt aan: / This document has been supplied under license by NEN to: European Certification Bureau B.V. H.J. Bloemers 2018/11/26 NEN-EN-ISO/IEC 27001:2017 11 b) ongewenste effecten te voorkomen of t",
+        "interpretatie": "Risico's en kansen bepalen waar de organisatie haar aandacht heenbrengt. Een systeem dat alleen op incidenten reageert, loopt per definitie achter.",
+        "bewijslast": [
+            "Vastgelegde aanpak voor risico's en kansen",
+            "Herleiding naar de context uit 4.1 en 4.2",
+            "Bewijs dat maatregelen zijn geëvalueerd op doeltreffendheid",
+        ],
+    },
+    "6.1.2": {
+        "titel": "Risicobeoordeling van informatiebeveiliging",
+        "normtekst": "De organisatie moet een risicobeoordelingsprocedure voor informatiebeveiliging definiëren en toepassen die: a) risicocriteria voor informatiebeveiliging vaststelt en onderhoudt, waaronder: 1) de risicoacceptatiecriteria; en 2) criteria voor het verrichten van risicobeoordelingen van informatiebeveiliging; b) waarborgt dat herhaalde risicobeoordelingen van informatiebeveiliging consistente, geldige en vergelijkbare resultaten opleveren; c) de informatiebeveiligingsrisico’s identificeert: 1) het risicobeoordelingsproces voor informatiebeveiliging toepassen om de risico’s in verband met het verli",
+        "interpretatie": "Zonder vaste criteria is elke risicobeoordeling een momentopname van wie hem toevallig deed. Reproduceerbaarheid is hier de eis, niet de precisie.",
+        "bewijslast": [
+            "Risicocriteria voor aanvaarding en voor het uitvoeren van beoordelingen",
+            "Risicoregister met eigenaren",
+            "Twee opeenvolgende beoordelingen die vergelijkbaar zijn",
+        ],
+    },
+    "6.1.3": {
+        "titel": "Behandeling van informatiebeveiligingsrisico’s",
+        "normtekst": "De organisatie moet een behandelprocedure voor informatiebeveiligingsrisico’s definiëren en toepassen om: a) passende opties voor het behandelen van informatiebeveiligingsrisico’s te kiezen, rekening houdend met de resultaten van de risicobeoordeling; b) alle beheersmaatregelen vast te stellen die nodig zijn om de gekozen optie(s) voor het behandelen van informatiebeveiligingsrisico’s te implementeren;",
+        "interpretatie": "De Verklaring van Toepasselijkheid is het scharnier van de norm: zij verbindt de risico's aan de maatregelen en verantwoordt wat níet is toegepast.",
+        "bewijslast": [
+            "Verklaring van Toepasselijkheid met motivering per maatregel",
+            "Risicobehandelplan met eigenaren en termijnen",
+            "Goedkeuring door de risico-eigenaren",
+        ],
+    },
+    "6.2": {
+        "titel": "Informatiebeveiligingsdoelstellingen en de planning om ze te bereiken",
+        "normtekst": "De organisatie moet voor relevante functies en op relevante niveaus informatiebeveiligingsdoelstellingen vaststellen. De informatiebeveiligingsdoelstellingen moeten: Dit document is door NEN onder licentie verstrekt aan: / This document has been supplied under license by NEN to: European Certification Bureau B.V. H.J. Bloemers 2018/11/26 NEN-EN-ISO/IEC 27001:2017 13 a) consistent zijn met het informatiebeveiligingsbeleid; b) meetbaar zijn (indien praktisch uitvoerbaar); c) rekening houden met van toepassing zijnde informatiebeveiligingseisen en resultaten van risicobeoordeling en -behandeling;",
+        "interpretatie": "Doelstellingen maken het verschil tussen willen en sturen. Een doel zonder meetpunt en termijn is een intentie.",
+        "bewijslast": [
+            "Meetbare doelstellingen met termijn en eigenaar",
+            "Voortgangsrapportage",
+            "Aantoonbare samenhang met het beleid",
+        ],
+    },
+    "6.3": {
+        "titel": "Planning van wijzigingen",
+        "normtekst": "Wanneer de organisatie vaststelt dat het managementsysteem voor informatiebeveiliging moet worden gewijzigd, moeten de wijzigingen op een geplande wijze worden uitgevoerd.",
+        "interpretatie": "Wijzigingen aan het managementsysteem zelf zijn een risico: wie de scope of een proces aanpast zonder plan, verliest de aansluiting met de rest.",
+        "bewijslast": [
+            "Vastlegging van wijzigingen aan het ISMS",
+            "Onderbouwing en planning per wijziging",
+            "Doorwerking naar de betrokken documenten",
+        ],
+    },
+    "7.1": {
+        "titel": "Middelen",
+        "normtekst": "De organisatie moet de middelen vaststellen en beschikbaar stellen die nodig zijn voor het inrichten, implementeren, onderhouden en continu verbeteren van het managementsysteem voor informatiebeveiliging.",
+        "interpretatie": "Middelen zijn de toets of de rest van het systeem meer is dan papier. Een plan zonder mensen, tijd of budget wordt niet uitgevoerd.",
+        "bewijslast": [
+            "Toegewezen budget of formatie voor informatiebeveiliging",
+            "Aantoonbare beschikbaarheid van de benodigde middelen",
+            "Besluitvorming bij schaarste",
+        ],
+    },
+    "7.2": {
+        "titel": "Competentie",
+        "normtekst": "De organisatie moet: a) de noodzakelijke competentie vaststellen van de perso(o)n(en) die onder haar gezag werkzaamheden verricht(en) die de prestaties van de organisatie op het gebied van informatiebeveiliging beïnvloeden; b) bewerkstelligen dat deze personen competent zijn op basis van de juiste scholing, opleiding of ervaring; c) waar van toepassing, maatregelen nemen om de benodigde competentie te verwerven, en de doeltreffendheid van de genomen maatregelen evalueren; en d) geschikte gedocumenteerde informatie als bewijsmateriaal van competentie bewaren.",
+        "interpretatie": "Competentie is aantoonbaar kunnen, niet aanwezig zijn. De organisatie moet weten welke kennis nodig is en of die er is.",
+        "bewijslast": [
+            "Competentieprofiel per rol",
+            "Bewijs van opleiding, certificering of ervaring",
+            "Actie bij een geconstateerd hiaat",
+        ],
+    },
+    "7.3": {
+        "titel": "Bewustzijn",
+        "normtekst": "Personen die werkzaamheden verrichten onder het gezag van de organisatie, moeten zich bewust zijn van: a) het informatiebeveiligingsbeleid; b) hun bijdrage aan de doeltreffendheid van het managementsysteem voor informatiebeveiliging, met inbegrip van de voordelen van verbeterde informatiebeveiligingsprestaties; c) de gevolgen van het niet voldoen aan de eisen van het managementsysteem voor informatiebeveiliging.",
+        "interpretatie": "Bewustzijn gaat over de mensen die geen beveiligingsrol hebben. Zij nemen dagelijks de beslissingen waar de meeste incidenten uit voortkomen.",
+        "bewijslast": [
+            "Bewustwordingsprogramma met bereik en frequentie",
+            "Deelnameregistratie",
+            "Meting van het effect, bijvoorbeeld via phishing-oefeningen",
+        ],
+    },
+    "7.4": {
+        "titel": "Communicatie",
+        "normtekst": "De organisatie moet de behoefte vaststellen aan interne en externe communicatie die relevant is voor het managementsysteem voor informatiebeveiliging, waaronder: a) waarover te communiceren; b) wanneer te communiceren; c) met wie te communiceren; d) wie moet communiceren; en e) volgens welke processen de communicatie moet plaatsvinden.",
+        "interpretatie": "Communicatie is vastleggen wat er wanneer aan wie wordt gemeld. Zonder afspraak vooraf wordt tijdens een incident geïmproviseerd.",
+        "bewijslast": [
+            "Communicatieplan met onderwerp, moment, doelgroep en zender",
+            "Bewijs van uitgevoerde communicatie",
+            "Afspraken voor communicatie tijdens incidenten",
+        ],
+    },
+    "7.5": {
+        "titel": "Gedocumenteerde informatie",
+        "normtekst": "7.5.1 Algemeen Het managementsysteem voor informatiebeveiliging van de organisatie moet onder andere bevatten: a) gedocumenteerde informatie die deze Internationale Norm vereist; en b) de gedocumenteerde informatie die de organisatie vaststelt als noodzakelijk voor de doeltreffendheid van het managementsysteem voor informatiebeveiliging.",
+        "interpretatie": "Gedocumenteerde informatie is wat het systeem overdraagbaar maakt. Kennis die alleen in hoofden zit, verdwijnt met de persoon.",
+        "bewijslast": [
+            "Documentenoverzicht met eigenaar en status",
+            "Bewijs dat documenten vindbaar zijn voor wie ze nodig heeft",
+            "Beheer van verouderde versies",
+        ],
+    },
+    "7.5.2": {
+        "titel": "Creëren en actualiseren",
+        "normtekst": "Bij het creëren en actualiseren van gedocumenteerde informatie moet de organisatie zorgen voor de/het passende: a) identificatie en beschrijving (bijv. een titel, datum, auteur of referentienummer); b) format (bijv. taal, softwareversie, afbeeldingen) en media (bijv. papier, elektronisch); en Dit document is door NEN onder licentie verstrekt aan: / This document has been supplied under license by NEN to: European Certification Bureau B.V. H.J. Bloemers 2018/11/26 NEN-EN-ISO/IEC 27001:2017 15 c) beoordeling en goedkeuring van geschiktheid en adequaatheid.",
+        "interpretatie": "Een document zonder versie, datum en eigenaar is niet te beoordelen op actualiteit. Dat is de meest voorkomende bevinding in dit hoofdstuk.",
+        "bewijslast": [
+            "Versienummer, datum en eigenaar op elk document",
+            "Vastgelegde reviewcyclus",
+            "Bewijs van uitgevoerde herzieningen",
+        ],
+    },
+    "7.5.3": {
+        "titel": "Beheer van gedocumenteerde informatie",
+        "normtekst": "Gedocumenteerde informatie zoals het managementsysteem voor informatiebeveiliging en deze Internationale Norm vereisen, moet worden beheerd om te bewerkstelligen dat: a) de informatie beschikbaar is en geschikt is voor gebruik, waar en wanneer het nodig is; b) de informatie adequaat is beveiligd (bijv. tegen verlies van vertrouwelijkheid, oneigenlijk gebruik en aantasting). Voor het beheren van gedocumenteerde informatie moet de organisatie, voor zover van toepassing, invulling geven aan de volgende activiteiten: c) distributie, toegang, het terugvinden alsmede het gebruik; d) opslag en behoud",
+        "interpretatie": "Beheersing gaat over toegang en behoud: wie mag lezen, wie mag wijzigen, en blijft het bewaard zolang het nodig is.",
+        "bewijslast": [
+            "Toegangsrechten op documentniveau",
+            "Bewaartermijnen",
+            "Bescherming tegen ongewenste wijziging of verlies",
+        ],
+    },
+    "8.1": {
+        "titel": "Operationele planning en beheersing",
+        "normtekst": "Om te voldoen aan de informatiebeveiligingseisen en om de in 6.1 vastgestelde maatregelen te implementeren moet de organisatie de benodigde processen plannen, implementeren en beheersen. De organisatie moet ook plannen implementeren om de in 6.2 vastgestelde informatiebeveiligingsdoelstellingen te bereiken. De organisatie moet gedocumenteerde informatie bijhouden in de omvang die nodig is om het vertrouwen te hebben dat de processen volgens planning zijn uitgevoerd. De organisatie moet geplande wijzigingen beheersen en de consequenties van onbedoelde wijzigingen beoordelen, en zo nodig maatreg",
+        "interpretatie": "Operationele beheersing is het verschil tussen een plan en de praktijk. Uitbestede processen tellen mee: uitbesteden is geen overdragen van verantwoordelijkheid.",
+        "bewijslast": [
+            "Vastgelegde processen met beheersmaatregelen",
+            "Afspraken met leveranciers over uitbestede processen",
+            "Bewijs dat de processen worden uitgevoerd zoals vastgelegd",
+        ],
+    },
+    "8.2": {
+        "titel": "Risicobeoordeling van informatiebeveiliging",
+        "normtekst": "De organisatie moet risicobeoordelingen van informatiebeveiliging met geplande tussenpozen uitvoeren, of als significante veranderingen worden voorgesteld of zich voordoen, rekening houdend met de criteria die zijn vastgesteld in 6.1.2 a). Dit document is door NEN onder licentie verstrekt aan: / This document has been supplied under license by NEN to: European Certification Bureau B.V. H.J. Bloemers 2018/11/26 NEN-EN-ISO/IEC 27001:2017 16 De organisatie moet gedocumenteerde informatie bewaren van de resultaten van de risicobeoordelingen van informatiebeveiliging.",
+        "interpretatie": "Een risicobeoordeling die één keer is gedaan, veroudert. De norm vraagt om herhaling op geplande momenten en bij belangrijke wijzigingen.",
+        "bewijslast": [
+            "Uitgevoerde risicobeoordelingen met datum",
+            "Aanleiding per beoordeling",
+            "Vergelijking met de vorige ronde",
+        ],
+    },
+    "8.3": {
+        "titel": "Informatiebeveiligingsrisico’s behandelen",
+        "normtekst": "De organisatie moet het behandelplan van informatiebeveiligingsrisico’s implementeren. De organisatie moet gedocumenteerde informatie bewaren van de resultaten van het behandelen van informatiebeveiligingsrisico’s. 9 Evaluatie van de prestaties",
+        "interpretatie": "De behandeling is waar risicomanagement iets verandert. Een behandelplan zonder uitvoering is een lijst voornemens.",
+        "bewijslast": [
+            "Uitgevoerde maatregelen uit het behandelplan",
+            "Status per maatregel met eigenaar",
+            "Restrisico expliciet aanvaard",
+        ],
+    },
+    "9.1": {
+        "titel": "Monitoren, meten, analyseren en evalueren",
+        "normtekst": "De organisatie moet de informatiebeveiligingsprestaties en de doeltreffendheid van het managementsysteem voor informatiebeveiliging evalueren. De organisatie moet vaststellen: a) wat moet worden gemonitord en gemeten, met inbegrip van informatiebeveiligingsprocessen en -beheersmaatregelen; b) welke methoden worden toegepast voor het, voor zover van toepassing, monitoren, meten, analyseren en evalueren, om geldige resultaten te bewerkstelligen;",
+        "interpretatie": "Meten maakt zichtbaar of maatregelen werken. Zonder meetpunten is de conclusie 'het gaat goed' niet te onderbouwen.",
+        "bewijslast": [
+            "Meetplan met wat, hoe, wanneer en door wie",
+            "Meetresultaten over meerdere perioden",
+            "Analyse en conclusie, niet alleen cijfers",
+        ],
+    },
+    "9.2": {
+        "titel": "Interne audit",
+        "normtekst": "De organisatie moet met geplande tussenpozen interne audits uitvoeren om informatie te verkrijgen of het managementsysteem voor informatiebeveiliging: a) overeenkomt met: 1) de eigen eisen van de organisatie voor haar managementsysteem voor informatiebeveiliging; en 2) de eisen van deze Internationale norm; b) doeltreffend is geïmplementeerd en onderhouden. Dit document is door NEN onder licentie verstrekt aan: / This document has been supplied under license by NEN to: European Certification Bureau B.V. H.J. Bloemers 2018/11/26 NEN-EN-ISO/IEC 27001:2017 17 De organisatie moet: c) (een) auditpr",
+        "interpretatie": "Interne audit is de zelfcontrole van het systeem. Een auditprogramma dat alleen op papier bestaat, levert geen bevindingen en dus geen verbetering.",
+        "bewijslast": [
+            "Auditprogramma met planning en scope",
+            "Auditrapporten met bevindingen",
+            "Onafhankelijkheid van de auditor ten opzichte van het geauditeerde",
+        ],
+    },
+    "9.3": {
+        "titel": "Directiebeoordeling",
+        "normtekst": "De directie moet met geplande tussenpozen het managementsysteem voor informatiebeveiliging van de organisatie beoordelen, om de continue geschiktheid, adequaatheid en doeltreffendheid te bewerkstelligen. Bij de directiebeoordeling moet onder andere in overweging worden genomen: a) de status van acties als gevolg van voorgaande directiebeoordelingen; b) wijzigingen in externe en interne onderwerpen die relevant zijn voor het managementsysteem voor informatiebeveiliging; c) feedback over de informatiebeveiligingsprestaties, met inbegrip van trends in: 1) afwijkingen en corrigerende maatregelen; ",
+        "interpretatie": "De directiebeoordeling is het moment waarop de leiding oordeelt of het systeem nog past. Een beoordeling zonder besluiten is een verslag.",
+        "bewijslast": [
+            "Verslag met de verplichte onderwerpen uit de norm",
+            "Genomen besluiten met eigenaar en termijn",
+            "Opvolging van besluiten uit de vorige beoordeling",
+        ],
+    },
+    "10.1": {
+        "titel": "Continue verbetering",
+        "normtekst": "De organisatie moet continu de geschiktheid, adequaatheid en doeltreffendheid van het managementsysteem voor informatiebeveiliging verbeteren. Dit document is door NEN onder licentie verstrekt aan: / This document has been supplied under license by NEN to: European Certification Bureau B.V. H.J. Bloemers 2018/11/26 NEN-EN-ISO/IEC 27001:2017 19 Bijlage A (normatief) Referentiebeheersdoelstellingen en -maatregelen De beheersdoelstellingen en beheersmaatregelen die zijn opgenomen in tabel A.1 zijn rechtstreeks afgeleid van en in overeenstemming met die in ISO/IEC 27002:2013 [1], hoofdstukken 5 t.",
+        "interpretatie": "Continue verbetering is de reden dat het systeem geen eindpunt heeft. Zonder aantoonbare verbetering is de conclusie dat alles goed gaat, niet te toetsen.",
+        "bewijslast": [
+            "Verbeterregister met status",
+            "Aantoonbare verbeteringen over meerdere perioden",
+            "Herleiding naar bevindingen, metingen of incidenten",
+        ],
+    },
+    "10.2": {
+        "titel": "Afwijkingen en corrigerende maatregelen",
+        "normtekst": "Wanneer zich een afwijking voordoet, moet de organisatie: a) op de afwijking reageren, en indien van toepassing: 1) maatregelen treffen om de afwijking te beheersen en te corrigeren, en 2) de consequenties aanpakken; b) de noodzaak evalueren om maatregelen te treffen om de oorzaken van de afwijking weg te nemen, zodat de afwijking zich niet herhaalt of zich elders voordoet, door: 1) de afwijking te beoordelen; 2) de oorzaken van de afwijking vast te stellen, en 3) vast te stellen of zich gelijksoortige afwijkingen voordoen of zouden kunnen voordoen; c) de benodigde maatregelen implementeren; d",
+        "interpretatie": "Een afwijking vraagt om meer dan herstel: de oorzaak moet weg, anders komt hij terug. Dat onderscheid is waar de meeste corrigerende maatregelen op stranden.",
+        "bewijslast": [
+            "Registratie van afwijkingen met oorzaakanalyse",
+            "Corrigerende maatregelen met eigenaar en termijn",
+            "Verificatie dat de maatregel doeltreffend was",
         ],
     },
 }

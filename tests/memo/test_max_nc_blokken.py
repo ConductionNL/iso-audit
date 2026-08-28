@@ -26,7 +26,7 @@ from iso_audit.memo.norm_lookup import laad_norm_db
 from iso_audit.memo.theme.profile import laad_profiel
 
 _EX = Path("examples/auditmemo")
-_CLAUSULES = [f"8.{n}" for n in range(1, 25)]
+_CLAUSULES = [f"A.8.{n}" for n in range(1, 25)]
 
 
 def _nc(index: int, thema: str, ernst: str = "") -> Finding:

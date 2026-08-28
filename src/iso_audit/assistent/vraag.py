@@ -287,7 +287,15 @@ def verifieer_verwijzingen(antwoord: str, corpus: Corpus) -> list[str]:
             f"antwoord verwijst naar bronnen die niet zijn meegegeven: {', '.join(onbekend)}"
         )
 
+    # Een Bijlage A-maatregel wordt met én zonder prefix herkend. De norm noemt hem A.8.24, maar
+    # het model schrijft "8.24" omdat de auditor dat ook typt. Zonder deze normalisatie zou een
+    # correct antwoord als "verzonnen clausule" worden geweigerd — en dan ziet de auditor een
+    # storing waar het antwoord klopte.
+    from iso_audit.api.annex_migratie import migreer_clausule
+
     toegestaan = corpus.genoemde_clausules | set(corpus.clausules_in_vraag)
+    toegestaan |= {migreer_clausule(c, "27001") for c in toegestaan}
+    toegestaan |= {c[2:] for c in toegestaan if c.startswith("A.")}
     verzonnen = sorted({c for c in _CLAUSULE_IN_ANTWOORD.findall(antwoord) if c not in toegestaan})
     if verzonnen:
         raise AntwoordOnverifieerbaarError(

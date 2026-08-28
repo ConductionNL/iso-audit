@@ -27,7 +27,7 @@ _FINDINGS = [
         "id": "nc1",
         "severity": "NC",
         "standard": "iso-27001-2022",
-        "clause": "8.14",
+        "clause": "A.8.14",
         "title": "Continuïteit",
         "description": "Niet getest.",
         "triage_status": "valide",

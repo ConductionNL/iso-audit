@@ -105,7 +105,7 @@ def test_clausule_in_de_vraag_gebruikt_clause_matches_en_niet_fts(
     Het gekoppelde document bevat het woord "encryptie" níet; via FTS was het onvindbaar.
     """
     _document(conn, "d1", "Cryptobeleid.docx", tekst="sleutelbeheer en algoritmen")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     _document(conn, "d2", "Encryptie in de praktijk.docx", tekst="encryptie encryptie")
 
     corpus = ophalen.haal_bronnen_op(conn, "Welk bewijs hebben wij voor 8.24?")
@@ -195,7 +195,7 @@ def test_operatoren_uit_de_vraag_werken_niet_als_operator(conn: sqlite3.Connecti
 
 def test_opvolgpunten_komen_als_eigen_soort_en_niet_dubbel(conn: sqlite3.Connection) -> None:
     """Opvolgpunten staan in `bevindingen` met herkomst `<bron>-opvolging`."""
-    _bevinding(conn, "ISO-709", "8.24", "OFI", herkomst="Jira-opvolging", naam="ISO-709")
+    _bevinding(conn, "ISO-709", "A.8.24", "OFI", herkomst="Jira-opvolging", naam="ISO-709")
 
     corpus = ophalen.haal_bronnen_op(conn, "Wat staat open op 8.24?")
 
@@ -216,7 +216,7 @@ def test_afkapping_wordt_geteld_en_niet_stil_weggelaten(conn: sqlite3.Connection
     """Een lijst die stil op twaalf stopt leest als "dit is alles"."""
     for i in range(ophalen.MAX_DOCUMENTEN + 3):
         _document(conn, f"d{i}", f"Doc {i:02d}.docx")
-        _koppel(conn, f"d{i}", "8.24")
+        _koppel(conn, f"d{i}", "A.8.24")
 
     corpus = ophalen.haal_bronnen_op(conn, "Bewijs voor 8.24?")
 
@@ -237,7 +237,7 @@ def test_vraag_zonder_dekking_levert_staat_er_niet_in(conn: sqlite3.Connection) 
     assert uit.geen_dekking is True
     assert uit.antwoord == assistent.GEEN_DEKKING
     assert client.verzoeken == [], "er mag geen model bevraagd zijn"
-    assert "8.24" not in uit.antwoord
+    assert "A.8.24" not in uit.antwoord
 
 
 # --- verwijzingscontrole --------------------------------------------------
@@ -246,7 +246,7 @@ def test_vraag_zonder_dekking_levert_staat_er_niet_in(conn: sqlite3.Connection) 
 def test_antwoord_met_onbekend_bron_id_is_een_storing(conn: sqlite3.Connection) -> None:
     """ "Alleen uit de meegegeven bronnen" is een instructie; dit is de controle."""
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Er is beleid [bron:d-verzonnen].")
 
     with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="niet zijn meegegeven"):
@@ -261,7 +261,7 @@ def test_antwoord_zonder_verwijzing_wordt_vervangen(conn: sqlite3.Connection) ->
     gevallen tegelijk en hangt niet af van medewerking van het model.
     """
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Ja, dat is allemaal netjes geregeld.")
 
     uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
@@ -274,7 +274,7 @@ def test_antwoord_zonder_verwijzing_wordt_vervangen(conn: sqlite3.Connection) ->
 
 def test_antwoord_met_niet_meegegeven_clausule_is_een_storing(conn: sqlite3.Connection) -> None:
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Zie het beleid [bron:d1]; dit raakt ook 5.37.")
 
     with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="clausules"):
@@ -284,7 +284,7 @@ def test_antwoord_met_niet_meegegeven_clausule_is_een_storing(conn: sqlite3.Conn
 def test_afgekapt_antwoord_is_een_storing(conn: sqlite3.Connection) -> None:
     """Bij afkapping verdwijnt juist de bronvermelding aan het eind."""
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Er is beleid [bron:d1]", stop_reason="max_tokens")
 
     with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="afgekapt"):
@@ -293,7 +293,7 @@ def test_afgekapt_antwoord_is_een_storing(conn: sqlite3.Connection) -> None:
 
 def test_geldig_antwoord_geeft_gebruikte_bronnen_terug(conn: sqlite3.Connection) -> None:
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Het cryptobeleid raakt 8.24 [bron:d1] [bron:d1].")
 
     uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
@@ -308,7 +308,7 @@ def test_thinking_staat_expliciet_uit(conn: sqlite3.Connection) -> None:
     """Weglaten maakt het gedrag afhankelijk van het model; dat kostte op 2026-08-17 stil
     nul bevindingen op twee van de drie modellen."""
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Beleid [bron:d1].")
 
     assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
@@ -325,15 +325,15 @@ def test_tegenspraak_levert_beide_bronnen(conn: sqlite3.Connection) -> None:
     en de assistent kiest niet. Een regel als "nieuwste wint" verbergt precies die
     spanning."""
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
-    _bevinding(conn, "d1", "8.24", "NC", naam="Cryptobeleid.docx")
+    _koppel(conn, "d1", "A.8.24")
+    _bevinding(conn, "d1", "A.8.24", "NC", naam="Cryptobeleid.docx")
 
     corpus = ophalen.haal_bronnen_op(conn, "Zijn wij in orde op 8.24?")
 
     soorten = {b.soort for b in corpus.bronnen}
     assert {"document", "bevinding"} <= soorten
     prompt = assistent._user_prompt("Zijn wij in orde op 8.24?", corpus)
-    assert "Cryptobeleid.docx" in prompt and "NC op 8.24" in prompt
+    assert "Cryptobeleid.docx" in prompt and "NC op A.8.24" in prompt
 
 
 def test_de_prompt_benoemt_tegenspraak_als_geldige_uitkomst() -> None:
@@ -349,7 +349,7 @@ def test_de_prompt_benoemt_tegenspraak_als_geldige_uitkomst() -> None:
 def test_de_assistent_schrijft_geen_bevinding_en_geen_besluit(conn: sqlite3.Connection) -> None:
     """De auditor-spiegel is de capability die dit tool draagt: een mens houdt het oordeel."""
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Beleid [bron:d1].")
 
     assistent.beantwoord(conn, "Is dit een afwijking op 8.24?", client=client)
@@ -367,7 +367,7 @@ def test_vraag_en_antwoord_staan_met_de_meegegeven_bronnen_in_de_trail(
     """Een antwoord dat achteraf verkeerd blijkt is alleen te begrijpen als je weet wat de
     assistent op dat moment kon zien."""
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Beleid [bron:d1].")
     uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
 
@@ -412,17 +412,17 @@ def test_niet_bestaande_clausule_wordt_als_zodanig_gemeld(conn: sqlite3.Connecti
     corpus = ophalen.haal_bronnen_op(conn, "Welk bewijs hebben we voor 8.2.4?")
 
     assert corpus.onbekende_clausules == ("8.2.4",)
-    assert corpus.suggesties["8.2.4"] == ["8.24"], "zelfde cijferreeks zonder punten"
+    assert corpus.suggesties["8.2.4"] == ["A.8.24"], "zelfde cijferreeks zonder punten"
     tekst = assistent.geen_dekking_tekst(corpus, "27001")
     assert "bestaat niet in ISO 27001" in tekst
-    assert "8.24" in tekst
+    assert "A.8.24" in tekst
 
 
 def test_suggestie_is_een_cijfervergelijking_en_geen_drempel() -> None:
     """Geen gelijkenis-maat: "0.83 leek genoeg" is geen antwoord aan een auditor."""
-    assert ophalen.gelijkende_clausules("8.2.4", "27001") == ["8.24"]
+    assert ophalen.gelijkende_clausules("8.2.4", "27001") == ["A.8.24"]
     assert ophalen.gelijkende_clausules("8.99", "27001") == []
-    assert ophalen.gelijkende_clausules("8.24", "27001") == [], "zichzelf niet suggereren"
+    assert ophalen.gelijkende_clausules("A.8.24", "27001") == [], "zichzelf niet suggereren"
 
 
 def test_bestaande_clausule_zonder_bewijs_is_geen_lege_uitkomst(
@@ -460,7 +460,7 @@ def test_leeg_corpus_en_onverifieerbaar_zijn_twee_verschillende_dingen(
     trekken. Beide teksten zeggen iets anders tegen de auditor.
     """
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
 
     leeg = assistent.beantwoord(conn, "Wat is de beste encryptie?", client=_Client("x"))
     assert leeg.geen_dekking is True and leeg.onverifieerbaar is False
@@ -478,7 +478,7 @@ def test_eerlijk_niet_gevonden_levert_dezelfde_vaste_tekst(conn: sqlite3.Connect
     onderscheid is van buitenaf niet te maken, dus het tool doet alsof het dat kan.
     """
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client(f"Hierover staat niets in de bronnen. {assistent.NIETS_GEVONDEN}")
 
     uit = assistent.beantwoord(conn, "Staat er iets over catering in 8.24?", client=client)
@@ -490,7 +490,7 @@ def test_eerlijk_niet_gevonden_levert_dezelfde_vaste_tekst(conn: sqlite3.Connect
 def test_verzonnen_bron_blijft_een_storing(conn: sqlite3.Connection) -> None:
     """Vervangen geldt voor geen verwijzing; een verzónnen verwijzing blijft geweigerd."""
     _document(conn, "d1", "Cryptobeleid.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client(f"Niets gevonden {assistent.NIETS_GEVONDEN}, zie wel [bron:d-verzonnen].")
 
     with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="niet zijn meegegeven"):
@@ -510,7 +510,7 @@ def test_meerdere_bronnen_in_een_merkteken(conn: sqlite3.Connection) -> None:
     """
     for i in (1, 2, 3):
         _document(conn, f"d{i}", f"Doc {i}.docx")
-        _koppel(conn, f"d{i}", "8.24")
+        _koppel(conn, f"d{i}", "A.8.24")
     client = _Client("De rapporten dekken dit [bron:d1, d2,  d3].")
 
     uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
@@ -521,7 +521,7 @@ def test_meerdere_bronnen_in_een_merkteken(conn: sqlite3.Connection) -> None:
 def test_een_onbekend_id_in_een_groep_blijft_een_storing(conn: sqlite3.Connection) -> None:
     """Tolerant voor de vorm, niet voor de inhoud: élk los ID moet meegegeven zijn."""
     _document(conn, "d1", "Doc 1.docx")
-    _koppel(conn, "d1", "8.24")
+    _koppel(conn, "d1", "A.8.24")
     client = _Client("Zie [bron:d1, d-verzonnen].")
 
     with pytest.raises(assistent.AntwoordOnverifieerbaarError, match="d-verzonnen"):
@@ -536,7 +536,7 @@ def test_bronnen_gescheiden_door_het_woord_en(conn: sqlite3.Connection) -> None:
     """
     for i in (1, 2):
         _document(conn, f"d{i}", f"Doc {i}.docx")
-        _koppel(conn, f"d{i}", "8.24")
+        _koppel(conn, f"d{i}", "A.8.24")
     client = _Client("Beide rapporten dekken dit [bron:d1 en d2].")
 
     uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)
@@ -552,7 +552,7 @@ def test_herhaald_bron_voorvoegsel_binnen_een_merkteken(conn: sqlite3.Connection
     """
     for i in (1, 2):
         _document(conn, f"d{i}", f"Doc {i}.docx")
-        _koppel(conn, f"d{i}", "8.24")
+        _koppel(conn, f"d{i}", "A.8.24")
     client = _Client("Zie [bron:d1, bron:d2].")
 
     uit = assistent.beantwoord(conn, "Bewijs voor 8.24?", client=client)

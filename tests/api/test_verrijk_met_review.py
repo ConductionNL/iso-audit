@@ -86,7 +86,11 @@ def test_bestaande_acties_worden_niet_overschreven() -> None:
 
 
 def test_de_titel_volgt_de_norm_van_de_bevinding() -> None:
-    """§7.5 heet in 9001 iets anders dan in 27001; de auditor ziet de titel in de werkset.
+    """§8.2 heet in 9001 iets anders dan in 27001; de auditor ziet de titel in de werkset.
+
+    Stond op §7.5. Dat werkte zolang 27001 alleen Bijlage A kende — A.7.5 is "Bescherming tegen
+    fysieke bedreigingen". Sinds de managementclausules erbij zijn, heet 27001 §7.5 net als 9001
+    §7.5 "Gedocumenteerde informatie": beide normen volgen Annex SL.
 
     Zonder deze koppeling toont een 9001-bevinding de 27001-titel, want dat is degene die de
     samengevoegde map bovenaan zet. Dan staat er "Bescherming tegen fysieke en
@@ -94,5 +98,5 @@ def test_de_titel_volgt_de_norm_van_de_bevinding() -> None:
     """
     from iso_audit.classification.clause_mapping import titel_voor
 
-    assert titel_voor("7.5", "9001") != titel_voor("7.5", "27001")
+    assert titel_voor("8.2", "9001") != titel_voor("8.2", "27001")
     assert "informatie" in titel_voor("7.5", "9001").lower()

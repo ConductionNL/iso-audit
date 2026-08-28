@@ -45,9 +45,9 @@ def test_drive_link_overig() -> None:
 
 def test_sorteersleutel_numeriek() -> None:
     """5.9 vóór 5.12 (in tegenstelling tot lexicografisch)."""
-    items = ["5.12", "5.2", "5.9", "5.10"]
+    items = ["A.5.12", "5.2", "A.5.9", "A.5.10"]
     items.sort(key=full_report._sorteersleutel)
-    assert items == ["5.2", "5.9", "5.10", "5.12"]
+    assert items == ["5.2", "A.5.9", "A.5.10", "A.5.12"]
 
 
 def test_sorteersleutel_invalid_terugval() -> None:
@@ -66,13 +66,13 @@ def test_laad_normteksten_9001() -> None:
 
 def test_laad_normteksten_27001() -> None:
     nt = full_report._laad_normteksten("27001")
-    assert "6.5" in nt
+    assert "A.6.5" in nt
 
 
 def test_laad_normteksten_beide() -> None:
     nt = full_report._laad_normteksten("beide")
     assert "4.1" in nt  # 9001
-    assert "6.5" in nt  # 27001
+    assert "A.6.5" in nt  # 27001
 
 
 # ---------- _fetch_planning ----------

@@ -18,7 +18,7 @@ _FINDINGS = [
         "id": "f1",
         "severity": "NC",
         "standard": "iso-27001-2022",
-        "clause": "6.5",
+        "clause": "A.6.5",
         "title": "Offboarding",
         "description": "Offboarding niet aantoonbaar afgesloten.",
         "triage_status": "valide",
@@ -139,7 +139,7 @@ def test_memo_toont_brondocument_links(tmp_path: Path) -> None:
             "id": "f1",
             "severity": "NC",
             "standard": "iso-27001-2022",
-            "clause": "6.5",
+            "clause": "A.6.5",
             "title": "x",
             "description": "d",
             "triage_status": "valide",
@@ -203,13 +203,13 @@ def test_triage_status_endpoint(tmp_path: Path) -> None:
 def test_finding_detail(tmp_path: Path) -> None:
     r = _client(tmp_path).get("/findings/f1")
     assert r.status_code == 200
-    assert r.json()["clause"] == "6.5"
+    assert r.json()["clause"] == "A.6.5"
 
 
 def test_finding_context_hover(tmp_path: Path) -> None:
     c = _client(tmp_path).get("/findings/f1/context").json()
     assert c["citations"]  # 6.5 resolvet in de voorbeeld-norm-DB
-    assert c["citations"][0]["clause"] == "6.5"
+    assert c["citations"][0]["clause"] == "A.6.5"
     assert c["citations"][0]["text"]  # échte normtekst voor de hover
     assert "deviation" in c and "reasoning" in c and "verify_with" in c
 
@@ -387,7 +387,7 @@ def test_live_run_worker_draft_en_status(tmp_path: Path, monkeypatch) -> None:  
             id="nc-8.15",
             severity="NC",
             standard="iso-27001-2022",
-            clause="8.15",
+            clause="A.8.15",
             title="Logging",
             description="d",
             triage_status="open",

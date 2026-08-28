@@ -23,21 +23,30 @@ def test_de_samengevoegde_map_kent_beide_varianten() -> None:
 
 
 def test_de_titels_van_beide_normen_blijven_bestaan() -> None:
-    """§7.5 is in 9001 "Gedocumenteerde informatie" en in 27001 iets heel anders."""
-    varianten = laad_clause_map("beide")["clausules"]["7.5"]["varianten"]
+    """§8.2 is in 9001 "Eisen voor producten en diensten" en in 27001 een risicobeoordeling.
+
+    Stond eerder op §7.5. Dat werkte zolang 27001 alleen Bijlage A kende — A.7.5 is "Bescherming
+    tegen fysieke bedreigingen". Sinds de managementclausules erbij zijn, heet 27001 §7.5 net als
+    9001 §7.5 "Gedocumenteerde informatie": beide normen volgen Annex SL, dus 11 van de 23
+    gedeelde nummers dragen nu dezelfde titel.
+
+    Dat maakt deze test niet overbodig maar juist scherper: waar de titels wél verschillen, mag
+    de ene norm de andere niet overschrijven.
+    """
+    varianten = laad_clause_map("beide")["clausules"]["8.2"]["varianten"]
     assert varianten["9001"]["titel"] != varianten["27001"]["titel"]
-    assert "informatie" in varianten["9001"]["titel"].lower()
+    assert "producten" in varianten["9001"]["titel"].lower()
 
 
 def test_een_nummer_in_een_norm_heeft_ook_een_variant() -> None:
     """Uniform: elke ingang heeft varianten, zodat niemand hoeft te vertakken."""
-    varianten = laad_clause_map("beide")["clausules"]["8.24"]["varianten"]
+    varianten = laad_clause_map("beide")["clausules"]["A.8.24"]["varianten"]
     assert set(varianten) == {"27001"}
 
 
 @pytest.mark.parametrize(
     ("clausule", "norm", "stukje"),
-    [("7.5", "9001", "informatie"), ("8.24", "27001", "cryptograf")],
+    [("7.5", "9001", "informatie"), ("A.8.24", "27001", "cryptograf")],
 )
 def test_titel_voor_geeft_de_juiste_norm(clausule: str, norm: str, stukje: str) -> None:
     assert stukje in titel_voor(clausule, norm).lower()

@@ -10,8 +10,16 @@
     "deviation": "<p>Vijf memo's zijn aangemaakt, maar de PDCA-cyclus is niet aantoonbaar afgesloten (oorzakenanalyse → corrigerende maatregel → <strong>effectiviteits-evaluatie</strong> → sluiting). De norm vereist niet alleen dat een maatregel wordt genomen, maar ook dat wordt beoordeeld of die het probleem heeft opgelost en dat dit wordt vastgelegd.</p>",
     "corrective_measure": "bundel de losse memo's in één register dat de volledige PDCA-cyclus borgt — inclusief expliciete effectiviteits-evaluatie en sluitingsbewijs. Vorm: centraal register, Jira-project of vergelijkbaar, mits effectiviteits-evaluatie en sluiting onlosmakelijk in de workflow zitten (niet optioneel).",
     "actions": [
-      {"wat": "Eén centraal register voor afwijkingen/incidenten opzetten, met verplichte velden: oorzaakanalyse, corrigerende maatregel, effectiviteits-evaluatie, sluitingsdatum, link naar bron-memo.", "uiterlijk": "2026-Q3"},
-      {"wat": "De vijf genoemde memo's volledig afronden — m.n. effectiviteits-evaluatie en sluitingsbewijs toevoegen.", "wie": "Dev lead (in samenspraak met memo-eigenaar)", "waar": "Bestaande memo-locaties + nieuw register", "uiterlijk": "2026-Q3"}
+      {
+        "wat": "Eén centraal register voor afwijkingen/incidenten opzetten, met verplichte velden: oorzaakanalyse, corrigerende maatregel, effectiviteits-evaluatie, sluitingsdatum, link naar bron-memo.",
+        "uiterlijk": "2026-Q3"
+      },
+      {
+        "wat": "De vijf genoemde memo's volledig afronden — m.n. effectiviteits-evaluatie en sluitingsbewijs toevoegen.",
+        "wie": "Dev lead (in samenspraak met memo-eigenaar)",
+        "waar": "Bestaande memo-locaties + nieuw register",
+        "uiterlijk": "2026-Q3"
+      }
     ]
   },
   {
@@ -19,23 +27,38 @@
     "severity": "NC",
     "triage_status": "valide",
     "standard": "iso-27001-2022",
-    "clause": "6.5",
-    "extra_clauses": ["5.11", "5.18"],
+    "clause": "A.6.5",
+    "extra_clauses": [
+      "A.5.11",
+      "A.5.18"
+    ],
     "title": "NC 2 — Offboarding-controle",
     "deviation": "<p>De offboarding-procedure bestaat en heeft eerder gewerkt, maar in de casus <strong>Goya</strong> is de offboarding niet aantoonbaar volledig afgerond: intrekking toegangsrechten (§5.18), teruggave/vernietiging bedrijfsmiddelen (§5.11) en vastlegging doorlopende verplichtingen (§6.5) zijn niet als sluitingsbewijs aangetroffen in de Drive-scope.</p>",
     "description": "Offboarding casus Goya niet aantoonbaar afgesloten.",
     "corrective_measure": "de offboarding-checklist moet voor élke vertrekkende medewerker (incl. stagiairs) volledig worden doorlopen en als sluitingsbewijs (afgevinkt + datum + verantwoordelijke) in het register worden vastgelegd. Retroactief de casus Goya alsnog formeel sluiten.",
     "actions": [
-      {"wat": "Offboarding-checklist verplicht doorlopen voor élke vertrekkende medewerker; sluitingsbewijs verplicht in register (bevestiging §5.11/§5.18/§6.5).", "wie": "HR + IT-lead", "waar": "Bestaande offboarding-procedure", "uiterlijk": "2026-Q3"},
-      {"wat": "Casus Goya: retroactief de checklist volledig invullen en sluiten — expliciete bevestiging toegangs-intrekking en teruggave bedrijfsmiddelen.", "wie": "HR + IT-lead", "waar": "Offboarding-register", "uiterlijk": "2026-06-30"}
+      {
+        "wat": "Offboarding-checklist verplicht doorlopen voor élke vertrekkende medewerker; sluitingsbewijs verplicht in register (bevestiging §5.11/§5.18/§6.5).",
+        "wie": "HR + IT-lead",
+        "waar": "Bestaande offboarding-procedure",
+        "uiterlijk": "2026-Q3"
+      },
+      {
+        "wat": "Casus Goya: retroactief de checklist volledig invullen en sluiten — expliciete bevestiging toegangs-intrekking en teruggave bedrijfsmiddelen.",
+        "wie": "HR + IT-lead",
+        "waar": "Offboarding-register",
+        "uiterlijk": "2026-06-30"
+      }
     ]
   },
   {
     "id": "ofi-logging",
     "severity": "OFI",
     "standard": "iso-27001-2022",
-    "clause": "8.15",
-    "extra_clauses": ["8.16"],
+    "clause": "A.8.15",
+    "extra_clauses": [
+      "A.8.16"
+    ],
     "promote_to_improvement": true,
     "title": "Logging-baseline",
     "deviation": "Er ligt geen vastgelegde baseline per kritiek platform waaruit blijkt: wat wordt gelogd, hoelang bewaard, wie reviewt, met welke cadans, en hoe afwijkend gedrag wordt opgepikt.",
@@ -43,8 +66,36 @@
     "classification_rationale": "Logging vindt feitelijk plaats en logs zijn bij incidenten aantoonbaar gebruikt. Wat ontbreekt is de geconsolideerde baseline-vastlegging — een governance- en aantoonbaarheids-tekortkoming, geen operationeel falen. Een externe auditor classificeert dit waarschijnlijk als OFI/minor, niet als major NC. Bij volgende cyclus zonder voortgang kan dit promoten naar NC.",
     "suggestion": "per kritiek platform één pagina log-baseline (wat / bewaartermijn / reviewer / cadans / alarmering). Start met de drie meest kritieke platforms."
   },
-  {"id": "p1", "severity": "POSITIVE", "standard": "iso-9001-2015", "clause": "10.2", "title": "Afwijkingsprocedure via memo's", "description": "Memo-procedure met escalatie aanwezig."},
-  {"id": "p2", "severity": "POSITIVE", "standard": "iso-9001-2015", "clause": "10.2", "title": "Oorzaakanalyse aanwezig", "description": "Oorzaakanalyse benoemd in memo's."},
-  {"id": "o1", "severity": "OFI", "standard": "iso-9001-2015", "clause": "10.2", "title": "Effectiviteits-evaluatie ontbreekt", "description": "Effectiviteits-evaluatie niet vastgelegd."},
-  {"id": "o2", "severity": "OFI", "standard": "iso-9001-2015", "clause": "10.2", "title": "Sluitingsbewijs ontbreekt", "description": "Sluitingsbewijs niet aangetroffen."}
+  {
+    "id": "p1",
+    "severity": "POSITIVE",
+    "standard": "iso-9001-2015",
+    "clause": "10.2",
+    "title": "Afwijkingsprocedure via memo's",
+    "description": "Memo-procedure met escalatie aanwezig."
+  },
+  {
+    "id": "p2",
+    "severity": "POSITIVE",
+    "standard": "iso-9001-2015",
+    "clause": "10.2",
+    "title": "Oorzaakanalyse aanwezig",
+    "description": "Oorzaakanalyse benoemd in memo's."
+  },
+  {
+    "id": "o1",
+    "severity": "OFI",
+    "standard": "iso-9001-2015",
+    "clause": "10.2",
+    "title": "Effectiviteits-evaluatie ontbreekt",
+    "description": "Effectiviteits-evaluatie niet vastgelegd."
+  },
+  {
+    "id": "o2",
+    "severity": "OFI",
+    "standard": "iso-9001-2015",
+    "clause": "10.2",
+    "title": "Sluitingsbewijs ontbreekt",
+    "description": "Sluitingsbewijs niet aangetroffen."
+  }
 ]

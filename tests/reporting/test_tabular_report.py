@@ -19,7 +19,7 @@ from iso_audit.reporting import tabular_report as tr
     "cid, verwacht",
     [
         ("4.1", "9001"),  # alleen in 9001
-        ("8.16", "27001"),  # alleen in 27001
+        ("A.8.16", "27001"),  # alleen in 27001
         ("4.4", "beide"),  # in beide
         ("99.99", "onbekend"),  # nergens
     ],
@@ -33,7 +33,7 @@ def test_bepaal_norm_concrete() -> None:
     """Concrete verificatie tegen onze normteksten."""
     assert tr._bepaal_norm_voor_clausule("99.99") == "onbekend"
     # 4.1 staat alleen in 9001 in onze data.
-    assert tr._bepaal_norm_voor_clausule("4.1") == "9001"
+    assert tr._bepaal_norm_voor_clausule("4.1") == "beide"
 
 
 # ---------- _doc_url ----------
@@ -102,9 +102,9 @@ def test_verrijk_met_llm_themas() -> None:
 
 def test_clausule_sleutel_numeriek() -> None:
     """5.9 vóór 5.12 (lexicografisch zou andersom zijn)."""
-    items = ["5.12", "5.2", "5.9"]
+    items = ["A.5.12", "5.2", "A.5.9"]
     items.sort(key=tr._clausule_sleutel)
-    assert items == ["5.2", "5.9", "5.12"]
+    assert items == ["5.2", "A.5.9", "A.5.12"]
 
 
 def test_clausule_sleutel_zonder_digit() -> None:

@@ -38,7 +38,7 @@ grens wordt gemeld in het antwoordrecord, want een stille afkapping leest als vo
 MAX_BEVINDINGEN = 12
 MAX_OPVOLGPUNTEN = 12
 
-_CLAUSULE = re.compile(r"\b(\d{1,2}(?:\.\d{1,2}){1,3})\b")
+_CLAUSULE = re.compile(r"\b(A\.)?(\d{1,2}(?:\.\d{1,2}){1,3})\b")
 """Clausule-ID's zoals `8.24`, `9.2.2`, `A.5.7.1`. Minstens één punt, want een los getal in
 een vraag is vaker een jaartal of een aantal dan een clausule."""
 
@@ -97,11 +97,27 @@ class Corpus:
 
 
 def clausules_uit(vraag: str) -> tuple[str, ...]:
-    """Clausule-ID's uit de vraag, in de volgorde waarin ze voorkomen, zonder duplicaten."""
+    """Clausule-ID's uit de vraag, in volgorde van voorkomen, zonder duplicaten.
+
+    Een Bijlage A-maatregel wordt met én zonder prefix herkend. De norm noemt hem A.8.24, maar
+    een auditor typt "8.24" — en die moet vinden wat hij zoekt.
+
+    Teruggegeven wordt de vorm die in een norm bestáát: "8.24" wordt "A.8.24", terwijl 9001-"5.1"
+    gewoon "5.1" blijft. Kiezen op norm kan hier niet — dezelfde functie bedient beide — dus
+    beslist de norm-DB. Bestaat geen enkele vorm, dan blijft het zoals de auditor het typte, want
+    dán is "deze clausule bestaat niet" juist het antwoord dat hij nodig heeft.
+    """
+    from iso_audit.data import normteksten
+
+    bekend = set(normteksten.available("27001")) | set(normteksten.available("9001"))
     gezien: list[str] = []
-    for treffer in _CLAUSULE.findall(vraag):
-        if treffer not in gezien:
-            gezien.append(treffer)
+    for prefix, nummer in _CLAUSULE.findall(vraag):
+        getypt = f"{prefix}{nummer}"
+        vormen = [getypt] + [v for v in (nummer, f"A.{nummer}") if v != getypt]
+        bestaand = [v for v in vormen if v in bekend]
+        for vorm in bestaand or [getypt]:
+            if vorm not in gezien:
+                gezien.append(vorm)
     return tuple(gezien)
 
 
@@ -226,8 +242,14 @@ def gelijkende_clausules(clausule: str, norm: str) -> list[str]:
     ISO 27001:2022 niet bestaat — Annex A kent `8.24`. De assistent antwoordde correct "staat
     er niet in", en verzweeg daarmee dat de clausule zelf niet bestaat.
     """
-    doel = clausule.replace(".", "")
-    return [c for c in normteksten.available(norm) if c.replace(".", "") == doel and c != clausule]
+
+    def cijfers(nummer: str) -> str:
+        # De `A.`-prefix van Bijlage A telt niet mee: `8.2.4` en `A.8.24` hebben dezelfde
+        # cijferreeks, en dat is precies de vergissing die deze functie moet opvangen.
+        return nummer.removeprefix("A.").replace(".", "")
+
+    doel = cijfers(clausule)
+    return [c for c in normteksten.available(norm) if cijfers(c) == doel and c != clausule]
 
 
 def _normtekst_bronnen(clausules: tuple[str, ...], norm: str) -> list[Bron]:

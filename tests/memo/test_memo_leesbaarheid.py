@@ -104,15 +104,15 @@ def test_de_identificatie_komt_in_de_gerenderde_memo() -> None:
 
 
 def test_nc_blokken_zijn_genummerd() -> None:
-    memo = _memo([_nc("8.14", "Continuïteit"), _nc("5.12", "Informatieclassificatie")])
+    memo = _memo([_nc("A.8.14", "Continuïteit"), _nc("A.5.12", "Informatieclassificatie")])
     assert [b.code for b in memo.nc_blocks] == ["NC 1", "NC 2"]
 
 
 def test_verbeterblokken_krijgen_een_ofi_code() -> None:
     fs = [
-        _ofi("8.15", "Logging & monitoring"),
-        _ofi("8.16", "Logging & monitoring"),
-        _ofi("8.17", "Logging & monitoring"),
+        _ofi("A.8.15", "Logging & monitoring"),
+        _ofi("A.8.16", "Logging & monitoring"),
+        _ofi("A.8.17", "Logging & monitoring"),
     ]
     assert [b.code for b in _memo(fs).improvements] == ["OFI 1"]
 
@@ -120,7 +120,7 @@ def test_verbeterblokken_krijgen_een_ofi_code() -> None:
 def test_de_code_staat_in_de_gerenderde_kop() -> None:
     from iso_audit.memo.renderer.html import MemoRendererImpl
 
-    memo = _memo([_nc("8.14", "Back-up & continuïteit")])
+    memo = _memo([_nc("A.8.14", "Back-up & continuïteit")])
     html = MemoRendererImpl().render_html(memo, laad_profiel(str(_EX / "conduction.profile.yaml")))
     assert "NC 1 — Back-up &amp; continuïteit" in html or "NC 1 — Back-up & continuïteit" in html
 
@@ -132,18 +132,18 @@ def test_de_memo_citeert_de_normtekst_niet_meer() -> None:
     """Normtekst is bijlage-materiaal; de clausuleverwijzing blijft."""
     from iso_audit.memo.renderer.html import MemoRendererImpl
 
-    memo = _memo([_nc("8.14", "Back-up & continuïteit")])
+    memo = _memo([_nc("A.8.14", "Back-up & continuïteit")])
     html = MemoRendererImpl().render_html(memo, laad_profiel(str(_EX / "conduction.profile.yaml")))
     assert "norm-quote" not in html
-    assert "8.14" in html
+    assert "A.8.14" in html
 
 
 def test_zes_ncs_over_twee_themas_passen_in_drie_a4(tmp_path: Path) -> None:
     """Het formaat van het handgemaakte Q2-memo: twee blokken van drie clausules."""
     from iso_audit.memo.renderer.html import MemoRendererImpl
 
-    fs = [_nc(c, "Back-up & continuïteit") for c in ("8.14", "5.29", "5.30")]
-    fs += [_nc(c, "Toegangsbeheer") for c in ("8.2", "8.5", "5.17")]
+    fs = [_nc(c, "Back-up & continuïteit") for c in ("A.8.14", "A.5.29", "A.5.30")]
+    fs += [_nc(c, "Toegangsbeheer") for c in ("8.2", "A.8.5", "A.5.17")]
     profiel = laad_profiel(str(_EX / "conduction.profile.yaml"))
     r = MemoRendererImpl()
     budget = r.render_pdf(r.render_html(_memo(fs), profiel), tmp_path / "memo.pdf")

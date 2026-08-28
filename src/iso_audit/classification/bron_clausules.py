@@ -13,10 +13,11 @@ Voor die documenten geldt de koppeling dus op **soort**, niet op inhoud. Dat is 
 mechanisme naast de zoektermen: de vaste koppeling komt erbij, de zoektermen blijven draaien.
 Een `SECURITY.md` die toevallig over back-ups gaat, krijgt §8.13 er gewoon bij.
 
-Elke clausule hier moet in de norm-DB bestaan; `tests/classification/test_bron_clausules.py`
-faalt zodra dat niet zo is. Een koppeling naar een clausule die niet bestaat, levert een
-bevinding op die nergens over gaat — dat is precies de fout die op 2026-08-24 448 van de 903
-bevindingen verkeerd labelde.
+De 27001-maatregelen dragen de `A.`-prefix van Bijlage A: A.8.8 is "Beheer van technische
+kwetsbaarheden", terwijl 8.8 als managementclausule niet bestaat. Elke clausule hier moet in de
+norm-DB staan; `tests/classification/test_bron_clausules.py` faalt zodra dat niet zo is. Een
+koppeling naar een clausule die niet bestaat, levert een bevinding op die nergens over gaat — dat
+is precies de fout die op 2026-08-24 448 van de 903 bevindingen verkeerd labelde.
 """
 
 from __future__ import annotations
@@ -29,14 +30,14 @@ Koppeling = tuple[tuple[str, str], ...]
 REPO_BESTANDEN: Final[dict[str, Koppeling]] = {
     "README.md": (("7.5", "9001"),),
     "profile/README.md": (("4.1", "9001"),),
-    "SECURITY.md": (("8.8", "27001"), ("5.24", "27001")),
-    "CONTRIBUTING.md": (("8.28", "27001"),),
-    "CODEOWNERS": (("5.2", "27001"), ("8.32", "27001")),
-    ".github/CODEOWNERS": (("5.2", "27001"), ("8.32", "27001")),
-    "LICENSE": (("5.32", "27001"),),
-    ".github/dependabot.yml": (("8.8", "27001"),),
-    "renovate.json": (("8.8", "27001"),),
-    ".pre-commit-config.yaml": (("8.28", "27001"),),
+    "SECURITY.md": (("A.8.8", "27001"), ("A.5.24", "27001")),
+    "CONTRIBUTING.md": (("A.8.28", "27001"),),
+    "CODEOWNERS": (("A.5.2", "27001"), ("A.8.32", "27001")),
+    ".github/CODEOWNERS": (("A.5.2", "27001"), ("A.8.32", "27001")),
+    "LICENSE": (("A.5.32", "27001"),),
+    ".github/dependabot.yml": (("A.8.8", "27001"),),
+    "renovate.json": (("A.8.8", "27001"),),
+    ".pre-commit-config.yaml": (("A.8.28", "27001"),),
 }
 """Welk bewijspad welke eis raakt.
 
@@ -51,16 +52,16 @@ het interne beleid is precies wat een auditor wil kunnen leggen.
 Hier wordt niets ingevuld of verondersteld: er wordt alleen gelezen wat er staat."""
 
 REPO_WORKFLOWS: Final[Koppeling] = (
-    ("8.25", "27001"),
-    ("8.31", "27001"),
-    ("8.32", "27001"),
+    ("A.8.25", "27001"),
+    ("A.8.31", "27001"),
+    ("A.8.32", "27001"),
 )
 """CI-workflows: veilige ontwikkelcyclus, scheiding van omgevingen, wijzigingsbeheer."""
 
 REPO_INSTELLINGEN: Final[Koppeling] = (
-    ("8.4", "27001"),
-    ("8.32", "27001"),
-    ("5.2", "27001"),
+    ("A.8.4", "27001"),
+    ("A.8.32", "27001"),
+    ("A.5.2", "27001"),
 )
 """Zichtbaarheid, branch-bescherming en de review-eis.
 
@@ -69,11 +70,11 @@ rolverdeling die hier wel of niet is afgedwongen."""
 
 WEBSITE_PADEN: Final[dict[str, Koppeling]] = {
     "/about": (("4.1", "9001"),),
-    "/privacy": (("5.34", "27001"),),
-    "/terms": (("5.31", "27001"), ("8.2", "9001")),
-    "/quality": (("5.1", "27001"), ("5.2", "9001")),
+    "/privacy": (("A.5.34", "27001"),),
+    "/terms": (("A.5.31", "27001"), ("8.2", "9001")),
+    "/quality": (("A.5.1", "27001"), ("5.2", "9001")),
     "/support": (("8.2", "9001"),),
-    "/contact": (("5.5", "27001"),),
+    "/contact": (("A.5.5", "27001"),),
 }
 """Publieke toezeggingen per padprefix.
 

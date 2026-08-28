@@ -110,10 +110,16 @@ def _laad_normteksten(norm: str) -> dict[str, dict[str, Any]]:
 
 
 def _sorteersleutel(clausule_id: str) -> tuple[int, ...]:
-    """Sorteert "5.12" correct na "5.9" (numeriek, niet lexicografisch)."""
-    parts = clausule_id.split(".")
+    """Sorteert "5.12" correct na "5.9" (numeriek, niet lexicografisch).
+
+    Bijlage A-maatregelen dragen sinds 2026-08-28 een `A.`-prefix en horen ná de
+    managementclausules: eerst hoofdstuk 4 t/m 10, dan A.5 t/m A.8. Dat is de volgorde van de
+    norm zelf, en een rapport dat A.5.1 tussen 4.4 en 5.1 zet, leest als een fout.
+    """
+    annex = clausule_id.startswith("A.")
+    parts = clausule_id.removeprefix("A.").split(".")
     try:
-        return tuple(int(p) for p in parts)
+        return (1 if annex else 0, *(int(p) for p in parts))
     except ValueError:
         return (0,)
 

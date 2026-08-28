@@ -56,7 +56,7 @@ def test_voorbeeld_norm_referenties_resolven() -> None:
     assert len(memo.nc_blocks) == 2
     # NC 2 citeert 6.5 + 5.11 + 5.18 → drie citaten.
     nc2 = next(b for b in memo.nc_blocks if "Offboarding" in b.title)
-    assert {c.clause for c in nc2.citations} == {"6.5", "5.11", "5.18"}
+    assert {c.clause for c in nc2.citations} == {"A.6.5", "A.5.11", "A.5.18"}
 
 
 def test_voorbeeld_pattern_en_verbeterpunt() -> None:

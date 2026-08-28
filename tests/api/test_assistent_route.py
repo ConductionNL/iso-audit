@@ -60,7 +60,7 @@ def portaal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> PortaalClient:
     )
     conn.execute(
         "INSERT INTO clause_matches (doc_id, herkomst, clausule_id, norm) VALUES (?,?,?,?)",
-        ("d1", "Drive", "8.24", "27001"),
+        ("d1", "Drive", "A.8.24", "27001"),
     )
     conn.commit()
     conn.close()

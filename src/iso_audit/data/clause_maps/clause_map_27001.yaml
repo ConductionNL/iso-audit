@@ -1,13 +1,185 @@
-# ISO 27001:2022 Annex A Clausule-mapping
-# 93 controls verdeeld over 4 thema's
+# ISO 27001:2022 clausule-mapping
+# 27 managementclausules (hoofdstuk 4-10) + 93 maatregelen uit Bijlage A (A.5-A.8)
+#
+# De A-prefix volgt de norm zelf en lost een botsing op: 5.1 is "Leiderschap en betrokkenheid",
+# A.5.1 is "Beleid voor informatiebeveiliging". Tot 2026-08-28 bevatte dit bestand alleen
+# Bijlage A, waardoor hoofdstuk 4 t/m 10 nooit werd getoetst — de helft van de eis.
 # Pas zoektermen aan op organisatie-specifieke terminologie
 
 norm: "ISO 27001:2022"
 
 clausules:
+
+  # ─── Managementclausules (hoofdstuk 4 t/m 10) ─────────────────────────────
+
+  "4.1":
+    titel: "Inzicht verkrijgen in de organisatie en haar context"
+    zoektermen:
+      - context van de organisatie
+      - interne en externe context
+      - contextanalyse
+      - SWOT
+  "4.2":
+    titel: "Inzicht verkrijgen in de behoeften en verwachtingen van belanghebbenden"
+    zoektermen:
+      - belanghebbenden
+      - stakeholder
+      - eisen van belanghebbenden
+  "4.3":
+    titel: "Het toepassingsgebied van het managementsysteem voor informatiebeveiliging"
+    zoektermen:
+      - toepassingsgebied
+      - scope van het managementsysteem
+      - scope statement
+  "4.4":
+    titel: "Managementsysteem voor informatiebeveiliging"
+    zoektermen:
+      - managementsysteem voor informatiebeveiliging
+      - ISMS
+      - ISMS-processen
+  "5.1":
+    titel: "Leiderschap en betrokkenheid"
+    zoektermen:
+      - leiderschap
+      - betrokkenheid van de directie
+      - directieverantwoordelijkheid
+  "5.2":
+    titel: "Beleid"
+    zoektermen:
+      - informatiebeveiligingsbeleid
+      - beleidsverklaring
+      - beleid vastgesteld
+  "5.3":
+    titel: "Rollen, verantwoordelijkheden en bevoegdheden binnen de organisatie"
+    zoektermen:
+      - rollen en verantwoordelijkheden
+      - bevoegdheden
+      - RACI
+      - functieprofiel
+  "6.1":
+    titel: "Maatregelen om risico’s te beperken en kansen te benutten"
+    zoektermen:
+      - risico's en kansen
+      - risicomanagement
+      - risicoaanpak
+  "6.1.2":
+    titel: "Risicobeoordeling van informatiebeveiliging"
+    zoektermen:
+      - risicobeoordeling
+      - risicoanalyse
+      - risicocriteria
+  "6.1.3":
+    titel: "Behandeling van informatiebeveiligingsrisico’s"
+    zoektermen:
+      - risicobehandeling
+      - verklaring van toepasselijkheid
+      - VvT
+      - risicobehandelplan
+  "6.2":
+    titel: "Informatiebeveiligingsdoelstellingen en de planning om ze te bereiken"
+    zoektermen:
+      - informatiebeveiligingsdoelstellingen
+      - doelstellingen
+      - KPI
+  "6.3":
+    titel: "Planning van wijzigingen"
+    zoektermen:
+      - planning van wijzigingen
+      - wijzigingsplanning
+      - change management ISMS
+  "7.1":
+    titel: "Middelen"
+    zoektermen:
+      - middelen
+      - resources
+      - budget voor informatiebeveiliging
+  "7.2":
+    titel: "Competentie"
+    zoektermen:
+      - competentie
+      - opleiding
+      - vakbekwaamheid
+      - certificering medewerker
+  "7.3":
+    titel: "Bewustzijn"
+    zoektermen:
+      - bewustzijn
+      - awareness
+      - bewustwording
+  "7.4":
+    titel: "Communicatie"
+    zoektermen:
+      - communicatie
+      - communicatieplan
+      - interne communicatie
+  "7.5":
+    titel: "Gedocumenteerde informatie"
+    zoektermen:
+      - gedocumenteerde informatie
+      - documentbeheer
+      - documentatie
+  "7.5.2":
+    titel: "Creëren en actualiseren"
+    zoektermen:
+      - creëren en actualiseren
+      - versiebeheer
+      - documentversie
+  "7.5.3":
+    titel: "Beheer van gedocumenteerde informatie"
+    zoektermen:
+      - beheer van gedocumenteerde informatie
+      - documentbeheersing
+      - toegang tot documenten
+  "8.1":
+    titel: "Operationele planning en beheersing"
+    zoektermen:
+      - operationele planning
+      - operationele beheersing
+      - uitbestede processen
+  "8.2":
+    titel: "Risicobeoordeling van informatiebeveiliging"
+    zoektermen:
+      - risicobeoordeling uitvoeren
+      - periodieke risicobeoordeling
+  "8.3":
+    titel: "Informatiebeveiligingsrisico’s behandelen"
+    zoektermen:
+      - risicobehandeling uitvoeren
+      - behandelplan uitvoeren
+  "9.1":
+    titel: "Monitoren, meten, analyseren en evalueren"
+    zoektermen:
+      - monitoren en meten
+      - analyseren en evalueren
+      - meetplan
+  "9.2":
+    titel: "Interne audit"
+    zoektermen:
+      - interne audit
+      - auditprogramma
+      - auditplan
+  "9.3":
+    titel: "Directiebeoordeling"
+    zoektermen:
+      - directiebeoordeling
+      - management review
+      - managementreview
+  "10.1":
+    titel: "Continue verbetering"
+    zoektermen:
+      - continue verbetering
+      - continu verbeteren
+      - verbetercyclus
+  "10.2":
+    titel: "Afwijkingen en corrigerende maatregelen"
+    zoektermen:
+      - afwijking
+      - corrigerende maatregel
+      - non-conformiteit
+      - NC-registratie
   # ─── Thema 5: Organisatorische beheersmaatregelen ─────────────────────────
 
-  "5.1":
+  "A.5.1":
     titel: "Beleid voor informatiebeveiliging"
     zoektermen:
       - informatiebeveiligingsbeleid
@@ -15,7 +187,7 @@ clausules:
       - beveiligingsbeleid
       - security policy
 
-  "5.2":
+  "A.5.2":
     titel: "Rollen en verantwoordelijkheden voor informatiebeveiliging"
     zoektermen:
       - CISO
@@ -23,7 +195,7 @@ clausules:
       - security rollen
       - beveiligingsverantwoordelijke
 
-  "5.3":
+  "A.5.3":
     titel: "Scheiding van taken"
     zoektermen:
       - functiescheiding
@@ -31,14 +203,14 @@ clausules:
       - segregation of duties
       - vier-ogen principe
 
-  "5.4":
+  "A.5.4":
     titel: "Managementverantwoordelijkheden"
     zoektermen:
       - managementverantwoordelijkheid
       - directieverantwoordelijkheid
       - management commitment beveiliging
 
-  "5.5":
+  "A.5.5":
     titel: "Contact met autoriteiten"
     zoektermen:
       - contacten autoriteiten
@@ -47,14 +219,14 @@ clausules:
       - Autoriteit Persoonsgegevens
       - NCSC
 
-  "5.6":
+  "A.5.6":
     titel: "Contact met speciale belangengroepen"
     zoektermen:
       - ISAC
       - sectoroverleg beveiliging
       - kennisdeling beveiliging
 
-  "5.7":
+  "A.5.7":
     titel: "Dreigingsinformatie"
     zoektermen:
       - threat intelligence
@@ -62,7 +234,7 @@ clausules:
       - kwetsbaarheden
       - CVE
 
-  "5.8":
+  "A.5.8":
     titel: "Informatiebeveiliging in projectbeheer"
     zoektermen:
       - beveiliging in projecten
@@ -70,7 +242,7 @@ clausules:
       - privacy impact assessment
       - security in projectmanagement
 
-  "5.9":
+  "A.5.9":
     titel: "Inventarisatie van informatie en andere bijbehorende activa"
     zoektermen:
       - inventarislijst
@@ -78,7 +250,7 @@ clausules:
       - informatie-activa
       - dataclassificatie
 
-  "5.10":
+  "A.5.10":
     titel: "Aanvaardbaar gebruik van informatie en andere bijbehorende activa"
     zoektermen:
       - acceptable use policy
@@ -86,14 +258,14 @@ clausules:
       - clean desk
       - BYOD
 
-  "5.11":
+  "A.5.11":
     titel: "Retournering van activa"
     zoektermen:
       - retournering activa
       - offboarding
       - inleveren apparatuur
 
-  "5.12":
+  "A.5.12":
     titel: "Classificatie van informatie"
     zoektermen:
       - classificatie
@@ -102,14 +274,14 @@ clausules:
       - rubricering
       - labeling
 
-  "5.13":
+  "A.5.13":
     titel: "Labeling van informatie"
     zoektermen:
       - labeling
       - markering documenten
       - vertrouwelijk stempel
 
-  "5.14":
+  "A.5.14":
     titel: "Informatieoverdracht"
     zoektermen:
       - informatieoverdracht
@@ -118,7 +290,7 @@ clausules:
       - NDA
       - verwerkersovereenkomst
 
-  "5.15":
+  "A.5.15":
     titel: "Toegangsbeheersing"
     zoektermen:
       - toegangsbeheer
@@ -127,7 +299,7 @@ clausules:
       - rechtenbeheer
       - least privilege
 
-  "5.16":
+  "A.5.16":
     titel: "Identiteitsbeheer"
     zoektermen:
       - identiteitsbeheer
@@ -135,7 +307,7 @@ clausules:
       - gebruikersbeheer
       - accountbeheer
 
-  "5.17":
+  "A.5.17":
     titel: "Authenticatie-informatie"
     zoektermen:
       - wachtwoordbeleid
@@ -144,7 +316,7 @@ clausules:
       - multi-factor authenticatie
       - wachtwoordbeheer
 
-  "5.18":
+  "A.5.18":
     titel: "Toegangsrechten"
     zoektermen:
       - toegangsrechten
@@ -152,7 +324,7 @@ clausules:
       - role based access
       - RBAC
 
-  "5.19":
+  "A.5.19":
     titel: "Informatiebeveiliging in leveranciersrelaties"
     zoektermen:
       - leveranciersbeveiliging
@@ -160,28 +332,28 @@ clausules:
       - derde partijen
       - verwerkersovereenkomst
 
-  "5.20":
+  "A.5.20":
     titel: "Behandeling van informatiebeveiliging binnen leveranciersovereenkomsten"
     zoektermen:
       - leveranciersovereenkomst
       - SLA beveiliging
       - contract beveiliging
 
-  "5.21":
+  "A.5.21":
     titel: "Beheer van informatiebeveiliging in de ICT-toeleveringsketen"
     zoektermen:
       - supply chain security
       - ICT-toeleveringsketen
       - softwareleveranciers
 
-  "5.22":
+  "A.5.22":
     titel: "Bewaking, beoordeling en wijzigingsbeheer van leveranciersdiensten"
     zoektermen:
       - leveranciersbeoordeling
       - servicebeoordeling
       - wijzigingen leveranciers
 
-  "5.23":
+  "A.5.23":
     titel: "Informatiebeveiliging bij gebruik van clouddiensten"
     zoektermen:
       - cloud security
@@ -190,7 +362,7 @@ clausules:
       - cloud beveiliging
       - shared responsibility
 
-  "5.24":
+  "A.5.24":
     titel: "Planning en voorbereiding van het beheer van informatiebeveiligingsincidenten"
     zoektermen:
       - incidentbeheer
@@ -198,35 +370,35 @@ clausules:
       - CSIRT
       - incidentprocedure
 
-  "5.25":
+  "A.5.25":
     titel: "Beoordeling en besluitvorming over informatiebeveiligingsincidenten"
     zoektermen:
       - incidentbeoordeling
       - incident classificatie
       - escalatieprocedure
 
-  "5.26":
+  "A.5.26":
     titel: "Reactie op informatiebeveiligingsincidenten"
     zoektermen:
       - incident response
       - incidentafhandeling
       - crisismanagement
 
-  "5.27":
+  "A.5.27":
     titel: "Leren van informatiebeveiligingsincidenten"
     zoektermen:
       - lessons learned
       - post-incident review
       - incidentevaluatie
 
-  "5.28":
+  "A.5.28":
     titel: "Verzamelen van bewijs"
     zoektermen:
       - digitaal forensisch onderzoek
       - bewijsverzameling
       - logging bewijs
 
-  "5.29":
+  "A.5.29":
     titel: "Informatiebeveiliging tijdens verstoring"
     zoektermen:
       - bedrijfscontinuïteit
@@ -234,7 +406,7 @@ clausules:
       - DRP
       - herstelplan
 
-  "5.30":
+  "A.5.30":
     titel: "ICT-gereedheid voor bedrijfscontinuïteit"
     zoektermen:
       - ICT continuïteit
@@ -243,7 +415,7 @@ clausules:
       - RPO
       - uitwijkplan
 
-  "5.31":
+  "A.5.31":
     titel: "Wettelijke, statutaire, regelgevende en contractuele eisen"
     zoektermen:
       - compliancematrix
@@ -253,7 +425,7 @@ clausules:
       - NIS2
       - regelgeving
 
-  "5.32":
+  "A.5.32":
     titel: "Intellectuele eigendomsrechten"
     zoektermen:
       - intellectueel eigendom
@@ -261,7 +433,7 @@ clausules:
       - software licenties
       - copyright
 
-  "5.33":
+  "A.5.33":
     titel: "Bescherming van registraties"
     zoektermen:
       - archivering
@@ -269,7 +441,7 @@ clausules:
       - retentiebeleid
       - registratiebeheer
 
-  "5.34":
+  "A.5.34":
     titel: "Privacy en bescherming van persoonsgegevens"
     zoektermen:
       - privacy
@@ -279,7 +451,7 @@ clausules:
       - privacy policy
       - register verwerkingsactiviteiten
 
-  "5.35":
+  "A.5.35":
     titel: "Onafhankelijke beoordeling van informatiebeveiliging"
     zoektermen:
       - externe audit
@@ -287,14 +459,14 @@ clausules:
       - onafhankelijke beoordeling
       - externe review
 
-  "5.36":
+  "A.5.36":
     titel: "Naleving van beleid, regels en normen voor informatiebeveiliging"
     zoektermen:
       - compliance monitoring
       - nalevingscontrole
       - beleidscontrole
 
-  "5.37":
+  "A.5.37":
     titel: "Gedocumenteerde bedieningsprocedures"
     zoektermen:
       - operationele procedures
@@ -304,7 +476,7 @@ clausules:
 
   # ─── Thema 6: Persoonsgebonden beheersmaatregelen ─────────────────────────
 
-  "6.1":
+  "A.6.1":
     titel: "Screening"
     zoektermen:
       - screening
@@ -312,7 +484,7 @@ clausules:
       - VOG
       - pre-employment screening
 
-  "6.2":
+  "A.6.2":
     titel: "Arbeidsvoorwaarden"
     zoektermen:
       - arbeidsovereenkomst
@@ -320,7 +492,7 @@ clausules:
       - NDA medewerkers
       - gedragscode
 
-  "6.3":
+  "A.6.3":
     titel: "Bewustzijn, opleiding en training op het gebied van informatiebeveiliging"
     zoektermen:
       - security awareness
@@ -328,14 +500,14 @@ clausules:
       - phishing simulatie
       - e-learning beveiliging
 
-  "6.4":
+  "A.6.4":
     titel: "Disciplinaire procedure"
     zoektermen:
       - disciplinaire maatregel
       - sanctiebeleid
       - overtreding beveiligingsbeleid
 
-  "6.5":
+  "A.6.5":
     titel: "Verantwoordelijkheden na beëindiging of wijziging van het dienstverband"
     zoektermen:
       - offboarding
@@ -343,7 +515,7 @@ clausules:
       - toegangsintrekking
       - exitprocedure
 
-  "6.6":
+  "A.6.6":
     titel: "Vertrouwelijkheids- of geheimhoudingsovereenkomsten"
     zoektermen:
       - geheimhouding
@@ -351,7 +523,7 @@ clausules:
       - vertrouwelijkheidsverklaring
       - confidentialiteitsverklaring
 
-  "6.7":
+  "A.6.7":
     titel: "Werken op afstand"
     zoektermen:
       - thuiswerken
@@ -359,7 +531,7 @@ clausules:
       - remote work beleid
       - VPN
 
-  "6.8":
+  "A.6.8":
     titel: "Melding van informatiebeveiligingsgebeurtenissen"
     zoektermen:
       - incidentmelding
@@ -368,7 +540,7 @@ clausules:
 
   # ─── Thema 7: Fysieke beheersmaatregelen ──────────────────────────────────
 
-  "7.1":
+  "A.7.1":
     titel: "Fysieke beveiligingsperimeters"
     zoektermen:
       - toegangscontrole gebouw
@@ -376,7 +548,7 @@ clausules:
       - serverruimte
       - fysieke beveiliging
 
-  "7.2":
+  "A.7.2":
     titel: "Fysieke toegang"
     zoektermen:
       - toegangspassen
@@ -384,14 +556,14 @@ clausules:
       - bezoekersregistratie
       - beveiligde toegang
 
-  "7.3":
+  "A.7.3":
     titel: "Beveiliging van kantoren, ruimten en faciliteiten"
     zoektermen:
       - kantoorbeveiliging
       - ruimtebeveiliging
       - clean desk policy
 
-  "7.4":
+  "A.7.4":
     titel: "Bewaking van fysieke beveiliging"
     zoektermen:
       - cameratoezicht
@@ -399,7 +571,7 @@ clausules:
       - alarmsysteem
       - beveiligingsmonitoring
 
-  "7.5":
+  "A.7.5":
     titel: "Bescherming tegen fysieke en omgevingsbedreigingen"
     zoektermen:
       - brandbescherming
@@ -408,14 +580,14 @@ clausules:
       - UPS
       - noodstroom
 
-  "7.6":
+  "A.7.6":
     titel: "Werken in beveiligde zones"
     zoektermen:
       - beveiligde werkruimte
       - clean room
       - beperkte toegangszone
 
-  "7.7":
+  "A.7.7":
     titel: "Clear desk en clear screen"
     zoektermen:
       - clean desk
@@ -423,14 +595,14 @@ clausules:
       - schermbeveiliging
       - schermvergrendeling
 
-  "7.8":
+  "A.7.8":
     titel: "Plaatsing en bescherming van apparatuur"
     zoektermen:
       - apparatuurplaatsing
       - serveropstelling
       - rack beveiliging
 
-  "7.9":
+  "A.7.9":
     titel: "Beveiliging van activa buiten de gebouwen"
     zoektermen:
       - mobiele apparatuur
@@ -438,7 +610,7 @@ clausules:
       - remote devices
       - apparatuur buiten kantoor
 
-  "7.10":
+  "A.7.10":
     titel: "Opslagmedia"
     zoektermen:
       - opslagmedia
@@ -446,7 +618,7 @@ clausules:
       - mediabeheer
       - externe schijven
 
-  "7.11":
+  "A.7.11":
     titel: "Nutsvoorzieningen"
     zoektermen:
       - nutsvoorzieningen
@@ -454,21 +626,21 @@ clausules:
       - koeling datacenter
       - klimaatbeheersing
 
-  "7.12":
+  "A.7.12":
     titel: "Kabelbeveiliging"
     zoektermen:
       - kabelmanagement
       - netwerkkabels
       - kabelbeveiliging
 
-  "7.13":
+  "A.7.13":
     titel: "Onderhoud van apparatuur"
     zoektermen:
       - onderhoud apparatuur
       - preventief onderhoud
       - maintenance
 
-  "7.14":
+  "A.7.14":
     titel: "Veilige verwijdering of hergebruik van apparatuur"
     zoektermen:
       - verwijdering apparatuur
@@ -479,7 +651,7 @@ clausules:
 
   # ─── Thema 8: Technologische beheersmaatregelen ───────────────────────────
 
-  "8.1":
+  "A.8.1":
     titel: "Eindgebruikersapparaten"
     zoektermen:
       - endpoint beveiliging
@@ -487,7 +659,7 @@ clausules:
       - device management
       - laptop beveiliging
 
-  "8.2":
+  "A.8.2":
     titel: "Bevoorrechte toegangsrechten"
     zoektermen:
       - privileged access
@@ -496,14 +668,14 @@ clausules:
       - root toegang
       - beheerders accounts
 
-  "8.3":
+  "A.8.3":
     titel: "Beperking van toegang tot informatie"
     zoektermen:
       - need-to-know
       - toegangsbeperking
       - dataclassificatie toegang
 
-  "8.4":
+  "A.8.4":
     titel: "Toegang tot broncode"
     zoektermen:
       - broncode toegang
@@ -511,7 +683,7 @@ clausules:
       - repository toegang
       - code review
 
-  "8.5":
+  "A.8.5":
     titel: "Veilige authenticatie"
     zoektermen:
       - authenticatie
@@ -520,14 +692,14 @@ clausules:
       - single sign-on
       - wachtwoordmanager
 
-  "8.6":
+  "A.8.6":
     titel: "Capaciteitsbeheer"
     zoektermen:
       - capaciteitsplanning
       - capacity management
       - schaalbaarheid
 
-  "8.7":
+  "A.8.7":
     titel: "Bescherming tegen malware"
     zoektermen:
       - antivirus
@@ -535,7 +707,7 @@ clausules:
       - endpoint protection
       - EDR
 
-  "8.8":
+  "A.8.8":
     titel: "Beheer van technische kwetsbaarheden"
     zoektermen:
       - kwetsbaarheidsbeheer
@@ -544,7 +716,7 @@ clausules:
       - CVE
       - CVSS
 
-  "8.9":
+  "A.8.9":
     titel: "Configuratiebeheer"
     zoektermen:
       - configuratiebeheer
@@ -553,7 +725,7 @@ clausules:
       - baselines
       - CIS benchmarks
 
-  "8.10":
+  "A.8.10":
     titel: "Wissen van informatie"
     zoektermen:
       - dataverwijdering
@@ -561,7 +733,7 @@ clausules:
       - retentiebeleid
       - secure delete
 
-  "8.11":
+  "A.8.11":
     titel: "Datamaskering"
     zoektermen:
       - datamaskering
@@ -569,7 +741,7 @@ clausules:
       - anonimisering
       - data masking
 
-  "8.12":
+  "A.8.12":
     titel: "Preventie van gegevenslekken"
     zoektermen:
       - DLP
@@ -577,7 +749,7 @@ clausules:
       - gegevenslekpreventie
       - datalekkage
 
-  "8.13":
+  "A.8.13":
     titel: "Back-up van informatie"
     zoektermen:
       - backup
@@ -587,7 +759,7 @@ clausules:
       - back-up procedure
       - 3-2-1 backup
 
-  "8.14":
+  "A.8.14":
     titel: "Redundantie van informatieverwerkende faciliteiten"
     zoektermen:
       - redundantie
@@ -595,7 +767,7 @@ clausules:
       - failover
       - load balancing
 
-  "8.15":
+  "A.8.15":
     titel: "Logging"
     zoektermen:
       - logging
@@ -604,7 +776,7 @@ clausules:
       - log beheer
       - logretentie
 
-  "8.16":
+  "A.8.16":
     titel: "Bewakingsactiviteiten"
     zoektermen:
       - monitoring
@@ -612,21 +784,21 @@ clausules:
       - security monitoring
       - alerting
 
-  "8.17":
+  "A.8.17":
     titel: "Kloksynchronisatie"
     zoektermen:
       - NTP
       - tijdsynchronisatie
       - kloksynchronisatie
 
-  "8.18":
+  "A.8.18":
     titel: "Gebruik van bevoorrechte hulpprogramma's"
     zoektermen:
       - admin tools
       - privileged tools
       - systeemhulpmiddelen
 
-  "8.19":
+  "A.8.19":
     titel: "Installatie van software op operationele systemen"
     zoektermen:
       - software installatie beleid
@@ -634,7 +806,7 @@ clausules:
       - whitelisting
       - software goedkeuring
 
-  "8.20":
+  "A.8.20":
     titel: "Netwerkbeveiliging"
     zoektermen:
       - netwerksegmentatie
@@ -643,14 +815,14 @@ clausules:
       - network security
       - VLAN
 
-  "8.21":
+  "A.8.21":
     titel: "Beveiliging van netwerkdiensten"
     zoektermen:
       - netwerkdiensten beveiliging
       - VPN
       - netwerktoegang
 
-  "8.22":
+  "A.8.22":
     titel: "Scheiding van netwerken"
     zoektermen:
       - netwerksegmentatie
@@ -658,7 +830,7 @@ clausules:
       - VLAN
       - DMZ
 
-  "8.23":
+  "A.8.23":
     titel: "Webfiltering"
     zoektermen:
       - webfilter
@@ -666,7 +838,7 @@ clausules:
       - content filtering
       - proxy
 
-  "8.24":
+  "A.8.24":
     titel: "Gebruik van cryptografie"
     zoektermen:
       - encryptie
@@ -676,7 +848,7 @@ clausules:
       - certificaten
       - PKI
 
-  "8.25":
+  "A.8.25":
     titel: "Veilige ontwikkelingslevenscyclus"
     zoektermen:
       - SDLC
@@ -684,7 +856,7 @@ clausules:
       - DevSecOps
       - security by design
 
-  "8.26":
+  "A.8.26":
     titel: "Beveiligingseisen voor toepassingen"
     zoektermen:
       - applicatiebeveiliging
@@ -692,7 +864,7 @@ clausules:
       - OWASP
       - penetratietest
 
-  "8.27":
+  "A.8.27":
     titel: "Veilige systeemarchitectuur en technische principes"
     zoektermen:
       - security architectuur
@@ -700,7 +872,7 @@ clausules:
       - zero trust
       - technische beveiligingsprincipes
 
-  "8.28":
+  "A.8.28":
     titel: "Veilig coderen"
     zoektermen:
       - secure coding
@@ -709,7 +881,7 @@ clausules:
       - DAST
       - veilig programmeren
 
-  "8.29":
+  "A.8.29":
     titel: "Beveiligingstesten in ontwikkeling en acceptatie"
     zoektermen:
       - security testing
@@ -717,14 +889,14 @@ clausules:
       - acceptatietest beveiliging
       - DAST
 
-  "8.30":
+  "A.8.30":
     titel: "Uitbestede ontwikkeling"
     zoektermen:
       - uitbestede ontwikkeling
       - externe ontwikkelaars
       - offshore development
 
-  "8.31":
+  "A.8.31":
     titel: "Scheiding van ontwikkel-, test- en productieomgevingen"
     zoektermen:
       - OTAP
@@ -732,7 +904,7 @@ clausules:
       - test acceptatie productie
       - development productie scheiding
 
-  "8.32":
+  "A.8.32":
     titel: "Wijzigingsbeheer"
     zoektermen:
       - change management
@@ -741,14 +913,14 @@ clausules:
       - CAB
       - release management
 
-  "8.33":
+  "A.8.33":
     titel: "Testinformatie"
     zoektermen:
       - testdata
       - anonimisering testdata
       - testomgeving data
 
-  "8.34":
+  "A.8.34":
     titel: "Bescherming van informatiesystemen tijdens audittesten"
     zoektermen:
       - audit tools

@@ -23,72 +23,37 @@ onderscheid is het **type** en niet de inhoud — op inhoud filteren zou raden z
 melding gaat nog steeds naar het serverlog, want dat hoort het volledige verloop van een run te
 bevatten.
 
-### Bekend gat — de 27001-norm-DB bevat alleen Annex A
+### Added — 2026-08-28 — ISO 27001 wordt op de hele norm getoetst
 
-Hierdoor kwam iets ernstigers boven water. `examples/norms/iso-27001-2022.yaml` bevat **93
-clausules, verdeeld over hoofdstuk 5 t/m 8** — dat zijn de Annex A-maatregelen. De
-management-systeemclausules **4 t/m 10** (context, leiderschap, planning, ondersteuning,
-uitvoering, evaluatie, verbetering) staan er niet in, en die zijn net zo goed certificeringseis.
-Voor ISO 9001 staan de hoofdstukken 4 t/m 10 er wél.
+De norm-DB voor 27001 bevatte **alleen Bijlage A**: 93 maatregelen, genummerd 5.1 t/m 8.34. De
+managementclausules 4 t/m 10 — context, leiderschap, planning, ondersteuning, uitvoering,
+evaluatie, verbetering — ontbraken volledig. Dat is de helft van de certificeringseis, en het
+kwam pas boven water toen de auditor hoofdstuk 4 koos en een foutmelding kreeg.
 
-Dit is niet stilletjes op te lossen, want de nummers botsen: 27001 §5.1 is "Leiderschap en
-betrokkenheid" en A.5.1 is "Beleid voor informatiebeveiliging". De DB gebruikt nu `5.1` voor de
-Annex A-maatregel. Ze allebei opnemen vraagt dat de Annex A-maatregelen `A.`-prefix krijgen —
-wat de norm zelf ook doet — en dat raakt de 271 bestaande bevindingen van de lopende audit.
+De teksten komen uit `Norm ISO 27001.pdf` in de Drive van de organisatie — dat had de eerste
+plek moeten zijn waar ik keek, in plaats van te concluderen dat het niet kon.
 
-Genoteerd als openstaand punt, niet eigenmachtig gewijzigd.
+**Bijlage A krijgt de `A.`-prefix**, zoals de norm zelf. Zonder dat botsen de nummers: §5.1 is
+"Leiderschap en betrokkenheid", A.5.1 is "Beleid voor informatiebeveiliging". De DB gaat van 93
+naar **120 clausules**: 27 managementclausules plus 93 maatregelen.
 
-### Fixed — 2026-08-28 — navigatie en voettekst zijn geen inhoud
+**Herkomst en aannames, expliciet.** Het brondocument is de 2013/2017-uitgave; de structuur van
+hoofdstuk 4-10 is in 2022 op twee punten gewijzigd, en die zijn hier met de hand toegepast:
+2022 voegt 6.3 (Planning van wijzigingen) toe, en draait 10.1 en 10.2 om. Dat staat hier omdat
+het niet uit het brondocument volgt — wie het wil controleren, weet waar hij op moet letten.
 
-De eerste echte website-ingest bracht 137 pagina's van conduction.nl binnen — en meteen een fout
-die alleen bij echte data zichtbaar wordt: **135 van die 137 matchten op §5.34 (privacy)**. Niet
-omdat ze over privacy gaan, maar omdat in de voettekst van elke pagina "© 2026 Privacy · Terms ·
-ISO" staat, en in de navigatie "Apps Solutions Academy Support About".
+**Bestaande gegevens migreren mee.** `api/annex_migratie.py` zet oude verwijzingen om. Dat is
+eenduidig omdat er vóór deze wijziging niets anders bestond: élke opgeslagen 27001-clausule was
+een Bijlage A-maatregel. Twee keer draaien verandert niets, en 9001 blijft ongemoeid.
 
-Dat is geen kleine onzuiverheid. Een clausule-koppeling die op boilerplate matcht, levert honderd
-bevindingen op over een eis waar de pagina niets over zegt — en dan is de dekking een getal dat
-niets betekent. Precies de soort stille onwaarheid waar dit tool bevindingen over hoort te
-schrijven.
+**De auditor merkt de prefix niet.** Wie "8.24" typt in de assistent, vindt A.8.24 — de norm
+noemt het zo, maar niemand praat zo. Zowel het ophalen als de antwoordverificatie accepteert
+beide vormen, en de suggestie bij een typefout (`8.2.4` → `A.8.24`) negeert de prefix bij het
+vergelijken.
 
-`<nav>`, `<footer>`, `<header>` en `<aside>` gaan er nu uit, net als `<script>` en `<style>`, en
-de tekst komt uit `<main>`. Op `/about/`: van 4.795 naar 4.037 tekens, zonder "Privacy", "Terms",
-"Solutions" of "Academy" — en met de inhoud intact.
-
-Heeft een pagina geen `<main>`, dan valt het terug op de hele body minus die tags. Liever te veel
-dan niets: een lege pagina leest als "hier staat niets" terwijl er wel degelijk iets stond.
-
-De al ingelezen pagina's dragen nog de oude tekst; die moeten met `ISO_AUDIT_OPNIEUW_LEZEN`
-opnieuw opgehaald worden voordat er geclassificeerd wordt.
-
-### Fixed — 2026-08-28 — een run over de hele organisatie past nu binnen de API-limiet
-
-Vóór de eerste org-brede run nagerekend, en dat was nodig: de aanpak kostte **13.860 aanroepen**
-voor 385 repository's, op een limiet van 5.000 per uur. Bijna drie keer over, met een run die
-halverwege was blijven staan. Twee fouten van mij:
-
-**`REPO_MAX_PR=0` deed het tegenovergestelde van wat de hint beloofde.** GitHub negeert
-`per_page=0` en gebruikt zijn eigen default — gemeten kwamen er **21** pull requests terug, elk
-met een eigen review-aanroep. De instelling die de run goedkoop moest maken, was juist de
-duurste. Nu betekent 0: overslaan, in onze eigen code en niet via een parameter waarvan de
-andere kant iets anders vindt. De instellingentekst zegt dan *"niet opgevraagd (ingesteld op
-0)"* — "geen samenvoegingen gevonden" en "we hebben niet gekeken" zijn niet hetzelfde.
-
-**Elk bewijspad werd opgehaald, ook de niet-bestaande.** Tien vaste paden per repository terwijl
-er gemeten gemiddeld vier bestaan; de rest waren aanroepen om een 404 op te halen. Eén
-`git/trees`-aanroep noemt alle paden, en daarna hoeft alleen op te halen wat er is. Dat een pad
-níet bestaat blijft een waarneming — die informatie komt nu uit de boom.
-
-Live nagemeten op `ConductionNL/iso-audit`:
-
-| | per repository | 385 repository's |
-|---|---|---|
-| eerder | 36 aanroepen | 13.860 — 2,8× over de limiet |
-| nu | **9 aanroepen** | **3.465** — past, ~18 minuten |
-
-Terugval als de boom niet gelezen kan worden: dan alsnog de volledige lijst. Liever te veel
-aanroepen dan stilzwijgend concluderen dat er niets is. Een door de forge afgekapte boom wordt
-gemeld, want dan is "dit pad bestaat niet" niet meer waar te maken en mag het geen bevinding
-worden.
+**Gevolg dat opvalt:** 23 clausulenummers komen nu in beide normen voor, tegen 18 eerder — beide
+volgen Annex SL, dus 27001 §7.5 heet net als 9001 §7.5 "Gedocumenteerde informatie". Precies
+daarom draagt een koppeling zijn norm mee en niet alleen een nummer.
 
 ### Added — 2026-08-28 — verbruik bij de API-key
 

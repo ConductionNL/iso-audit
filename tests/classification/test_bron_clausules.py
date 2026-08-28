@@ -44,26 +44,26 @@ def test_elke_gekoppelde_clausule_bestaat_in_de_norm_db() -> None:
 def test_de_repository_instellingen_raken_toegang_en_wijzigingsbeheer() -> None:
     """Vier-ogen is een instelling op een branch, niet een zin in een handboek."""
     koppeling = voor_repo_document("instellingen")
-    assert ("8.4", "27001") in koppeling
-    assert ("8.32", "27001") in koppeling
+    assert ("A.8.4", "27001") in koppeling
+    assert ("A.8.32", "27001") in koppeling
 
 
 def test_security_md_hangt_aan_kwetsbaarhedenbeheer() -> None:
-    assert ("8.8", "27001") in voor_repo_document("SECURITY.md")
+    assert ("A.8.8", "27001") in voor_repo_document("SECURITY.md")
 
 
 def test_codeowners_hangt_aan_rollen_en_wijzigingsbeheer() -> None:
     for pad in ("CODEOWNERS", ".github/CODEOWNERS"):
         koppeling = voor_repo_document(pad)
-        assert ("5.2", "27001") in koppeling, pad
-        assert ("8.32", "27001") in koppeling, pad
+        assert ("A.5.2", "27001") in koppeling, pad
+        assert ("A.8.32", "27001") in koppeling, pad
 
 
 @pytest.mark.parametrize("pad", [".github/workflows/ci.yml", ".forgejo/workflows/test.yaml"])
 def test_workflows_raken_ontwikkeling_scheiding_en_wijziging(pad: str) -> None:
     """Beide forges, want de mapnaam verschilt en de eis niet."""
     koppeling = voor_repo_document(pad)
-    assert {("8.25", "27001"), ("8.31", "27001"), ("8.32", "27001")} == set(koppeling)
+    assert {("A.8.25", "27001"), ("A.8.31", "27001"), ("A.8.32", "27001")} == set(koppeling)
 
 
 def test_een_onbekend_pad_levert_niets_op() -> None:
@@ -72,18 +72,18 @@ def test_een_onbekend_pad_levert_niets_op() -> None:
 
 
 def test_de_privacyverklaring_hangt_aan_privacy() -> None:
-    assert voor_webpagina("https://www.conduction.nl/privacy/") == (("5.34", "27001"),)
+    assert voor_webpagina("https://www.conduction.nl/privacy/") == (("A.5.34", "27001"),)
 
 
 def test_een_subpagina_erft_de_koppeling() -> None:
     """`/privacy/` en `/privacy/cookies/` gaan over hetzelfde."""
-    assert voor_webpagina("https://x.nl/privacy/cookies/") == (("5.34", "27001"),)
+    assert voor_webpagina("https://x.nl/privacy/cookies/") == (("A.5.34", "27001"),)
 
 
 def test_de_voorwaardenpagina_raakt_beide_normen() -> None:
     """Een SLA is een contractuele eis (27001 §5.31) én een eis aan de dienst (9001 §8.2)."""
     koppeling = voor_webpagina("https://www.conduction.nl/terms/")
-    assert ("5.31", "27001") in koppeling
+    assert ("A.5.31", "27001") in koppeling
     assert ("8.2", "9001") in koppeling
 
 
@@ -119,7 +119,7 @@ def test_een_security_md_zonder_normtermen_valt_niet_buiten_de_boot() -> None:
     }
     gekoppeld, niet = _koppel([doc])
     assert not niet
-    assert ("8.8", "27001") in gekoppeld[0]["clausule_normen"]
+    assert ("A.8.8", "27001") in gekoppeld[0]["clausule_normen"]
 
 
 def test_de_repository_instellingen_landen_op_wijzigingsbeheer() -> None:
@@ -130,8 +130,8 @@ def test_de_repository_instellingen_landen_op_wijzigingsbeheer() -> None:
         "tekst": "Branch-bescherming op de hoofdbranch: niet ingesteld.",
     }
     gekoppeld, _ = _koppel([doc])
-    assert ("8.32", "27001") in gekoppeld[0]["clausule_normen"]
-    assert ("8.4", "27001") in gekoppeld[0]["clausule_normen"]
+    assert ("A.8.32", "27001") in gekoppeld[0]["clausule_normen"]
+    assert ("A.8.4", "27001") in gekoppeld[0]["clausule_normen"]
 
 
 def test_een_webpagina_landt_op_zijn_eis() -> None:
@@ -142,7 +142,7 @@ def test_een_webpagina_landt_op_zijn_eis() -> None:
         "tekst": "Privacy statement.",
     }
     gekoppeld, _ = _koppel([doc])
-    assert ("5.34", "27001") in gekoppeld[0]["clausule_normen"]
+    assert ("A.5.34", "27001") in gekoppeld[0]["clausule_normen"]
 
 
 def test_de_zoektermen_blijven_gewoon_draaien() -> None:
@@ -156,7 +156,7 @@ def test_de_zoektermen_blijven_gewoon_draaien() -> None:
     }
     gekoppeld, _ = _koppel([doc])
     ids = {cid for cid, _ in gekoppeld[0]["clausule_normen"]}
-    assert "8.8" in ids, "vaste koppeling ontbreekt"
+    assert "A.8.8" in ids, "vaste koppeling ontbreekt"
     assert len(ids) > 1, f"zoektermen leverden niets extra's: {ids}"
 
 
