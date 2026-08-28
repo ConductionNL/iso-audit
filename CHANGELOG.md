@@ -6,6 +6,28 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-28 — verbruik bij de API-key
+
+Gevraagd was het credit-saldo bij de sleutel. **Dat kan niet**, en dat is gemeten en niet
+aangenomen: `cost_report` en `usage_report` geven met de geconfigureerde key een 401 — *"The
+Admin API requires an Admin API key"* — en zo'n key kan alleen een org-owner maken. Bovendien
+geeft dat endpoint uitgaven en geen resterend tegoed; een saldo-endpoint bestaat niet in de
+publieke API.
+
+Wat wél kan met wat er al lag: het portaal legt per run de werkelijke kosten vast (bedrag,
+model, aantal aanroepen, peildatum). Die stonden alleen in het run-record en nergens bij elkaar.
+De vraag achter "hoeveel credit heb ik nog" is in de praktijk "wat verbruikt dit ding", en dát
+is met eigen gemeten cijfers te beantwoorden.
+
+De Claude-kaart toont nu: **Verbruikt: $0,79 over 1 run, 129 modelaanroepen**, met eronder
+letterlijk dat het gaat om wat dit portaal heeft uitgegeven en niet om het accountsaldo. Een
+getal dat als saldo leest terwijl het dat niet is, is erger dan geen getal.
+
+Runs zonder bedrag (sim-runs, afgebroken runs) tellen niet mee — die als 0 meerekenen zou
+suggereren dat er gratis gedraaid is. Een onleesbare regel wordt overgeslagen: een
+configuratiescherm dat omvalt op één rare regel in een append-only bestand, is niet te
+repareren.
+
 ### Fixed — 2026-08-28 — een adres zonder `https://` levert geen lege bron meer
 
 De auditor vulde `www.conduction.nl` in en de website-bron leverde **nul pagina's**: `urljoin`

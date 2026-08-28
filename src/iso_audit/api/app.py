@@ -395,6 +395,11 @@ def create_app(
             # als wat er gefactureerd wordt. Sinds 2026-08-20 staat de tabel op het
             # werkelijke tarief; de UI hoort te zeggen welke van de twee ze ziet.
             "prijzen_grondslag": PRIJZEN_GRONDSLAG,
+            # Wat dit portaal heeft uitgegeven — niet het accountsaldo. Dat laatste is met een
+            # gewone API-key niet op te vragen (de Admin API weigert hem), en een saldo-endpoint
+            # bestaat sowieso niet. De vraag achter "hoeveel credit heb ik nog" is in de praktijk
+            # "wat verbruikt dit ding", en dát kunnen we met gemeten eigen cijfers beantwoorden.
+            "verbruik": ov.verbruik(registry.root),
             **sessie,
         }
 

@@ -596,6 +596,12 @@ function anthropicKaart(a){
       rapportgeneratie draaien altijd op Haiku.</div>
     <div class="mini">Tarieven gecontroleerd op ${esc(a.prijzen_peildatum||"")}
       (${esc(a.prijzen_grondslag||"")}).</div>
+    ${a.verbruik ? `<div class="mini" data-tip="${esc(a.verbruik.toelichting||"")}">
+      <strong>Verbruikt: $${(a.verbruik.usd||0).toFixed(2)}</strong>
+      over ${a.verbruik.runs||0} run(s), ${a.verbruik.calls||0} modelaanroepen.
+      ${a.verbruik.modellen && a.verbruik.modellen.length
+        ? esc(a.verbruik.modellen.map(modelLabel).join(", ")) + "." : ""}
+      <br>Dit is wat dit portaal heeft uitgegeven, niet het saldo van het account.</div>` : ""}
   </div>`;
 }
 function modelLabel(m){

@@ -120,3 +120,54 @@ def alles(registry: AuditRegistry) -> list[AuditOverzicht]:
     ]
     # Periode aflopend, dan norm — `2026-Q3` sorteert lexicografisch correct.
     return sorted(regels, key=lambda r: (r.periode, r.normen), reverse=True)
+
+
+def verbruik(root: Path) -> dict[str, object]:
+    """Wat dit portaal aan modelkosten heeft uitgegeven, uit de eigen run-records.
+
+    **Niet het accountsaldo.** Dat is met een gewone API-key niet op te vragen: `cost_report` en
+    `usage_report` vragen een Admin API key, en zelfs die geeft uitgaven en geen resterend
+    tegoed. Een getal dat als saldo leest terwijl het dat niet is, is erger dan geen getal —
+    vandaar de toelichting die meegaat.
+
+    Runs zonder bedrag (een sim-run, een afgebroken run) tellen niet mee. Die als 0 meerekenen
+    zou suggereren dat er gratis gedraaid is.
+
+    Een onleesbare regel wordt overgeslagen: een configuratiescherm dat omvalt op één rare regel
+    in een append-only bestand, is niet te repareren.
+    """
+    totaal = 0.0
+    calls = 0
+    runs = 0
+    modellen: set[str] = set()
+    peildatum = ""
+    for pad in sorted(Path(root).glob("*/runs.jsonl")):
+        for regel in pad.read_text(encoding="utf-8").splitlines():
+            if not regel.strip():
+                continue
+            try:
+                record = json.loads(regel)
+            except json.JSONDecodeError:
+                continue
+            kosten = record.get("kosten") or {}
+            bedrag = kosten.get("usd")
+            if not bedrag:
+                continue
+            totaal += float(bedrag)
+            calls += int(kosten.get("calls") or 0)
+            runs += 1
+            if kosten.get("model"):
+                modellen.add(str(kosten["model"]))
+            peildatum = str(kosten.get("peildatum") or peildatum)
+    return {
+        "usd": round(totaal, 4),
+        "calls": calls,
+        "runs": runs,
+        "modellen": sorted(modellen),
+        "peildatum": peildatum,
+        "toelichting": (
+            "Wat dit portaal aan modelkosten heeft uitgegeven, opgeteld uit de eigen "
+            "run-records. Dit is niet het saldo van het account: dat is met een gewone "
+            "API-key niet op te vragen."
+        ),
+    }
