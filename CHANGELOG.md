@@ -6,6 +6,31 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-27 — de zwaarste NC's staan bovenaan in de memo
+
+De auditor bevestigde 47 NC's en de geëxporteerde memo werd 27 pagina's. De eerste ingeving was
+een bovengrens op het aantal NC-blokken. Die is er niet gekomen, en de reden weegt zwaarder dan
+de paginatelling: **zo'n grens laat NC's buiten de memo vallen op omvang, zonder dat een mens
+erover besliste en zonder vastgelegde reden.**
+
+Wat niet in de memo thuishoort, wordt in de **triage** uitgesloten. Daar legt de append-only
+trail vast wie dat besloot en waarom. De memo blijft daarmee een gevolg van auditor-beslissingen
+in plaats van een selectie die het tool zelf maakt — dat is de auditor-spiegel, de capability
+die dit tool draagt.
+
+Wat wél verandert is de **volgorde**: zwaarte vóór omvang. Een thema met een `major`-bevinding
+staat bovenaan, ook als het klein is, zodat een lezer die na één blok stopt het zwaarste heeft
+gezien. `Finding.ernst` is daarvoor toegevoegd aan het memo-model.
+
+Op de werkset van 26-08 was `ernst` op alle 47 leeg — de review is er niet over gelopen — en dan
+valt de ordening terug op omvang. Zwaarte verzinnen waar die niet gemeten is, zou erger zijn dan
+een grovere volgorde.
+
+**Wat dit openlaat:** er is geen triage-status voor "dit is een echte NC, maar hij hoort niet in
+déze memo". `niet_valide` betekent false positive en `follow_up` betekent bewijs buiten
+tool-scope. De auditor gebruikt voorlopig `niet_valide` met een reden in de trail; het onderscheid
+draagt dan volledig op die reden, dus die moet inhoudelijk zijn en niet "auditsessie (bulk)".
+
 ### Added — 2026-08-26 — een hele organisatie als scope: `github:ConductionNL/*`
 
 De API heeft er inderdaad iets voor: `GET /orgs/{org}/repos`. 414 namen intypen is geen

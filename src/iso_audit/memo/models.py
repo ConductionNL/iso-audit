@@ -71,6 +71,9 @@ class Finding(BaseModel):
     examples: list[str] = Field(default_factory=list)
     kern: str = ""
     """Synthese-zin uit de autonome review; zie `NCBlock.kern`."""
+    ernst: str = ""
+    """`major` of `minor`, uit de review. Leeg als die niet gedraaid heeft — en dan valt de
+    ordening terug op omvang in plaats van zwaarte te verzinnen."""
     triage_status: TriageStatus = "open"
     # Bij follow_up: LLM-suggestie met wie het bewijs te verifiëren (voorstel
     # tot uitsluiting). Auditor maakt de afspraak.
@@ -205,6 +208,11 @@ class AuditMemo(BaseModel):
     lead_summary: str
     context: MemoContext
     nc_blocks: list[NCBlock]
+    nc_note: str = ""
+    """Hoeveel bevestigde NC's níet in de memo staan, en waar ze wél staan.
+
+    Zonder deze regel leest een memo met drie blokken als "er zijn drie NC's". Ze zijn allemaal
+    bevestigd; de memo toont er minder."""
     improvements: list[ImprovementBlock]
     improvements_note: str = ""
     """Welke thema's het niet in de memo haalden, en waar ze staan.

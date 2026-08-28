@@ -217,10 +217,18 @@ def build_memo(
     # Eén blok per thema, niet per bevinding: 47 bevestigde NC's gaven 47 blokken en 35
     # pagina's (gemeten 2026-08-26), terwijl het handgemaakte Q2-memo er twee had. Zie
     # `memo/groepering.py` voor waarom op thema en niet op clausule gebundeld wordt.
+    # Geen bovengrens op het aantal NC-blokken, en dat is een bewuste keuze. Zo'n grens laat
+    # NC's buiten de memo vallen op omvang, zonder dat een mens erover besliste en zonder
+    # vastgelegde reden — precies andersom dan het hoort. Wat niet in de memo thuishoort, wordt
+    # in de **triage** uitgesloten, en dáár legt de trail vast wie dat besloot en waarom.
+    #
+    # De memo blijft daarmee een gevolg van auditor-beslissingen in plaats van een selectie die
+    # het tool zelf maakt. Dat is de auditor-spiegel, en die weegt zwaarder dan een paginatelling.
     nc_blocks = [
         _nc_block(groep, findings, norm_db, detector, lang, f"NC {i}")
         for i, groep in enumerate(groepeer_ncs(findings), start=1)
     ]
+    nc_note = ""
     # Verbeterpunten bundelen op thema en niet op clausule: op de werkset van 2026-08-25 haalde
     # geen enkele clausule de drempel, terwijl de 53 OFI's zich over 16 thema's verdeelden.
     # Daar zitten de patronen, en een verbeteradvies gaat over een patroon.
@@ -260,6 +268,7 @@ def build_memo(
         lead_summary=memo_input.lead_summary,
         context=memo_input.context,
         nc_blocks=nc_blocks,
+        nc_note=nc_note,
         improvements=improvements,
         improvements_note=improvements_note,
         historical_ncs=historical_ncs,

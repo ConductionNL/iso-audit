@@ -41,6 +41,16 @@ class Themagroep:
         return sorted({f.clause for f in self.bevindingen})
 
     @property
+    def majors(self) -> int:
+        """Hoeveel bevindingen in dit blok als `major` zijn beoordeeld.
+
+        Bepaalt de volgorde vóór omvang: een zwaar gebrek hoort in de memo, ook als zijn thema
+        klein is. Is `ernst` nergens gevuld (de review draaide niet), dan is dit overal 0 en valt
+        de ordening vanzelf terug op omvang — zwaarte verzinnen zou erger zijn.
+        """
+        return sum(1 for f in self.bevindingen if (f.ernst or "").lower() == "major")
+
+    @property
     def kern(self) -> str:
         """De synthese-zin van het blok — de eerste die er een heeft.
 
@@ -120,5 +130,5 @@ def _groepeer(findings: list[Finding], *, los_bij_geen_thema: bool) -> list[Them
         per_thema[thema].append(f)
 
     groepen = [Themagroep(thema=t, bevindingen=b) for t, b in per_thema.items()]
-    groepen.sort(key=lambda g: (-len(g.bevindingen), g.thema))
+    groepen.sort(key=lambda g: (-g.majors, -len(g.bevindingen), g.thema))
     return groepen + los

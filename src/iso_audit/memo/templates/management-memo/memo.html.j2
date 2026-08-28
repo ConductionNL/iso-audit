@@ -71,6 +71,9 @@
 {% for nc in memo.nc_blocks %}
 {% include "management-memo/partials/nc.html.j2" %}
 {% endfor %}
+{% if memo.nc_note %}
+<p class="detailref">{{ memo.nc_note }}</p>
+{% endif %}
 
 {% for imp in memo.improvements %}
 {% include "management-memo/partials/improvement.html.j2" %}
