@@ -96,6 +96,26 @@ def lijst_naar(waarden: list[str]) -> str:
     return ",".join(lijst_uit(",".join(waarden)))
 
 
+HERNOEMD: dict[str, str] = {
+    "AUDIT_REPOS": "REPO_LOCATIES",
+    "GITHUB_TOKEN": "REPO_GITHUB_TOKEN",
+    "CODEBERG_TOKEN": "REPO_CODEBERG_TOKEN",
+    "GITHUB_APP_ID": "REPO_GITHUB_APP_ID",
+    "GITHUB_APP_INSTALLATION_ID": "REPO_GITHUB_APP_INSTALLATION_ID",
+    "GITHUB_APP_PRIVATE_KEY": "REPO_GITHUB_APP_PRIVATE_KEY",
+}
+"""Oude env-naam → nieuwe, voor waarden die al waren ingevuld.
+
+`GITHUB_TOKEN` moest weg omdat GitHub Actions die naam zélf in elke workflow zet: draait dit tool
+ooit in een Action, dan leest het het Actions-token in plaats van het geconfigureerde token, met
+andere rechten en zonder dat iemand het merkt. `AUDIT_REPOS` moest weg omdat elke andere bron
+`<BRON>_<VELD>` gebruikt.
+
+Een hernoeming mag een ingevulde configuratie niet stil laten omvallen — dat zou de audit
+laten draaien met een bron die de auditor dénkt te hebben gekoppeld. Vandaar deze tabel, en niet
+"opnieuw invullen"."""
+
+
 class BronConfig:
     """Bron-configuratie onder één root-directory (de PVC)."""
 
@@ -116,6 +136,16 @@ class BronConfig:
     # --- lezen ---------------------------------------------------------------
 
     def _laad(self) -> dict[str, dict[str, str]]:
+        """De opgeslagen waarden, met oude env-namen vertaald naar hun huidige.
+
+        De vertaling zit hier en niet in `naar_omgeving()`, zodat élke lezer hem krijgt: de
+        omgeving, het configuratiescherm, de health en de herkomst. Op één plek vertalen en op
+        vier plekken vergeten is precies hoe een configuratie half migreert.
+        """
+        ruw = self._uit_opslag()
+        return {bron: self._met_hernoemde_namen(velden) for bron, velden in ruw.items()}
+
+    def _uit_opslag(self) -> dict[str, dict[str, str]]:
         if secret_store.beschikbaar():
             try:
                 return secret_store.lees()
@@ -171,6 +201,21 @@ class BronConfig:
                 if waarde:
                     plat[naam] = waarde
         return plat
+
+    @staticmethod
+    def _met_hernoemde_namen(velden: dict[str, str]) -> dict[str, str]:
+        """Vervang oude env-namen door hun huidige. Een nieuwe naam wint van een oude.
+
+        Staan beide er, dan is de nieuwe wat de auditor het laatst bedoelde — de oude is dan een
+        overblijfsel van vóór de hernoeming.
+        """
+        vertaald: dict[str, str] = {}
+        for naam, waarde in velden.items():
+            vertaald.setdefault(HERNOEMD.get(naam, naam), waarde)
+        for naam, waarde in velden.items():
+            if naam not in HERNOEMD:
+                vertaald[naam] = waarde
+        return vertaald
 
     def naar_omgeving(self) -> None:
         """Zet alle opgeslagen waarden in ``os.environ``.

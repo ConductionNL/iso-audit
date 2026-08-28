@@ -6,6 +6,53 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-28 — een adres zonder `https://` levert geen lege bron meer
+
+De auditor vulde `www.conduction.nl` in en de website-bron leverde **nul pagina's**: `urljoin`
+maakt van een adres zonder schema `/sitemap.xml`, en dat is geen URL. De melding klopte wél
+("sitemap niet op te halen: No scheme supplied"), maar een tool dat een normale schrijfwijze
+afwijst en dan netjes uitlegt waarom, heeft nog steeds niets gelezen.
+
+`https://` wordt aangevuld, niet `http://`: een auditbron over een publieke website hoort niet
+stilletjes onversleuteld op te halen. Staat er al een schema, dan blijft dat staan — ook
+`http://`, want dat kan een bewuste keuze zijn voor een interne omgeving en overrulen zou de
+auditscope stil wijzigen.
+
+### Changed — 2026-08-28 — env-namen van de nieuwe bronnen volgen één patroon
+
+Twee dingen waren mis aan de namen die de repo-bron gebruikte:
+
+**`GITHUB_TOKEN` botst.** Dat is de naam die GitHub Actions zélf in elke workflow zet. Draait dit
+tool ooit in een Action, dan leest het het Actions-token in plaats van het geconfigureerde token
+— met andere rechten, en zonder dat iemand het merkt. Een audit die stilletjes met een ander
+credential leest dan geconfigureerd, is niet te verantwoorden.
+
+**`AUDIT_REPOS` brak het patroon.** Elke andere bron gebruikt `<BRON>_<VELD>`:
+`NEXTCLOUD_BASE_URL`, `JIRA_API_TOKEN`, `MIRO_API_TOKEN`, `WEBSITE_URLS`. Alleen Drive en
+Planning wijken af met `AUDIT_*`, en dat zijn de twee oudste — geen reden om de fout te herhalen.
+
+| oud | nieuw |
+|---|---|
+| `AUDIT_REPOS` | `REPO_LOCATIES` |
+| `GITHUB_TOKEN` | `REPO_GITHUB_TOKEN` |
+| `CODEBERG_TOKEN` | `REPO_CODEBERG_TOKEN` |
+| `GITHUB_APP_ID` / `_INSTALLATION_ID` / `_PRIVATE_KEY` | `REPO_GITHUB_APP_*` |
+
+**Een ingevulde configuratie valt niet stil.** De vertaling zit in `BronConfig._laad()` en niet
+in `naar_omgeving()`, zodat élke lezer hem krijgt: de omgeving, het configuratiescherm, de health
+en de herkomst. Op één plek vertalen en op vier plekken vergeten is precies hoe een configuratie
+half migreert. Staan een oude en een nieuwe naam allebei in de opslag, dan wint de nieuwe — dat
+is wat de auditor het laatst bedoelde.
+
+De env-namen staan nergens in de UI; die toont labels ("Repositories", "GitHub-token") met een
+tooltip. De hernoeming is dus alleen zichtbaar voor wie het cluster-Secret of het YAML-bestand
+leest — en juist daar telt consistentie.
+
+**Testisolatie:** de nieuwe test schreef via `naar_omgeving()` rechtstreeks in `os.environ` en
+liet `REPO_LOCATIES` staan, waarna `RepoSource()` verderop in de suite dácht dat er repositories
+geconfigureerd waren. Nu vervangt de test `os.environ` door een kopie. Een test die de volgende
+test beïnvloedt, meet niets.
+
 ### Changed — 2026-08-27 — de zwaarste NC's staan bovenaan in de memo
 
 De auditor bevestigde 47 NC's en de geëxporteerde memo werd 27 pagina's. De eerste ingeving was

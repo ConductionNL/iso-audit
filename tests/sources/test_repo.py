@@ -168,8 +168,8 @@ def test_zonder_token_werkt_de_bron_maar_waarschuwt_hij(monkeypatch: pytest.Monk
     "Fout" zou hier onwaar zijn en de auditor laten denken dat de bron niets doet. Wat er wél
     ontbreekt is de branch-bescherming, en die blijft eerlijk op "niet vast te stellen" staan.
     """
-    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-    monkeypatch.delenv("CODEBERG_TOKEN", raising=False)
+    monkeypatch.delenv("REPO_GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("REPO_CODEBERG_TOKEN", raising=False)
     gezondheid = RepoSource([{"forge": "github", "eigenaar": "x", "naam": "y"}]).healthcheck()
     assert gezondheid["status"] == "ok"
     assert "geen token voor github" in str(gezondheid["waarschuwing"])
@@ -177,7 +177,7 @@ def test_zonder_token_werkt_de_bron_maar_waarschuwt_hij(monkeypatch: pytest.Monk
 
 
 def test_met_token_waarschuwt_de_health_niet(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GITHUB_TOKEN", "geheim")
+    monkeypatch.setenv("REPO_GITHUB_TOKEN", "geheim")
     gezondheid = RepoSource([{"forge": "github", "eigenaar": "x", "naam": "y"}]).healthcheck()
     assert "waarschuwing" not in gezondheid
 
@@ -193,7 +193,7 @@ def test_de_bron_levert_geen_kant_en_klare_bevindingen() -> None:
 def test_de_pipeline_kan_de_bron_zonder_argumenten_bouwen(monkeypatch: pytest.MonkeyPatch) -> None:
     """`sources.get(naam)()` geeft geen argumenten mee; de env-var is de weg naar binnen."""
     monkeypatch.setenv(
-        "AUDIT_REPOS",
+        "REPO_LOCATIES",
         "github:ConductionNL/iso-audit, codeberg:conduction/conduction-website",
     )
     gezondheid = RepoSource().healthcheck()

@@ -224,7 +224,7 @@ STANDAARD: list[BronDefinitie] = [
         ),
         velden=[
             Veld(
-                naam="AUDIT_REPOS",
+                naam="REPO_LOCATIES",
                 label="Repositories",
                 lijst=True,
                 hint=(
@@ -236,7 +236,7 @@ STANDAARD: list[BronDefinitie] = [
                 ),
             ),
             Veld(
-                naam="GITHUB_TOKEN",
+                naam="REPO_GITHUB_TOKEN",
                 label="GitHub-token",
                 geheim=True,
                 verplicht=False,
@@ -247,7 +247,7 @@ STANDAARD: list[BronDefinitie] = [
                 ),
             ),
             Veld(
-                naam="GITHUB_APP_ID",
+                naam="REPO_GITHUB_APP_ID",
                 label="GitHub-App id",
                 verplicht=False,
                 hint=(
@@ -257,13 +257,13 @@ STANDAARD: list[BronDefinitie] = [
                 ),
             ),
             Veld(
-                naam="GITHUB_APP_INSTALLATION_ID",
+                naam="REPO_GITHUB_APP_INSTALLATION_ID",
                 label="GitHub-App installatie-id",
                 verplicht=False,
                 hint="Het id van de installatie op de organisatie, niet dat van de App zelf.",
             ),
             Veld(
-                naam="GITHUB_APP_PRIVATE_KEY",
+                naam="REPO_GITHUB_APP_PRIVATE_KEY",
                 label="GitHub-App private key",
                 geheim=True,
                 verplicht=False,
@@ -273,7 +273,7 @@ STANDAARD: list[BronDefinitie] = [
                 ),
             ),
             Veld(
-                naam="CODEBERG_TOKEN",
+                naam="REPO_CODEBERG_TOKEN",
                 label="Codeberg-token",
                 geheim=True,
                 verplicht=False,

@@ -44,9 +44,9 @@ from iso_audit.sources.base import Document, Finding
 
 logger = logging.getLogger(__name__)
 
-GITHUB_TOKEN_ENV = "GITHUB_TOKEN"
-CODEBERG_TOKEN_ENV = "CODEBERG_TOKEN"
-REPOS_ENV = "AUDIT_REPOS"
+GITHUB_TOKEN_ENV = "REPO_GITHUB_TOKEN"
+CODEBERG_TOKEN_ENV = "REPO_CODEBERG_TOKEN"
+REPOS_ENV = "REPO_LOCATIES"
 """Komma-gescheiden `forge:eigenaar/naam`, bv. `github:ConductionNL/iso-audit`.
 
 De komma is het opslagformaat van de env-var, niet iets dat een auditor intypt — in de UI staan

@@ -42,9 +42,9 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 logger = logging.getLogger(__name__)
 
-APP_ID_ENV = "GITHUB_APP_ID"
-INSTALLATIE_ENV = "GITHUB_APP_INSTALLATION_ID"
-PRIVATE_KEY_ENV = "GITHUB_APP_PRIVATE_KEY"
+APP_ID_ENV = "REPO_GITHUB_APP_ID"
+INSTALLATIE_ENV = "REPO_GITHUB_APP_INSTALLATION_ID"
+PRIVATE_KEY_ENV = "REPO_GITHUB_APP_PRIVATE_KEY"
 
 JWT_GELDIGHEID = 540
 """Negen minuten. GitHub weigert meer dan tien; negen laat ruimte voor klokverschil."""

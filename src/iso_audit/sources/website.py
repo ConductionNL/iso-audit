@@ -79,6 +79,27 @@ def urls_uit_sitemap(xml: str) -> list[str]:
     ]
 
 
+def normaliseer_adres(adres: str) -> str:
+    """Maak van een ingevuld adres een bruikbare URL.
+
+    De auditor vulde `www.conduction.nl` in en de bron leverde nul pagina's: `urljoin` maakt van
+    een adres zonder schema `/sitemap.xml`, en dat is geen URL. De melding klopte, maar een tool
+    dat een normale schrijfwijze afwijst en dan netjes uitlegt waarom, heeft nog steeds niets
+    gelezen.
+
+    `https://` en niet `http://`: een auditbron over een publieke website hoort niet stilletjes
+    onversleuteld op te halen. Staat er al een schema, dan blijft dat staan — ook `http://`, want
+    dat kan een bewuste keuze zijn voor een interne omgeving en overrulen zou de scope stil
+    wijzigen.
+    """
+    schoon = adres.strip().rstrip("/")
+    if not schoon:
+        return ""
+    if "://" not in schoon:
+        schoon = f"https://{schoon}"
+    return schoon
+
+
 @register
 class WebsiteSource:
     """Bron-adapter voor gepubliceerde webpagina's."""
@@ -89,7 +110,7 @@ class WebsiteSource:
         ruw = sites if sites is not None else os.environ.get(WEBSITES_ENV, "")
         if isinstance(ruw, str):
             ruw = [s.strip() for s in ruw.split(",") if s.strip()]
-        self._sites: list[str] = list(ruw)
+        self._sites: list[str] = [a for a in (normaliseer_adres(x) for x in ruw) if a]
         self._max = int(os.environ.get("WEBSITE_MAX_PAGINAS") or MAX_PAGINAS)
         self._vertraging = float(os.environ.get(VERTRAGING_ENV) or 0.2)
         self._sessie = requests.Session()
