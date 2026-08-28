@@ -67,6 +67,24 @@ _PATRONEN: tuple[tuple[Soort, re.Pattern[str]], ...] = (
 )
 
 
+class EigenFoutError(Exception):
+    """Een fout waarvan de tekst van ons is, en die dus ongewijzigd naar de auditor mag.
+
+    De normalisatie hieronder vervangt élke foutmelding door een veilige standaardtekst, omdat
+    een leveranciersrespons een URL met credential of een tokenfragment kan bevatten — tot
+    2026-08-14 landde dat rechtstreeks in de browser.
+
+    Maar een melding die wij zelf schrijven ("hoofdstuk 4 bestaat niet in deze norm; beschikbaar
+    zijn 5, 6, 7 en 8") bevat per definitie geen leveranciersrespons, en is precies wat de
+    auditor nodig heeft. Op 2026-08-28 kreeg hij daarvoor "De verbinding kon niet worden gelegd.
+    Zie het serverlog" te zien — een verwijzing naar een log waar hij niet bij kan, voor een
+    probleem dat niets met een verbinding te maken had.
+
+    Het onderscheid is het **type** en niet de inhoud: wie deze fout opgooit, verklaart daarmee
+    dat de tekst veilig is. Op inhoud filteren zou raden zijn.
+    """
+
+
 def classificeer(melding: str) -> Soort:
     """Bepaal de soort fout uit een ruwe melding. Alleen de soort komt eruit."""
     for soort, patroon in _PATRONEN:
@@ -81,6 +99,11 @@ def normaliseer(exc: BaseException, *, bron: str) -> tuple[Soort, str]:
     De ruwe melding gaat naar het serverlog omdat je zonder hem niets kunt diagnosticeren.
     Hij gaat **niet** naar de client, want daar hoort geen leveranciersrespons.
     """
+    if isinstance(exc, EigenFoutError):
+        # Onze eigen tekst, dus geen normalisatie. Wel loggen: het serverlog hoort het volledige
+        # verloop van een run te bevatten, ook de fouten die de auditor al ziet.
+        _log.warning('{"event": "eigen_fout", "bron": "%s", "detail": %r}', bron, str(exc)[:500])
+        return "niet_geconfigureerd", str(exc)
     ruw = f"{type(exc).__name__}: {exc}"
     soort = classificeer(ruw)
     _log.warning(

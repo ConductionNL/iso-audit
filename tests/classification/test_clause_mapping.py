@@ -63,7 +63,12 @@ def test_filter_clause_map_hoofdstuk(map_9001: dict[str, Any]) -> None:
 
 
 def test_filter_clause_map_geen_match(map_9001: dict[str, Any]) -> None:
-    with pytest.raises(ValueError, match="Geen clausules gevonden"):
+    """`EigenFoutError` en geen `ValueError`: deze tekst hoort ongewijzigd bij de auditor aan
+    te komen. Als gewone fout werd hij door `config.verbinding.normaliseer` vervangen door "De
+    verbinding kon niet worden gelegd" — zie `tests/config/test_eigen_fout.py`."""
+    from iso_audit.config.verbinding import EigenFoutError
+
+    with pytest.raises(EigenFoutError, match="Geen clausules gevonden"):
         filter_clause_map(map_9001, "99")
 
 

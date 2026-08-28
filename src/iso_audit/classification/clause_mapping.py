@@ -17,6 +17,8 @@ from typing import Any
 
 import yaml
 
+from iso_audit.config.verbinding import EigenFoutError
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,10 +38,15 @@ def filter_clause_map(clause_map: dict[str, Any], chapter: str) -> dict[str, Any
         if k.startswith(prefix) or k == chapter
     }
     if not gefilterd:
-        beschikbaar = sorted({k.split(".")[0] for k in clause_map.get("clausules", {})})
-        raise ValueError(
-            f"Geen clausules gevonden voor hoofdstuk {chapter!r}. "
-            f"Beschikbare hoofdstukken: {', '.join(beschikbaar)}"
+        # `EigenFoutError` en geen `ValueError`: deze tekst is van ons en hoort ongewijzigd bij de
+        # auditor aan te komen. Als `ValueError` werd hij door de normalisatie vervangen door
+        # "De verbinding kon niet worden gelegd" — zie `config/verbinding.EigenFoutError`.
+        beschikbaar = sorted(
+            {k.split(".")[0] for k in clause_map.get("clausules", {})}, key=lambda x: int(x)
+        )
+        raise EigenFoutError(
+            f"Geen clausules gevonden voor hoofdstuk {chapter!r} in deze norm. "
+            f"Beschikbare hoofdstukken: {', '.join(beschikbaar)}."
         )
     result = dict(clause_map)
     result["clausules"] = gefilterd

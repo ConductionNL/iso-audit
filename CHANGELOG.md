@@ -6,6 +6,38 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-28 — onze eigen foutmeldingen komen ongewijzigd bij de auditor aan
+
+De auditor koos hoofdstuk 4 voor ISO 27001 en zag: *"FOUT: De verbinding kon niet worden gelegd.
+Zie het serverlog voor details."* De echte melding stond in het log en was volstrekt duidelijk:
+*"Geen clausules gevonden voor hoofdstuk '4'. Beschikbare hoofdstukken: 5, 6, 7, 8."* Een
+verwijzing naar een serverlog waar hij niet bij kan, voor een probleem dat niets met een
+verbinding te maken had.
+
+De normalisatie die dat verving bestaat met goede reden: `run()` vangt élke pipeline-fout, ook
+die van Google, Jira en Anthropic, en zo'n tekst kan een URL met credential of een tokenfragment
+bevatten. Tot 2026-08-14 landde dat rechtstreeks in de browser.
+
+Nieuw is `EigenFoutError`: wie die opgooit, verklaart dat de tekst van ons is en dus veilig. Het
+onderscheid is het **type** en niet de inhoud — op inhoud filteren zou raden zijn. De ruwe
+melding gaat nog steeds naar het serverlog, want dat hoort het volledige verloop van een run te
+bevatten.
+
+### Bekend gat — de 27001-norm-DB bevat alleen Annex A
+
+Hierdoor kwam iets ernstigers boven water. `examples/norms/iso-27001-2022.yaml` bevat **93
+clausules, verdeeld over hoofdstuk 5 t/m 8** — dat zijn de Annex A-maatregelen. De
+management-systeemclausules **4 t/m 10** (context, leiderschap, planning, ondersteuning,
+uitvoering, evaluatie, verbetering) staan er niet in, en die zijn net zo goed certificeringseis.
+Voor ISO 9001 staan de hoofdstukken 4 t/m 10 er wél.
+
+Dit is niet stilletjes op te lossen, want de nummers botsen: 27001 §5.1 is "Leiderschap en
+betrokkenheid" en A.5.1 is "Beleid voor informatiebeveiliging". De DB gebruikt nu `5.1` voor de
+Annex A-maatregel. Ze allebei opnemen vraagt dat de Annex A-maatregelen `A.`-prefix krijgen —
+wat de norm zelf ook doet — en dat raakt de 271 bestaande bevindingen van de lopende audit.
+
+Genoteerd als openstaand punt, niet eigenmachtig gewijzigd.
+
 ### Fixed — 2026-08-28 — navigatie en voettekst zijn geen inhoud
 
 De eerste echte website-ingest bracht 137 pagina's van conduction.nl binnen — en meteen een fout
