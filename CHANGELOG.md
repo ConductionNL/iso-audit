@@ -6,6 +6,28 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-28 — navigatie en voettekst zijn geen inhoud
+
+De eerste echte website-ingest bracht 137 pagina's van conduction.nl binnen — en meteen een fout
+die alleen bij echte data zichtbaar wordt: **135 van die 137 matchten op §5.34 (privacy)**. Niet
+omdat ze over privacy gaan, maar omdat in de voettekst van elke pagina "© 2026 Privacy · Terms ·
+ISO" staat, en in de navigatie "Apps Solutions Academy Support About".
+
+Dat is geen kleine onzuiverheid. Een clausule-koppeling die op boilerplate matcht, levert honderd
+bevindingen op over een eis waar de pagina niets over zegt — en dan is de dekking een getal dat
+niets betekent. Precies de soort stille onwaarheid waar dit tool bevindingen over hoort te
+schrijven.
+
+`<nav>`, `<footer>`, `<header>` en `<aside>` gaan er nu uit, net als `<script>` en `<style>`, en
+de tekst komt uit `<main>`. Op `/about/`: van 4.795 naar 4.037 tekens, zonder "Privacy", "Terms",
+"Solutions" of "Academy" — en met de inhoud intact.
+
+Heeft een pagina geen `<main>`, dan valt het terug op de hele body minus die tags. Liever te veel
+dan niets: een lege pagina leest als "hier staat niets" terwijl er wel degelijk iets stond.
+
+De al ingelezen pagina's dragen nog de oude tekst; die moeten met `ISO_AUDIT_OPNIEUW_LEZEN`
+opnieuw opgehaald worden voordat er geclassificeerd wordt.
+
 ### Fixed — 2026-08-28 — een run over de hele organisatie past nu binnen de API-limiet
 
 Vóór de eerste org-brede run nagerekend, en dat was nodig: de aanpak kostte **13.860 aanroepen**

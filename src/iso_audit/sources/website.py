@@ -44,7 +44,14 @@ MAX_PAGINA_TEKENS = 200_000
 VERTRAGING_ENV = "WEBSITE_VERTRAGING"
 GEBRUIKERSAGENT = "iso-audit (ISO 9001/27001 audittool; read-only)"
 
-_TAGS_WEG = re.compile(r"<(script|style)[^>]*>.*?</\1>", re.S | re.I)
+_TAGS_WEG = re.compile(r"<(script|style|nav|footer|header|aside)[^>]*>.*?</\1>", re.S | re.I)
+"""Wat op elke pagina hetzelfde is, is geen inhoud van díe pagina.
+
+Gemeten 2026-08-28: 135 van de 137 pagina's van conduction.nl matchten op §5.34 omdat in de
+voettekst "© 2026 Privacy · Terms · ISO" staat. Een clausule-koppeling die op boilerplate matcht,
+levert honderd bevindingen op over een eis waar de pagina niets over zegt."""
+
+_MAIN = re.compile(r"<main[^>]*>(.*?)</main>", re.S | re.I)
 _MARKUP = re.compile(r"<[^>]+>")
 _WITRUIMTE = re.compile(r"\s+")
 
@@ -54,8 +61,17 @@ def zichtbare_tekst(html: str) -> str:
 
     Opgeslagen als tekst en niet als HTML, net als bij een PDF of ODF-document: de classificatie
     leest tekst, en opgeslagen markup maakt elke latere zoekopdracht onbetrouwbaar.
+
+    Navigatie en voettekst tellen niet mee: die staan op élke pagina en zeggen dus niets over
+    déze. Zie `_TAGS_WEG` voor wat dat concreet aanrichtte.
     """
     zonder = _TAGS_WEG.sub(" ", html)
+    # `<main>` is de inhoud van déze pagina. Geen `<main>`? Dan de hele body minus wat hierboven
+    # al weg is — liever te veel dan niets, want een lege pagina leest als "hier staat niets"
+    # terwijl er wel degelijk iets stond.
+    kern = _MAIN.search(zonder)
+    if kern:
+        zonder = kern.group(1)
     return _WITRUIMTE.sub(" ", _MARKUP.sub(" ", zonder)).strip()
 
 
