@@ -78,7 +78,7 @@ die GitHub op de organisatiepagina toont. Daar staat wat een organisatie over zi
 zijn en te maken, en dat is 9001 §4.1-materiaal. Tot 2026-08-26 stond `README.md` zelfs helemaal
 niet in deze lijst terwijl de tekst hierboven al beweerde van wel."""
 
-WORKFLOWMAPPEN: tuple[str, ...] = (".github/workflows", ".forgejo/workflows")
+WORKFLOWMAPPEN_PREFIX: tuple[str, ...] = (".github/workflows/", ".forgejo/workflows/")
 """Geautomatiseerde poorten: §8.25 en §8.31. Beide forges, want de mapnaam verschilt."""
 
 MAX_PR = 20
@@ -317,18 +317,25 @@ class RepoSource:
                 )
 
     def _paden(self, client: ForgeClient, verwijzing: RepoVerwijzing) -> list[str]:
-        """De op te halen paden. Een map die niet gelezen kon worden, wordt gemeld.
+        """De op te halen paden: alleen bewijspaden die in de repository bestaan.
 
-        Zonder die melding ziet "geen workflows" er identiek uit als "ik mocht de workflowmap
-        niet lezen" — het eerste is een bevinding, het tweede een gat in de dekking.
+        Eén boom-aanroep in plaats van tien losse pad-aanroepen. Gemeten bestaan er gemiddeld
+        vier van de tien bewijspaden, dus de rest waren aanroepen om een 404 op te halen — over
+        385 repository's het verschil tussen wel en niet binnen de limiet van 5.000 per uur.
+
+        Dat een pad níet bestaat blijft een waarneming; die informatie komt nu uit de boom in
+        plaats van uit een 404. Kon de boom niet gelezen worden, dan valt dit terug op de
+        volledige lijst: liever te veel aanroepen dan stilzwijgend concluderen dat er niets is.
         """
-        paden = list(BEWIJSPADEN)
-        for map_ in WORKFLOWMAPPEN:
-            gevonden, reden = client.bestanden_in_map(verwijzing.eigenaar, verwijzing.naam, map_)
-            paden.extend(gevonden)
-            if reden:
-                self.overgeslagen[f"{verwijzing.sleutel}:{map_}"] = reden
-                logger.warning("Map %s van %s niet gelezen: %s", map_, verwijzing.sleutel, reden)
+        boom, reden = client.paden(verwijzing.eigenaar, verwijzing.naam)
+        if reden:
+            self.overgeslagen[f"{verwijzing.sleutel}:bestandslijst"] = reden
+            logger.warning("Bestandslijst van %s: %s", verwijzing.sleutel, reden)
+        if not boom:
+            return list(BEWIJSPADEN)
+        aanwezig = set(boom)
+        paden = [p for p in BEWIJSPADEN if p in aanwezig]
+        paden.extend(p for p in boom if p.startswith(WORKFLOWMAPPEN_PREFIX))
         return paden
 
     def fetch_content(self, doc: Document) -> str:

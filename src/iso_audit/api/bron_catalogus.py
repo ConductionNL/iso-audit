@@ -288,9 +288,10 @@ STANDAARD: list[BronDefinitie] = [
                 verplicht=False,
                 hint=(
                     "Over hoeveel recent samengevoegde wijzigingen het aandeel zonder review "
-                    "wordt geteld. Standaard 20; elke wijziging kost een extra aanroep. Zet dit "
-                    "op 0 bij een hele organisatie: 385 repository's x 20 is 9.625 aanroepen, "
-                    "bijna twee keer de limiet van 5.000 per uur."
+                    "wordt geteld. Elke wijziging kost een extra aanroep. 0 betekent: niet "
+                    "opvragen — nodig bij een hele organisatie, want 385 repository's kosten "
+                    "dan 3.465 aanroepen van de 5.000 per uur. Voor een handvol repository's is "
+                    "20 juist waardevol: dat is waargenomen gedrag in plaats van een instelling."
                 ),
             ),
         ],

@@ -86,6 +86,7 @@ class ForgeClient(Protocol):
     def repositories(self, eigenaar: str) -> tuple[list[str], str]: ...
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand: ...
     def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]: ...
+    def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]: ...
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen: ...
 
 
@@ -219,6 +220,29 @@ class GitHubClient:
         reden = f"{gearchiveerd} gearchiveerde repository(s) overgeslagen" if gearchiveerd else ""
         return namen, reden
 
+    def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
+        """Alle bestandspaden in de repository, in één aanroep.
+
+        Vervangt het los opvragen van elk bewijspad. Tien vaste paden ophalen waarvan er
+        gemiddeld vier bestaan, is zes aanroepen weggooien per repository — over 385
+        repository's het verschil tussen wel en niet binnen de limiet van 5.000 per uur blijven.
+
+        Een afgekapte boom (`truncated`) wordt gemeld: dan is "pad bestaat niet" niet meer waar
+        te maken, en dat mag geen bevinding worden.
+        """
+        antwoord = self._get(f"/repos/{eigenaar}/{naam}/git/trees/HEAD?recursive=1")
+        if antwoord.status_code != 200:
+            return [], duiding(antwoord)
+        d = antwoord.json()
+        paden = [str(x.get("path", "")) for x in d.get("tree", []) if x.get("type") == "blob"]
+        reden = (
+            "de bestandslijst is door de forge afgekapt; ontbrekende bestanden zijn hier niet "
+            "vast te stellen"
+            if d.get("truncated")
+            else ""
+        )
+        return paden, reden
+
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
         antwoord = self._get(f"/repos/{eigenaar}/{naam}/contents/{pad}")
         if antwoord.status_code == 404:
@@ -249,7 +273,15 @@ class GitHubClient:
         return [str(x.get("path", "")) for x in d if x.get("type") == "file"], ""
 
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
-        """Aggregaat over de laatste gesloten pull requests. Geen namen — zie de spec."""
+        """Aggregaat over de laatste gesloten pull requests. Geen namen — zie de spec.
+
+        `aantal <= 0` betekent overslaan. Dat moet hier gebeuren en niet via de API: GitHub
+        negeert `per_page=0` en gebruikt zijn eigen default — gemeten kwamen er 21 pull requests
+        terug, elk met een eigen review-aanroep. De instelling beloofde het tegenovergestelde
+        van wat er gebeurde.
+        """
+        if aantal <= 0:
+            return Wijzigingen(onbekend=True, reden="niet opgevraagd (ingesteld op 0)")
         antwoord = self._get(f"/repos/{eigenaar}/{naam}/pulls?state=closed&per_page={aantal}")
         if antwoord.status_code != 200:
             return Wijzigingen(onbekend=True, reden=duiding(antwoord))
@@ -335,6 +367,23 @@ class CodebergClient:
         reden = f"{gearchiveerd} gearchiveerde repository(s) overgeslagen" if gearchiveerd else ""
         return namen, reden
 
+    def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
+        """Zie `GitHubClient.paden`. Forgejo kent hetzelfde tree-endpoint."""
+        antwoord = _haal(
+            self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/git/trees/HEAD?recursive=true"
+        )
+        if antwoord.status_code != 200:
+            return [], duiding(antwoord)
+        d = antwoord.json()
+        paden = [str(x.get("path", "")) for x in d.get("tree", []) if x.get("type") == "blob"]
+        reden = (
+            "de bestandslijst is door de forge afgekapt; ontbrekende bestanden zijn hier niet "
+            "vast te stellen"
+            if d.get("truncated")
+            else ""
+        )
+        return paden, reden
+
     def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
         antwoord = _haal(self._sessie, f"{self.basis}/repos/{eigenaar}/{naam}/contents/{pad}")
         if antwoord.status_code == 404:
@@ -360,6 +409,9 @@ class CodebergClient:
         return [str(x.get("path", "")) for x in d if x.get("type") == "file"], ""
 
     def wijzigingen(self, eigenaar: str, naam: str, aantal: int) -> Wijzigingen:
+        """Zie `GitHubClient.wijzigingen`; `aantal <= 0` betekent ook hier overslaan."""
+        if aantal <= 0:
+            return Wijzigingen(onbekend=True, reden="niet opgevraagd (ingesteld op 0)")
         antwoord = _haal(
             self._sessie,
             f"{self.basis}/repos/{eigenaar}/{naam}/pulls?state=closed&limit={aantal}",

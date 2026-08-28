@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-28 — een run over de hele organisatie past nu binnen de API-limiet
+
+Vóór de eerste org-brede run nagerekend, en dat was nodig: de aanpak kostte **13.860 aanroepen**
+voor 385 repository's, op een limiet van 5.000 per uur. Bijna drie keer over, met een run die
+halverwege was blijven staan. Twee fouten van mij:
+
+**`REPO_MAX_PR=0` deed het tegenovergestelde van wat de hint beloofde.** GitHub negeert
+`per_page=0` en gebruikt zijn eigen default — gemeten kwamen er **21** pull requests terug, elk
+met een eigen review-aanroep. De instelling die de run goedkoop moest maken, was juist de
+duurste. Nu betekent 0: overslaan, in onze eigen code en niet via een parameter waarvan de
+andere kant iets anders vindt. De instellingentekst zegt dan *"niet opgevraagd (ingesteld op
+0)"* — "geen samenvoegingen gevonden" en "we hebben niet gekeken" zijn niet hetzelfde.
+
+**Elk bewijspad werd opgehaald, ook de niet-bestaande.** Tien vaste paden per repository terwijl
+er gemeten gemiddeld vier bestaan; de rest waren aanroepen om een 404 op te halen. Eén
+`git/trees`-aanroep noemt alle paden, en daarna hoeft alleen op te halen wat er is. Dat een pad
+níet bestaat blijft een waarneming — die informatie komt nu uit de boom.
+
+Live nagemeten op `ConductionNL/iso-audit`:
+
+| | per repository | 385 repository's |
+|---|---|---|
+| eerder | 36 aanroepen | 13.860 — 2,8× over de limiet |
+| nu | **9 aanroepen** | **3.465** — past, ~18 minuten |
+
+Terugval als de boom niet gelezen kan worden: dan alsnog de volledige lijst. Liever te veel
+aanroepen dan stilzwijgend concluderen dat er niets is. Een door de forge afgekapte boom wordt
+gemeld, want dan is "dit pad bestaat niet" niet meer waar te maken en mag het geen bevinding
+worden.
+
 ### Added — 2026-08-28 — verbruik bij de API-key
 
 Gevraagd was het credit-saldo bij de sleutel. **Dat kan niet**, en dat is gemeten en niet

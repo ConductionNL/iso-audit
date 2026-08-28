@@ -260,6 +260,9 @@ def test_een_onleesbare_workflowmap_komt_in_de_dekking() -> None:
         def bestand(self, eigenaar: str, naam: str, pad: str) -> object:
             raise AssertionError("niet nodig voor deze test")
 
+        def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
+            return [], "het token mist het recht hiervoor (403)"
+
         def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
             return [], "het token mist het recht hiervoor (403)"
 
@@ -289,6 +292,9 @@ def test_een_onleesbare_repository_komt_in_de_dekking() -> None:
             raise ForgeError("bestaat niet, of het token mag het niet zien (404)")
 
         def bestand(self, eigenaar: str, naam: str, pad: str) -> object: ...
+
+        def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
+            return [], ""
 
         def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
             return [], ""
@@ -339,6 +345,9 @@ class _OrgClient:
         )
 
     def bestand(self, eigenaar: str, naam: str, pad: str) -> object: ...
+
+    def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
+        return ["README.md"], ""
 
     def bestanden_in_map(self, eigenaar: str, naam: str, map_: str) -> tuple[list[str], str]:
         return [], ""
