@@ -80,3 +80,16 @@ def test_ook_de_repository_aanroep_duidt_de_status() -> None:
         bron = inspect.getsource(klasse.repository)
         assert "duiding(antwoord)" in bron, klasse.__name__
         assert "gaf {antwoord.status_code}" not in bron, klasse.__name__
+
+
+def test_409_is_een_lege_repository_en_geen_storing() -> None:
+    """Gemeten tijdens de eerste org-brede run: 11 van de 385 repository's gaven 409.
+
+    GitHub antwoordt letterlijk *"Git Repository is empty."* op de bestandslijst van een
+    repository zonder commits. Dat is een waarneming — er is niets om te auditen — en geen gat in
+    de dekking. "De forge gaf een onverwacht antwoord (409)" liet de auditor zoeken naar een
+    storing die er niet was.
+    """
+    tekst = duiding(_Antwoord(409))
+    assert "leeg" in tekst
+    assert "onverwacht" not in tekst

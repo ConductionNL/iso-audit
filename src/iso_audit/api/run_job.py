@@ -179,7 +179,9 @@ def verrijk_met_review(findings: list[Finding], conn: Any) -> list[Finding]:
     return findings
 
 
-def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> list[Finding]:
+def export_db_findings(
+    *, norm: str = "9001", norms_dir: str | None = None, hoofdstuk: str | None = None
+) -> list[Finding]:
     """Lees de bevindingen uit de audit-DB en map ze naar het memo-Finding-model.
 
     **Opvolgpunten blijven hier buiten.** Een openstaand punt uit Jira is geen kandidaat voor
@@ -203,10 +205,15 @@ def export_db_findings(*, norm: str = "9001", norms_dir: str | None = None) -> l
     db = laad_norm_db(norms_dir) if norms_dir else None
     conn = verbinding()
     conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT * FROM bevindingen WHERE herkomst NOT LIKE ? ORDER BY clausule_id",
-        (f"%{HERKOMST_ACHTERVOEGSEL}",),
-    ).fetchall()
+    # Norm- en hoofdstukfilter uit `_bevindingen_query`, zodat er één waarheid is over wat
+    # binnen een run-scope valt. Deze functie had een eigen query die alléén opvolgpunten
+    # wegliet: een audit op ISO 27001 hoofdstuk 4 kreeg daardoor op 2026-08-29 alle 303
+    # bevindingen die ooit in de database waren gekomen, uit beide normen en alle hoofdstukken.
+    from iso_audit.classification.findings import _bevindingen_query
+
+    basis, waarden = _bevindingen_query(norm, hoofdstuk)
+    sql = basis.replace(" ORDER BY clausule_id", " AND herkomst NOT LIKE ? ORDER BY clausule_id")
+    rows = conn.execute(sql, (*waarden, f"%{HERKOMST_ACHTERVOEGSEL}")).fetchall()
     conn.close()
     findings: list[Finding] = []
     for r in rows:
@@ -356,9 +363,15 @@ def run_live_pipeline(
     )
 
 
-def draft_from_db(*, norm: str, norms_dir: str, language: str, top_n: int) -> list[Finding]:
-    """Exporteer DB-findings en draaf de kop-NC's (na een live run)."""
-    ruw = export_db_findings(norm=norm, norms_dir=norms_dir)
+def draft_from_db(
+    *, norm: str, norms_dir: str, language: str, top_n: int, hoofdstuk: str | None = None
+) -> list[Finding]:
+    """Exporteer DB-findings en draaf de kop-NC's (na een live run).
+
+    `hoofdstuk` begrenst de export tot de run-scope. Zonder dat kreeg een audit op hoofdstuk 4
+    alle 303 bevindingen die ooit in de database waren gekomen — zie `_bevindingen_query`.
+    """
+    ruw = export_db_findings(norm=norm, norms_dir=norms_dir, hoofdstuk=hoofdstuk)
     norm_db = laad_norm_db(norms_dir)
     gedraft = draft_findings(ruw, norm_db=norm_db, language=language, top_n=top_n)
     # Nogmaals verrijken: `draft_findings` bouwt nieuwe Finding-objecten uit clusters en die

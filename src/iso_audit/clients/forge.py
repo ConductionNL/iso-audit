@@ -126,6 +126,11 @@ def duiding(antwoord: Any) -> str:
         )
     if status == 404:
         return "bestaat niet, of het token mag het niet zien (404) — GitHub geeft beide zo terug"
+    if status == 409:
+        # GitHub antwoordt hier letterlijk "Git Repository is empty." Gemeten tijdens de eerste
+        # org-brede run: 11 van de 385 repository's. Dat is een waarneming en geen storing — er
+        # valt niets te lezen omdat er niets is.
+        return "de repository is leeg; er zijn geen bestanden om te lezen (409)"
     return f"de forge gaf een onverwacht antwoord ({status})"
 
 

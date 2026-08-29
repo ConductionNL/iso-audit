@@ -851,19 +851,34 @@ def _titel(clausule: str, norm: str, samengevoegd: dict[str, Any]) -> str:
     return str(titel) if titel else clausule
 
 
-def _bevindingen_query(norm: str) -> tuple[str, tuple[str, ...]]:
-    """De query die alle bevindingen van een run teruggeeft.
+def _bevindingen_query(norm: str, hoofdstuk: str | None = None) -> tuple[str, tuple[str, ...]]:
+    """De query die de bevindingen binnen de run-scope teruggeeft.
 
     Bij `beide` zijn dat de rijen van **beide** normen én de oude rijen die letterlijk `beide`
     dragen. Filteren op alleen de run-parameter leverde na de per-norm-opslag nul bevindingen
     op — en dan krijgen de review en de memo niets te zien terwijl de database vol staat.
+
+    `hoofdstuk` begrenst de scope tot dat hoofdstuk. Zonder die begrenzing leverde een run met
+    `chapter='4'` op 2026-08-29 **303 bevindingen** met clausules als 10.2, 9.1 en A.8.16: de
+    pipeline classificeerde netjes alleen hoofdstuk 4, maar de export pakte alles wat ooit in de
+    database was gekomen. Dezelfde fout waar `RunStartRequest` bij de norm al voor waarschuwt —
+    dan liegt de memo over wat er getoetst is.
+
+    De `A.`-prefix van Bijlage A telt mee in het filter: hoofdstuk `8` levert §8.1 t/m §8.3 en
+    níet A.8.16, want dat is een maatregel en geen managementclausule. Wie de maatregelen wil,
+    typt `A.8`.
     """
     from iso_audit.classification.clause_mapping import normen_van
 
-    waarden = (*normen_van(norm), norm)
+    waarden: tuple[str, ...] = (*normen_van(norm), norm)
     plaatshouders = ",".join("?" for _ in waarden)
+    waar = f"norm IN ({plaatshouders})"
+    if hoofdstuk:
+        kop = hoofdstuk.rstrip(".")
+        waar += " AND (clausule_id = ? OR clausule_id LIKE ?)"
+        waarden = (*waarden, kop, f"{kop}.%")
     return (
-        f"SELECT * FROM bevindingen WHERE norm IN ({plaatshouders}) ORDER BY clausule_id",  # nosec B608
+        f"SELECT * FROM bevindingen WHERE {waar} ORDER BY clausule_id",  # nosec B608
         waarden,
     )
 

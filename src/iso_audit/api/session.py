@@ -612,7 +612,11 @@ class AuditSession:
             )
             self._run.log.append("Findings exporteren + kop-NC's draften…")
             drafted = draft_from_db(
-                norm=norm, norms_dir=str(self._norms_dir), language="nl", top_n=top_n
+                norm=norm,
+                norms_dir=str(self._norms_dir),
+                language="nl",
+                top_n=top_n,
+                hoofdstuk=chapter,
             )
             # AANVULLEN, niet overschrijven. Eerder deed dit `self._save(drafted)` en
             # daarmee gooide een tweede run alle triage van de eerste weg — precies

@@ -6,6 +6,34 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-29 — een run op hoofdstuk 4 levert hoofdstuk 4
+
+De eerste run op ISO 27001 hoofdstuk 4 leverde **303 bevindingen**, met clausules als 10.2, 9.1
+en A.8.16. Het run-record zei netjes `hoofdstuk: 4` en de pipeline classificeerde ook alleen
+hoofdstuk 4 — maar de export naar de werkset pakte alles wat ooit in de database was gekomen,
+uit beide normen en alle hoofdstukken.
+
+Twee oorzaken, en de tweede is de ergste:
+
+- `_bevindingen_query` kende geen hoofdstuk. Nu wel, met de `A.`-prefix meegerekend: hoofdstuk
+  `8` levert §8.1 t/m §8.3 en níet A.8.16, want dat is een maatregel en geen managementclausule.
+  Wie de maatregelen wil, typt `A.8`.
+- **`export_db_findings` had een eigen query** die alleen opvolgpunten wegliet — geen norm, geen
+  hoofdstuk. Twee queries die hetzelfde zouden moeten doen, en één ervan deed het niet. Nu loopt
+  hij door dezelfde `_bevindingen_query`, zodat er één waarheid is over wat binnen een run-scope
+  valt.
+
+Dit is dezelfde fout waar `RunStartRequest` bij de norm al voor waarschuwt: *"een run waarvan de
+scope niet meer uit de audit volgt — en dan liegt de memo over wat er getoetst is"*. Voor het
+hoofdstuk gold die redenering nog niet.
+
+### Fixed — 2026-08-29 — een lege repository is een waarneming, geen storing
+
+Tijdens de org-brede run gaven 11 van de 385 repository's een 409 op de bestandslijst. De melding
+was *"de forge gaf een onverwacht antwoord (409)"*, wat de auditor laat zoeken naar een storing.
+GitHub antwoordt daar letterlijk *"Git Repository is empty."*: er valt niets te lezen omdat er
+niets is. Dat staat nu in de melding.
+
 ### Fixed — 2026-08-28 — onze eigen foutmeldingen komen ongewijzigd bij de auditor aan
 
 De auditor koos hoofdstuk 4 voor ISO 27001 en zag: *"FOUT: De verbinding kon niet worden gelegd.
