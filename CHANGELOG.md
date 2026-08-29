@@ -6,6 +6,21 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-29 — de archiveerknop werkte niet
+
+`POST /audits/{id}/archiveer` gaf een 422 met `loc: ["query","body"]`, en `/openapi.json` gaf
+zelfs een 500. De oorzaak: `AuditArchiveren` stond *binnen* `create_app`, en met
+`from __future__ import annotations` is elke annotatie een string — FastAPI kan zo'n forward
+reference naar een lokale klasse niet oplossen en zag `body` als queryparameter.
+
+De knop stond er, de route stond er, en samen werkten ze niet. `tests/api/test_ui_archiveren.py`
+controleerde dat de UI het juiste pad aanroept, niet dat dat pad werkt: precies het gat dat een
+contract-test openlaat.
+
+Het model staat nu op moduleniveau, waar de acht andere al stonden. Zeven tests dekken de route
+af, inclusief dat `/openapi.json` klopt — dat is niet cosmetisch, elke gegenereerde client leest
+het — en dat de reden in de audittrail landt.
+
 ### Added — 2026-08-29 — Bijlage A is een eigen scope, expliciet getoetst
 
 Sinds de maatregelen de `A.`-prefix dragen, kan een auditor kiezen wát hij toetst. Dat is nu met

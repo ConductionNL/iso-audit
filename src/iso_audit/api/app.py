@@ -92,6 +92,19 @@ class BronVelden(BaseModel):
     velden: dict[str, str]
 
 
+class AuditArchiveren(BaseModel):
+    """Reden verplicht: zonder reden is later niet te zien of dit opruimen was.
+
+    Op moduleniveau en niet binnen `create_app`, en dat is geen stijlkeuze. Met
+    `from __future__ import annotations` is elke annotatie een string; een model dat binnen een
+    functie staat, kan FastAPI niet oplossen. Het gevolg op 2026-08-29: `POST .../archiveer` gaf
+    een 422 met `loc: ["query","body"]` en `/openapi.json` een 500. De knop stond er, de route
+    stond er, en samen werkten ze niet.
+    """
+
+    reden: str
+
+
 class NieuweAudit(BaseModel):
     """Een audit aanmaken: één of meer normen + periode; de rest is afgeleid.
 
@@ -247,11 +260,6 @@ def create_app(
         hem verbergen tot er data is maakt het overzicht onbetrouwbaar als werklijst.
         """
         return [asdict(r) for r in ov.alles(registry)]
-
-    class AuditArchiveren(BaseModel):
-        """Reden verplicht: zonder reden is later niet te zien of dit opruimen was."""
-
-        reden: str
 
     @app.post("/audits/{audit_id}/archiveer")
     def archiveer_audit(audit_id: str, body: AuditArchiveren, request: Request) -> dict[str, str]:

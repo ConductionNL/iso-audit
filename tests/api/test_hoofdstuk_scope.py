@@ -52,7 +52,9 @@ def test_bijlage_a_valt_buiten_een_managementhoofdstuk() -> None:
         [("8.1", "27001"), ("8.3", "27001"), ("A.8.16", "27001"), ("A.8.2", "27001")],
     )
     query, waarden = _bevindingen_query("27001", hoofdstuk="8")
-    gevonden = {r[0] for r in conn.execute(query.replace("SELECT *", "SELECT clausule_id"), waarden)}
+    gevonden = {
+        r[0] for r in conn.execute(query.replace("SELECT *", "SELECT clausule_id"), waarden)
+    }
     assert gevonden == {"8.1", "8.3"}, f"Bijlage A hoort er niet bij: {gevonden}"
 
 
@@ -65,7 +67,9 @@ def test_een_bijlage_a_hoofdstuk_kan_ook(tmp_path: object) -> None:
         [("8.1", "27001"), ("A.8.16", "27001"), ("A.5.1", "27001")],
     )
     query, waarden = _bevindingen_query("27001", hoofdstuk="A.8")
-    gevonden = {r[0] for r in conn.execute(query.replace("SELECT *", "SELECT clausule_id"), waarden)}
+    gevonden = {
+        r[0] for r in conn.execute(query.replace("SELECT *", "SELECT clausule_id"), waarden)
+    }
     assert gevonden == {"A.8.16"}
 
 
