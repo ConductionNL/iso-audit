@@ -366,6 +366,37 @@ def _bewaar_ingest(documenten: list[dict[str, Any]], norm: str, bronnen: list[st
         logger.warning("Documenten vastleggen mislukt (run gaat door): %s", exc)
 
 
+def splits_op_leeftijd(
+    documenten: list[dict[str, Any]], cutoff: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """Splits in (actief, ouder dan de cutoff, zonder wijzigingstijd).
+
+    Een document zónder datum telt als **actief**. Dat lijkt een detail en was het niet: een lege
+    string is in Python altijd kleiner dan een datum-string, dus gold elk document zonder
+    `modified_at` als ouder dan twee jaar. Op 2026-08-29 verdwenen daardoor 1.448 documenten —
+    1.283 uit repository's en 162 webpagina's, allemaal die dag opgehaald en netjes aan clausules
+    gekoppeld. Zestien minuten ophalen, en dan stil weggegooid onder een melding die ">2 jaar oud"
+    zei.
+
+    Bij twijfel meenemen: een document ten onrechte wegen kost een modelaanroep, een document ten
+    onrechte weglaten kost bewijs. Hoeveel er geen datum hadden, wordt wel geteld — anders is
+    "actief" een getal waarin twee verschillende dingen zitten.
+    """
+    actief: list[dict[str, Any]] = []
+    ouder: list[dict[str, Any]] = []
+    zonder: list[dict[str, Any]] = []
+    for doc in documenten:
+        datum = (doc.get("modified_at") or "").strip()
+        if not datum:
+            actief.append(doc)
+            zonder.append(doc)
+        elif datum < cutoff:
+            ouder.append(doc)
+        else:
+            actief.append(doc)
+    return actief, ouder, zonder
+
+
 def run_audit(
     norm: str,
     no_review: bool = False,
@@ -549,13 +580,14 @@ def run_audit(
         for n in normen_van(norm)
     }
     gekoppeld_alle, niet_geclassificeerd = koppel_alle_normen(documenten, norm, maps)
-    gearchiveerd = [d for d in gekoppeld_alle if (d.get("modified_at") or "") < cutoff]
-    gekoppeld = [d for d in gekoppeld_alle if (d.get("modified_at") or "") >= cutoff]
+    gekoppeld, gearchiveerd, zonder_datum = splits_op_leeftijd(gekoppeld_alle, cutoff)
     logger.info(
-        "Leeftijdsfilter (%s): %d actief, %d gearchiveerd (>2 jaar oud)",
+        "Leeftijdsfilter (%s): %d actief, %d ouder dan twee jaar, %d zonder wijzigingstijd "
+        "(meegenomen)",
         cutoff,
         len(gekoppeld),
         len(gearchiveerd),
+        len(zonder_datum),
     )
 
     # Wat er gelezen is, wordt bewaard — vóór de classificatie en los daarvan.

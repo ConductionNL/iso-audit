@@ -303,7 +303,7 @@ class RepoSource:
                 titel=f"{gegevens.naam} — repository-instellingen",
                 bron=self.naam,
                 type="repository-instellingen",
-                laatst_gewijzigd="",
+                laatst_gewijzigd=gegevens.gewijzigd,
                 inhoud_uri=f"{verwijzing.sleutel}#instellingen",
             )
             for pad in self._paden(client, verwijzing):
@@ -312,7 +312,10 @@ class RepoSource:
                     titel=f"{gegevens.naam} — {pad}",
                     bron=self.naam,
                     type="repository-bestand",
-                    laatst_gewijzigd="",
+                    # De push-tijd van de repository, niet van het bestand: is er niet gepusht,
+                    # dan is geen enkel bestand gewijzigd. Per bestand een commit-datum ophalen
+                    # zou een extra aanroep per pad kosten — precies wat we net hebben weggehaald.
+                    laatst_gewijzigd=gegevens.gewijzigd,
                     inhoud_uri=f"{verwijzing.sleutel}#{pad}",
                 )
 

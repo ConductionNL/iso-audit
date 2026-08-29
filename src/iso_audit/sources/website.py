@@ -75,18 +75,45 @@ def zichtbare_tekst(html: str) -> str:
     return _WITRUIMTE.sub(" ", _MARKUP.sub(" ", zonder)).strip()
 
 
+def urls_uit_sitemap_met_datum(xml: str) -> list[tuple[str, str]]:
+    """De `<loc>`-waarden uit een sitemap, elk met zijn `<lastmod>` (leeg als die ontbreekt).
+
+    De datum draagt de incrementele ingest: zonder wijzigingstijd kan `mag_overslaan` nooit
+    overslaan, en haalde élke run alle 137 pagina's opnieuw op.
+    """
+    wortel = _wortel(xml)
+    uit: list[tuple[str, str]] = []
+    for el in wortel:
+        loc = ""
+        datum = ""
+        for kind in el:
+            naam = kind.tag.rsplit("}", 1)[-1]
+            if naam == "loc":
+                loc = (kind.text or "").strip()
+            elif naam == "lastmod":
+                datum = (kind.text or "").strip()
+        if loc:
+            uit.append((loc, datum))
+    return uit
+
+
+def _wortel(xml: str) -> ElementTree.Element:
+    """Parse de sitemap; weiger een DOCTYPE."""
+    if "<!DOCTYPE" in xml[:2000].upper():
+        raise ValueError("sitemap met DOCTYPE wordt niet gelezen")
+    try:
+        return ElementTree.fromstring(xml)
+    except ElementTree.ParseError as fout:
+        raise ValueError(f"sitemap is geen geldige XML: {fout}") from fout
+
+
 def urls_uit_sitemap(xml: str) -> list[str]:
     """De `<loc>`-waarden uit een sitemap.
 
     `ElementTree` blokkeert entity-expansie niet, dus een sitemap met een DOCTYPE wordt geweigerd
     in plaats van geparsed — zelfde regel als bij `sources/tekst.py` voor ODF.
     """
-    if "<!DOCTYPE" in xml[:2000].upper():
-        raise ValueError("sitemap met DOCTYPE wordt niet gelezen")
-    try:
-        wortel = ElementTree.fromstring(xml)
-    except ElementTree.ParseError as fout:
-        raise ValueError(f"sitemap is geen geldige XML: {fout}") from fout
+    wortel = _wortel(xml)
     return [
         (el.text or "").strip()
         for el in wortel.iter()
@@ -146,7 +173,7 @@ class WebsiteSource:
             parser.parse([])
         return parser
 
-    def _urls(self, site: str) -> list[str]:
+    def _urls(self, site: str) -> list[tuple[str, str]]:
         try:
             antwoord = self._sessie.get(urljoin(site, "/sitemap.xml"), timeout=TIMEOUT)
         except requests.RequestException as fout:
@@ -156,7 +183,7 @@ class WebsiteSource:
             self.overgeslagen[site] = f"geen sitemap (HTTP {antwoord.status_code})"
             return []
         try:
-            return urls_uit_sitemap(antwoord.text)
+            return urls_uit_sitemap_met_datum(antwoord.text)
         except ValueError as fout:
             self.overgeslagen[site] = str(fout)
             return []
@@ -165,7 +192,7 @@ class WebsiteSource:
         for site in self._sites:
             robots = self._robots(site)
             urls = self._urls(site)
-            toegestaan = [u for u in urls if robots.can_fetch(GEBRUIKERSAGENT, u)]
+            toegestaan = [(u, d) for u, d in urls if robots.can_fetch(GEBRUIKERSAGENT, u)]
             if len(toegestaan) < len(urls):
                 self.overgeslagen[f"{site} (robots.txt)"] = (
                     f"{len(urls) - len(toegestaan)} pagina('s) uitgesloten door robots.txt"
@@ -176,13 +203,16 @@ class WebsiteSource:
                     f"op {self._max}"
                 )
                 toegestaan = toegestaan[: self._max]
-            for url in toegestaan:
+            for url, gewijzigd in toegestaan:
                 yield Document(
                     id=url,
                     titel=urlparse(url).path or url,
                     bron=self.naam,
                     type="webpagina",
-                    laatst_gewijzigd="",
+                    # `<lastmod>` uit de sitemap; leeg als de site het niet vult. Zonder deze
+                    # tijd kan de incrementele ingest niets overslaan en haalt élke run alle
+                    # pagina's opnieuw op.
+                    laatst_gewijzigd=gewijzigd,
                     inhoud_uri=url,
                 )
 

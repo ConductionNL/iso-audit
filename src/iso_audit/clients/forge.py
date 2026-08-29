@@ -52,6 +52,12 @@ class Repositoriegegevens:
     branch_beschermd: bool | None = None
     bescherming_reden: str = ""
     """Waarom de bescherming niet vast te stellen was."""
+    gewijzigd: str = ""
+    """Wanneer er voor het laatst naar de repository is gepusht (`pushed_at`).
+
+    Draagt de incrementele ingest: is er sinds de vorige run niet gepusht, dan zijn de bestanden
+    niet gewijzigd. Leeg als de forge het niet geeft — dan wordt er gewoon opnieuw gelezen, want
+    een verzonnen tijdstempel zou een document ten onrechte als ongewijzigd laten gelden."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +193,7 @@ class GitHubClient:
             branch_beschermd=beschermd,
             review_verplicht=review,
             bescherming_reden=reden,
+            gewijzigd=str(d.get("pushed_at") or d.get("updated_at") or ""),
         )
 
     def _bescherming(
@@ -332,6 +339,7 @@ class CodebergClient:
             branch_beschermd=beschermd,
             review_verplicht=review,
             bescherming_reden=reden,
+            gewijzigd=str(d.get("pushed_at") or d.get("updated_at") or ""),
         )
 
     def _bescherming(

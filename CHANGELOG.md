@@ -6,6 +6,38 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-29 — de repo- en websitebron leverden geen enkele bevinding
+
+De A.5-run gaf 84 bevindingen, allemaal uit Drive en Nextcloud. Geen enkele uit de 1.283
+repository-documenten of 162 webpagina's die die run had opgehaald — terwijl ze wél waren
+gekoppeld: de database telt 1.080 A.5-koppelingen voor `Repo`.
+
+Ze sneuvelden op één regel:
+
+    gearchiveerd = [d for d in gekoppeld_alle if (d.get("modified_at") or "") < cutoff]
+
+Een lege string is in Python altijd kleiner dan een datum-string. Elk document zónder
+wijzigingstijd gold dus als ouder dan twee jaar. Het log zei het ook, en het klopte niet:
+*"Leeftijdsfilter (2024-08-29): 88 actief, 1448 gearchiveerd (>2 jaar oud)"* — die 1448 waren die
+dag opgehaald.
+
+Twee dingen aangepakt:
+
+**Onbekend is niet oud.** `splits_op_leeftijd()` telt een document zonder datum als actief en
+telt apart hoeveel dat er zijn. Bij twijfel meenemen: een document ten onrechte wegen kost een
+modelaanroep, een document ten onrechte weglaten kost bewijs. De melding noemt nu drie getallen
+in plaats van twee, want "actief" was een cijfer waarin twee verschillende dingen zaten.
+
+**De bronnen leveren nu wél een wijzigingstijd.** Alle 2.207 repo- en 175 websitedocumenten
+hadden een lege `modified_at`, tegen 0 van de 439 Drive-documenten. De repobron gebruikt
+`pushed_at` — is er niet gepusht, dan zijn de bestanden niet gewijzigd — en de websitebron
+`<lastmod>` uit de sitemap. Dat lost naast dit filter ook op waarom een herhaalde run over
+dezelfde 385 repository's opnieuw zestien minuten deed: zonder tijd kan `mag_overslaan` niets
+overslaan.
+
+Ontbreekt de tijd alsnog, dan blijft het veld leeg en wordt er gewoon opnieuw gelezen. Een
+verzonnen tijdstempel zou een document als ongewijzigd laten gelden terwijl niemand dat weet.
+
 ### Fixed — 2026-08-29 — de archiveerknop werkte niet
 
 `POST /audits/{id}/archiveer` gaf een 422 met `loc: ["query","body"]`, en `/openapi.json` gaf
