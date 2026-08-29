@@ -32,7 +32,6 @@ from dataclasses import dataclass
 
 from iso_audit.clients.forge import (
     CLIENTS,
-    Bestand,
     ForgeClient,
     ForgeError,
     GitHubClient,
@@ -227,6 +226,94 @@ def metadata_tekst(gegevens: Repositoriegegevens, wijzigingen: Wijzigingen) -> s
     return "\n".join(regels)
 
 
+WORKFLOWSLEUTEL = ".github/workflows/"
+"""Sleutel waaronder de workflowbestanden worden geaggregeerd.
+
+Eindigt op een schuine streep zodat `bron_clausules.voor_repo_document` hem als workflowpad
+herkent en aan §8.25, §8.31 en §8.32 koppelt."""
+
+MAX_GENOEMD = 40
+"""Hoeveel repository's er bij naam worden genoemd in een aggregaat.
+
+Driehonderd namen op een rij leest niemand, en het aantal staat er toch bij. Wat afvalt wordt
+geteld — stil weglaten zou van "in 258 repository's ontbreekt dit" een onbewijsbare bewering
+maken."""
+
+
+def _noem(namen: list[str]) -> str:
+    """Een leesbare opsomming, met het aantal weggelaten namen erachter."""
+    if not namen:
+        return "geen"
+    getoond = sorted(namen)[:MAX_GENOEMD]
+    rest = len(namen) - len(getoond)
+    return ", ".join(getoond) + (f" en {rest} andere" if rest else "")
+
+
+def instellingen_tekst(repos: list[tuple[RepoVerwijzing, Repositoriegegevens]]) -> str:
+    """De instellingen van álle repository's als één telling.
+
+    "1 van de 3 repository's stelt review verplicht" is de bevinding; drie losse regels die elk
+    hetzelfde zeggen, zijn dat niet. De repository's zónder worden bij naam genoemd, want daar
+    gaat de bevinding over.
+    """
+    totaal = len(repos)
+    zonder_review = [v.naam for v, g in repos if g.review_verplicht is False]
+    met_review = [v.naam for v, g in repos if g.review_verplicht is True]
+    onbekend = [v.naam for v, g in repos if g.review_verplicht is None]
+    onbeschermd = [v.naam for v, g in repos if g.branch_beschermd is False]
+    prive = [v.naam for v, g in repos if g.prive]
+
+    regels = [
+        f"Repository-instellingen over {totaal} repository(s).",
+        "",
+        f"Verplichte review vóór samenvoegen: {len(met_review)} van de {totaal}.",
+        f"  Zonder verplichte review: {_noem(zonder_review)}.",
+    ]
+    if onbekend:
+        regels.append(f"  Niet vast te stellen met het gebruikte token: {_noem(onbekend)}.")
+    regels += [
+        "",
+        f"Branch-bescherming op de hoofdbranch: {totaal - len(onbeschermd) - len(onbekend)} "
+        f"van de {totaal} ingesteld.",
+        f"  Zonder bescherming: {_noem(onbeschermd)}.",
+        "",
+        f"Zichtbaarheid: {len(prive)} privé, {totaal - len(prive)} publiek.",
+    ]
+    return "\n".join(regels)
+
+
+def bewijspad_tekst(pad: str, per_repo: dict[str, str], alle: list[str]) -> str:
+    """Eén bewijssoort over alle repository's: hoeveel, welke niet, en welke inhoud.
+
+    De inhoud gaat **ontdubbeld** mee. Honderdachtentwintig `SECURITY.md`-bestanden zijn in de
+    praktijk een handvol varianten van hetzelfde sjabloon, en juist het verschil daartussen is
+    wat een auditor wil zien — niet honderdachtentwintig keer dezelfde tekst.
+    """
+    aanwezig = sorted(per_repo)
+    ontbreekt = sorted(set(alle) - set(aanwezig))
+    varianten: dict[str, list[str]] = {}
+    for naam, inhoud in per_repo.items():
+        varianten.setdefault(inhoud.strip(), []).append(naam)
+
+    regels = [
+        f"{pad} over {len(alle)} repository(s).",
+        "",
+        f"Aanwezig in {len(aanwezig)} van de {len(alle)}.",
+        f"  Ontbreekt in: {_noem(ontbreekt)}.",
+        "",
+        f"Inhoud ({len(varianten)} unieke variant(en)):",
+    ]
+    for i, (inhoud, namen) in enumerate(
+        sorted(varianten.items(), key=lambda x: -len(x[1])), start=1
+    ):
+        regels += [
+            "",
+            f"--- variant {i}, in {len(namen)} repository(s) ({_noem(namen)}):",
+            inhoud,
+        ]
+    return "\n".join(regels)
+
+
 @register
 class RepoSource:
     """Bron-adapter voor repositories op GitHub en Codeberg."""
@@ -241,6 +328,9 @@ class RepoSource:
         self._gegevens: dict[str, Repositoriegegevens] = {}
         self.overgeslagen: dict[str, str] = {}
         """Wat er niet gelezen kon worden en waarom — gaat mee in de dekking."""
+        self._repos: list[tuple[RepoVerwijzing, Repositoriegegevens]] = []
+        self._inhoud: dict[str, dict[str, str]] = {}
+        self._verzameld = False
 
     def _client(self, forge: str) -> ForgeClient:
         if forge in self._clients:
@@ -282,85 +372,82 @@ class RepoSource:
             )
         return uitgevouwen
 
-    def list_documents(self, filter: dict[str, object] | None = None) -> Iterator[Document]:
-        """Per repository: één document met de instellingen, plus de aanwezige bewijspaden."""
+    def _verzamel(self) -> None:
+        """Loop de repository's langs en leg per bewijssoort vast wat er is.
+
+        Eén keer, in `list_documents`; `fetch_content` leest dan uit wat hier is verzameld. De
+        alternatieve volgorde — per aggregaat opnieuw alle repository's langs — zou het werk zo
+        vaak doen als er bewijssoorten zijn.
+        """
+        if self._verzameld:
+            return
+        self._verzameld = True
         for verwijzing in self._uitgevouwen():
             client = self._client(verwijzing.forge)
             try:
                 gegevens = client.repository(verwijzing.eigenaar, verwijzing.naam)
             except ForgeError as fout:
-                # Ook in de dekking, niet alleen in het log. Een hele repository die stil uit de
-                # audit verdwijnt is erger dan een die er niet in zat: de auditor denkt hem
-                # geauditeerd te hebben. Gevonden door de proefrun van 2026-08-26, waar een
-                # privérepo zonder token wegviel zonder dat de dekking dat meldde.
                 self.overgeslagen[verwijzing.sleutel] = str(fout)
                 logger.warning("Repository niet gelezen: %s (%s)", verwijzing.sleutel, fout)
                 continue
-            self._gegevens[verwijzing.sleutel] = gegevens
+            self._repos.append((verwijzing, gegevens))
+            boom, reden = client.paden(verwijzing.eigenaar, verwijzing.naam)
+            if reden:
+                self.overgeslagen[f"{verwijzing.sleutel}:bestandslijst"] = reden
+            aanwezig = set(boom)
+            for pad in BEWIJSPADEN:
+                if pad in aanwezig:
+                    bestand = client.bestand(verwijzing.eigenaar, verwijzing.naam, pad)
+                    self._inhoud.setdefault(pad, {})[verwijzing.naam] = bestand.inhoud[:MAX_BESTAND]
+            workflows = [p for p in boom if p.startswith(WORKFLOWMAPPEN_PREFIX)]
+            if workflows:
+                self._inhoud.setdefault(WORKFLOWSLEUTEL, {})[verwijzing.naam] = "\n".join(workflows)
 
-            yield Document(
-                id=f"{verwijzing.sleutel}#instellingen",
-                titel=f"{gegevens.naam} — repository-instellingen",
-                bron=self.naam,
-                type="repository-instellingen",
-                laatst_gewijzigd=gegevens.gewijzigd,
-                inhoud_uri=f"{verwijzing.sleutel}#instellingen",
-            )
-            for pad in self._paden(client, verwijzing):
-                yield Document(
-                    id=f"{verwijzing.sleutel}#{pad}",
-                    titel=f"{gegevens.naam} — {pad}",
-                    bron=self.naam,
-                    type="repository-bestand",
-                    # De push-tijd van de repository, niet van het bestand: is er niet gepusht,
-                    # dan is geen enkel bestand gewijzigd. Per bestand een commit-datum ophalen
-                    # zou een extra aanroep per pad kosten — precies wat we net hebben weggehaald.
-                    laatst_gewijzigd=gegevens.gewijzigd,
-                    inhoud_uri=f"{verwijzing.sleutel}#{pad}",
-                )
+    def list_documents(self, filter: dict[str, object] | None = None) -> Iterator[Document]:
+        """Eén document per bewijssoort over álle repository's, plus de instellingen.
 
-    def _paden(self, client: ForgeClient, verwijzing: RepoVerwijzing) -> list[str]:
-        """De op te halen paden: alleen bewijspaden die in de repository bestaan.
+        Niet één document per repository. Een auditor stelt zijn vraag per **maatregel** — "is
+        het intellectueel eigendom geregeld?" — en het antwoord daarop is "95 van de 386
+        repository's hebben een licentiebestand", niet vijfennegentig losse constateringen.
 
-        Eén boom-aanroep in plaats van tien losse pad-aanroepen. Gemeten bestaan er gemiddeld
-        vier van de tien bewijspaden, dus de rest waren aanroepen om een 404 op te halen — over
-        385 repository's het verschil tussen wel en niet binnen de limiet van 5.000 per uur.
-
-        Dat een pad níet bestaat blijft een waarneming; die informatie komt nu uit de boom in
-        plaats van uit een 404. Kon de boom niet gelezen worden, dan valt dit terug op de
-        volledige lijst: liever te veel aanroepen dan stilzwijgend concluderen dat er niets is.
+        Gemeten op 2026-08-29, vóór deze wijziging: 137 bevindingen uit repository's, waarvan 47
+        op A.5.32 die allemaal hetzelfde zeiden. 1.369 modelaanroepen, $4,33.
         """
-        boom, reden = client.paden(verwijzing.eigenaar, verwijzing.naam)
-        if reden:
-            self.overgeslagen[f"{verwijzing.sleutel}:bestandslijst"] = reden
-            logger.warning("Bestandslijst van %s: %s", verwijzing.sleutel, reden)
-        if not boom:
-            return list(BEWIJSPADEN)
-        aanwezig = set(boom)
-        paden = [p for p in BEWIJSPADEN if p in aanwezig]
-        paden.extend(p for p in boom if p.startswith(WORKFLOWMAPPEN_PREFIX))
-        return paden
+        self._verzamel()
+        if not self._repos:
+            return
+        laatste = max((g.gewijzigd for _, g in self._repos if g.gewijzigd), default="")
+        eigenaars = sorted({v.eigenaar for v, _ in self._repos})
+        sleutel = f"{self._repos[0][0].forge}:{'+'.join(eigenaars)}"
+
+        yield Document(
+            id=f"{sleutel}#instellingen",
+            titel=f"Repository-instellingen over {len(self._repos)} repository(s)",
+            bron=self.naam,
+            type="repository-instellingen",
+            laatst_gewijzigd=laatste,
+            inhoud_uri=f"{sleutel}#instellingen",
+        )
+        for pad in sorted(self._inhoud):
+            yield Document(
+                id=f"{sleutel}#{pad}",
+                titel=f"{pad} over {len(self._repos)} repository(s)",
+                bron=self.naam,
+                type="repository-bestand",
+                laatst_gewijzigd=laatste,
+                inhoud_uri=f"{sleutel}#{pad}",
+            )
 
     def fetch_content(self, doc: Document) -> str:
         if doc.bron != self.naam:
             raise ValueError(
                 f"RepoSource krijgt document uit bron={doc.bron!r}, verwacht {self.naam!r}"
             )
-        sleutel, _, rest = doc.inhoud_uri.partition("#")
-        forge, _, pad_repo = sleutel.partition(":")
-        eigenaar, _, naam = pad_repo.partition("/")
-        client = self._client(forge)
-
-        if rest == "instellingen":
-            gegevens = self._gegevens.get(sleutel) or client.repository(eigenaar, naam)
-            return metadata_tekst(gegevens, client.wijzigingen(eigenaar, naam, self._max_pr))
-
-        bestand: Bestand = client.bestand(eigenaar, naam, rest)
-        if not bestand.aanwezig:
-            # Een ontbrekend bewijspad is een waarneming en geen fout: "er is geen SECURITY.md"
-            # is precies wat een auditor wil weten.
-            return f"Het bestand {rest} bestaat niet in {eigenaar}/{naam} ({bestand.reden})."
-        return bestand.inhoud[:MAX_BESTAND]
+        self._verzamel()
+        _, _, pad = doc.inhoud_uri.partition("#")
+        if pad == "instellingen":
+            return instellingen_tekst(self._repos)
+        return bewijspad_tekst(pad, self._inhoud.get(pad, {}), [v.naam for v, _ in self._repos])
 
     def list_findings(self, sessie_id: str) -> Iterator[Finding]:
         """Deze bron levert bewijs, geen kant-en-klare bevindingen."""

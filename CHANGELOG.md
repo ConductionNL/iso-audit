@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-29 — de repobron aggregeert per maatregel, niet per repository
+
+De A.5-run leverde 137 bevindingen uit repository's, waarvan **47 op A.5.32 die allemaal
+hetzelfde zeiden**: "deze repository heeft een LICENSE-bestand". Dat is geen 47 keer bewijs maar
+één constatering over 47 repository's — en in een memo van 1-3 A4 onbruikbaar. Het kostte 1.369
+modelaanroepen en $4,33.
+
+Een auditor stelt zijn vraag per **maatregel**: "is het intellectueel eigendom geregeld?" Het
+antwoord daarop is "95 van de 386 repository's hebben een licentiebestand", niet vijfennegentig
+losse constateringen.
+
+De bron levert nu één document per bewijssoort over álle repository's. Gemeten op vijf
+repository's: **11 documenten** in plaats van dertig; over de hele organisatie wordt dat ongeveer
+twaalf in plaats van 2.200.
+
+Wat níet verdwijnt is de natrekbaarheid:
+
+- Het aggregaat telt en noemt namen: *"Aanwezig in 4 van de 5. Ontbreekt in: .github."*
+- De inhoud gaat **ontdubbeld** mee. Honderdachtentwintig `SECURITY.md`-bestanden zijn in de
+  praktijk een handvol varianten van hetzelfde sjabloon, en juist het verschil daartussen is wat
+  een auditor wil zien.
+- Bij meer dan veertig namen wordt de rest geteld in plaats van weggelaten — anders wordt "in 258
+  repository's ontbreekt dit" een onbewijsbare bewering.
+
+De instellingen gaan dezelfde kant op: *"Verplichte review vóór samenvoegen: 6 van de 386"* met
+de repository's zónder erbij, in plaats van 386 losse regels.
+
+Het aggregaat draagt de laatste `pushed_at` van alle repository's, zodat de incrementele ingest
+het kan overslaan als er nergens gepusht is.
+
 ### Fixed — 2026-08-29 — de repo- en websitebron leverden geen enkele bevinding
 
 De A.5-run gaf 84 bevindingen, allemaal uit Drive en Nextcloud. Geen enkele uit de 1.283

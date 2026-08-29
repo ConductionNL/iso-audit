@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 from iso_audit.clients import forge
-from iso_audit.clients.forge import Repositoriegegevens, Wijzigingen
+from iso_audit.clients.forge import Bestand, Repositoriegegevens, Wijzigingen
 from iso_audit.sources.repo import (
     BEWIJSPADEN,
     RepoConfigError,
@@ -291,7 +291,8 @@ def test_een_onleesbare_repository_komt_in_de_dekking() -> None:
         def repository(self, eigenaar: str, naam: str) -> Repositoriegegevens:
             raise ForgeError("bestaat niet, of het token mag het niet zien (404)")
 
-        def bestand(self, eigenaar: str, naam: str, pad: str) -> object: ...
+        def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
+            return Bestand(pad=pad, inhoud="inhoud")
 
         def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
             return [], ""
@@ -344,7 +345,8 @@ class _OrgClient:
             hoofdbranch="main",
         )
 
-    def bestand(self, eigenaar: str, naam: str, pad: str) -> object: ...
+    def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
+        return Bestand(pad=pad, inhoud="inhoud")
 
     def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
         return ["README.md"], ""
@@ -363,12 +365,16 @@ def _bron_met(namen: list[str], reden: str = "") -> RepoSource:
 
 
 def test_de_ster_wordt_uitgevouwen_tot_echte_repositories() -> None:
+    """De uitvouwing levert één instellingendocument over álle repository's.
+
+    Niet één per repository: sinds 2026-08-29 aggregeert de bron per maatregel, omdat
+    vijfennegentig losse constateringen "deze repository heeft een licentiebestand" geen bewijs
+    zijn maar één constatering over vijfennegentig repository's.
+    """
     docs = list(_bron_met(["iso-audit", "hydra"]).list_documents())
-    titels = {d.titel for d in docs if d.type == "repository-instellingen"}
-    assert titels == {
-        "ConductionNL/iso-audit — repository-instellingen",
-        "ConductionNL/hydra — repository-instellingen",
-    }
+    instellingen = [d for d in docs if d.type == "repository-instellingen"]
+    assert len(instellingen) == 1
+    assert "2 repository(s)" in instellingen[0].titel
 
 
 def test_gearchiveerde_repositories_worden_gemeld() -> None:

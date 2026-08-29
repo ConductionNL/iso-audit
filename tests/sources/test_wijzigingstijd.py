@@ -53,7 +53,7 @@ def test_de_websitebron_zet_de_datum_op_het_document() -> None:
 
 def test_de_repobron_gebruikt_pushed_at() -> None:
     """Is er sinds de vorige run niet gepusht, dan zijn de bestanden niet gewijzigd."""
-    from iso_audit.clients.forge import Repositoriegegevens, Wijzigingen
+    from iso_audit.clients.forge import Bestand, Repositoriegegevens, Wijzigingen
     from iso_audit.sources.repo import RepoSource
 
     class _Client:
@@ -76,7 +76,8 @@ def test_de_repobron_gebruikt_pushed_at() -> None:
         def paden(self, eigenaar: str, naam: str) -> tuple[list[str], str]:
             return ["README.md"], ""
 
-        def bestand(self, eigenaar: str, naam: str, pad: str) -> object: ...
+        def bestand(self, eigenaar: str, naam: str, pad: str) -> Bestand:
+            return Bestand(pad=pad, inhoud="inhoud")
 
         def bestanden_in_map(self, e: str, n: str, m: str) -> tuple[list[str], str]:
             return [], ""
