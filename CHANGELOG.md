@@ -6,6 +6,33 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-29 — Bijlage A is een eigen scope, expliciet getoetst
+
+Sinds de maatregelen de `A.`-prefix dragen, kan een auditor kiezen wát hij toetst. Dat is nu met
+tests vastgelegd, met de aantallen uit de norm zelf:
+
+| scope | clausules | wat |
+|---|---|---|
+| `4` | 4 | context van de organisatie |
+| `5` | 3 | leiderschap |
+| `9` | 3 | evaluatie van de prestaties |
+| `A` | 93 | de hele Bijlage A |
+| `A.5` | 37 | organisatorische maatregelen |
+| `A.6` | 8 | mensgerichte maatregelen |
+| `A.7` | 14 | fysieke maatregelen |
+| `A.8` | 34 | technologische maatregelen |
+| `A.8.24` | 1 | één maatregel |
+
+37 + 8 + 14 + 34 = 93; een thema dat clausules kwijtraakt valt zonder die som niet op.
+
+De scherpste toets is dat **§8 en A.8 elkaar niet raken**: §8 is "Uitvoering" (drie clausules),
+A.8 zijn de technologische maatregelen (vierendertig). Zonder dat onderscheid zou een run op
+hoofdstuk 8 er vierendertig meenemen die er niet bij horen, en zou de memo claimen dat de
+uitvoering is getoetst terwijl er encryptiebevindingen in staan.
+
+De managementclausules en Bijlage A dekken samen de hele norm — ook dat staat als test, zodat
+niets tussen wal en schip valt.
+
 ### Fixed — 2026-08-29 — een run op hoofdstuk 4 levert hoofdstuk 4
 
 De eerste run op ISO 27001 hoofdstuk 4 leverde **303 bevindingen**, met clausules als 10.2, 9.1
