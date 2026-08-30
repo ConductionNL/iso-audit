@@ -140,9 +140,30 @@ def duiding(antwoord: Any) -> str:
     return f"de forge gaf een onverwacht antwoord ({status})"
 
 
+POGINGEN = 2
+"""Hoe vaak een verzoek wordt geprobeerd bij een verbindingsfout.
+
+Twee en niet vijf: op 2026-08-30 verbrak GitHub de verbinding halverwege 386 repository's, en één
+hik hoort geen repository te kosten. Maar langer doorgaan maakt een échte storing traag zichtbaar
+— en een repository die in de dekking staat als niet-gelezen, is beter dan een run die twintig
+minuten hangt op iets wat stuk is."""
+
+
 def _haal(sessie: requests.Session, url: str) -> requests.Response:
+    """Eén GET, met een tweede poging bij een verbindingsfout.
+
+    Alleen bij `RequestException` — een 403 of 404 is een antwoord en geen storing, en die
+    opnieuw sturen levert hetzelfde op.
+    """
     logger.debug("forge-GET %s", url)
-    return sessie.get(url, timeout=TIMEOUT)
+    for poging in range(1, POGINGEN + 1):
+        try:
+            return sessie.get(url, timeout=TIMEOUT)
+        except requests.RequestException:
+            if poging == POGINGEN:
+                raise
+            logger.info("forge-GET mislukt (poging %d van %d), opnieuw: %s", poging, POGINGEN, url)
+    raise AssertionError("onbereikbaar")
 
 
 class GitHubClient:

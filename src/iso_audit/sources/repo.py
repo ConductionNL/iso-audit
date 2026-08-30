@@ -30,6 +30,8 @@ import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+import requests
+
 from iso_audit.clients.forge import (
     CLIENTS,
     ForgeClient,
@@ -38,6 +40,7 @@ from iso_audit.clients.forge import (
     Repositoriegegevens,
     Wijzigingen,
 )
+from iso_audit.config.verbinding import normaliseer
 from iso_audit.sources import register
 from iso_audit.sources.base import Document, Finding
 
@@ -384,21 +387,47 @@ class RepoSource:
         self._verzameld = True
         for verwijzing in self._uitgevouwen():
             client = self._client(verwijzing.forge)
+            # Netwerkfouten worden per repository afgevangen. Op 2026-08-30 verbrak GitHub de
+            # verbinding na zeven minuten (`RemoteDisconnected`); die fout werd niet gevangen, dus
+            # leverde de héle bron niets en brak de run af met "Bron(nen) leverden niets". Zeven
+            # minuten ophalen, weg door één hik.
+            #
+            # Alles voor deze repository gebeurt binnen de `try`, en pas daarna wordt er iets
+            # vastgelegd: een halve repository in het aggregaat zou een telling opleveren die
+            # niemand kan navertellen. Wat mislukt komt in `overgeslagen` en dus in de dekking —
+            # stil doorgaan zou een audit opleveren die iets beweert over wat niemand heeft
+            # gelezen.
             try:
                 gegevens = client.repository(verwijzing.eigenaar, verwijzing.naam)
+                boom, reden = client.paden(verwijzing.eigenaar, verwijzing.naam)
+                aanwezig = set(boom)
+                inhoud = {
+                    pad: client.bestand(verwijzing.eigenaar, verwijzing.naam, pad).inhoud[
+                        :MAX_BESTAND
+                    ]
+                    for pad in BEWIJSPADEN
+                    if pad in aanwezig
+                }
             except ForgeError as fout:
+                # Onze eigen tekst met de duiding erin ("bestaat niet, of het token mag het niet
+                # zien (404)"); die hoort niet door de normalisatie, want dan wordt hij vervangen
+                # door een algemene zin en is de auditor zijn diagnose kwijt.
                 self.overgeslagen[verwijzing.sleutel] = str(fout)
                 logger.warning("Repository niet gelezen: %s (%s)", verwijzing.sleutel, fout)
                 continue
+            except requests.RequestException as fout:
+                # Wél normaliseren: dit is de melding van de bibliotheek en die kan een URL met
+                # credential bevatten.
+                soort, tekst = normaliseer(fout, bron=self.naam)
+                self.overgeslagen[verwijzing.sleutel] = tekst
+                logger.warning("Repository niet gelezen: %s (%s)", verwijzing.sleutel, soort)
+                continue
+
             self._repos.append((verwijzing, gegevens))
-            boom, reden = client.paden(verwijzing.eigenaar, verwijzing.naam)
             if reden:
                 self.overgeslagen[f"{verwijzing.sleutel}:bestandslijst"] = reden
-            aanwezig = set(boom)
-            for pad in BEWIJSPADEN:
-                if pad in aanwezig:
-                    bestand = client.bestand(verwijzing.eigenaar, verwijzing.naam, pad)
-                    self._inhoud.setdefault(pad, {})[verwijzing.naam] = bestand.inhoud[:MAX_BESTAND]
+            for pad, bestandsinhoud in inhoud.items():
+                self._inhoud.setdefault(pad, {})[verwijzing.naam] = bestandsinhoud
             workflows = [p for p in boom if p.startswith(WORKFLOWMAPPEN_PREFIX)]
             if workflows:
                 self._inhoud.setdefault(WORKFLOWSLEUTEL, {})[verwijzing.naam] = "\n".join(workflows)

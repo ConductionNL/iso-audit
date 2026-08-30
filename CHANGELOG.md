@@ -6,6 +6,35 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-30 — één netwerkhikje gooide zeven minuten werk weg
+
+De eerste run met de aggregerende repobron brak af: *"Bron(nen) leverden niets: repo: De bron was
+niet bereikbaar."* In het serverlog stond wat er echt gebeurde:
+
+    ConnectionError: ('Connection aborted.', RemoteDisconnected('Remote end closed
+    connection without response'))
+
+GitHub verbrak de verbinding halverwege de 386 repository's. Die fout werd niet gevangen, dus
+leverde de héle bron niets — zeven minuten ophalen weg door één hik.
+
+Twee lagen aangepakt:
+
+**Per repository afvangen.** Alles voor één repository gebeurt binnen dezelfde `try`, en pas
+daarna wordt er iets vastgelegd: een halve repository in het aggregaat zou een telling opleveren
+die niemand kan navertellen. Wat mislukt komt in `overgeslagen` en dus in de dekking — stil
+doorgaan zou een audit opleveren die iets beweert over wat niemand heeft gelezen.
+
+**Eén herkansing per verzoek.** `_haal()` probeert het bij een verbindingsfout één keer opnieuw.
+Twee pogingen en niet vijf: langer doorgaan maakt een échte storing traag zichtbaar, en een
+repository die in de dekking staat als niet-gelezen is beter dan een run die twintig minuten
+hangt op iets wat stuk is. Alleen bij `RequestException` — een 403 of 404 is een antwoord en geen
+storing, en die opnieuw sturen levert hetzelfde op.
+
+Daarbij een eigen fout van vandaag hersteld: de melding liep even door `normaliseer()`, waardoor
+*"bestaat niet, of het token mag het niet zien (404)"* werd vervangen door de algemene zin "De
+opgegeven bron bestaat niet". Onze eigen duiding hoort ongewijzigd door; alleen de melding van de
+bibliotheek wordt afgeschermd, want die kan een URL met credential bevatten.
+
 ### Changed — 2026-08-29 — de repobron aggregeert per maatregel, niet per repository
 
 De A.5-run leverde 137 bevindingen uit repository's, waarvan **47 op A.5.32 die allemaal

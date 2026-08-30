@@ -93,3 +93,54 @@ def test_409_is_een_lege_repository_en_geen_storing() -> None:
     tekst = duiding(_Antwoord(409))
     assert "leeg" in tekst
     assert "onverwacht" not in tekst
+
+
+# --- tijdelijke storingen ---------------------------------------------------
+
+
+def test_een_verbroken_verbinding_wordt_opnieuw_geprobeerd() -> None:
+    """Op 2026-08-30 verbrak GitHub de verbinding halverwege 386 repository's.
+
+    Eén hik hoort geen repository te kosten. Twee pogingen en dan pas opgeven: langer doorgaan
+    maakt een echte storing traag zichtbaar, en dat is erger dan een repository die in de dekking
+    staat als niet-gelezen.
+    """
+    import requests
+
+    from iso_audit.clients.forge import _haal
+
+    class _Sessie:
+        def __init__(self) -> None:
+            self.pogingen = 0
+
+        def get(self, url: str, timeout: int) -> object:
+            self.pogingen += 1
+            if self.pogingen == 1:
+                raise requests.ConnectionError("Remote end closed connection")
+            return _Antwoord(200)
+
+    sessie = _Sessie()
+    antwoord = _haal(sessie, "https://api.github.com/repos/x/y")  # type: ignore[arg-type]
+    assert antwoord.status_code == 200
+    assert sessie.pogingen == 2
+
+
+def test_een_blijvende_storing_wordt_doorgegeven() -> None:
+    """Eindeloos herhalen verbergt een echte storing achter traagheid."""
+    import pytest
+    import requests
+
+    from iso_audit.clients.forge import _haal
+
+    class _Kapot:
+        def __init__(self) -> None:
+            self.pogingen = 0
+
+        def get(self, url: str, timeout: int) -> object:
+            self.pogingen += 1
+            raise requests.ConnectionError("blijft stuk")
+
+    kapot = _Kapot()
+    with pytest.raises(requests.RequestException):
+        _haal(kapot, "https://api.github.com/repos/x/y")  # type: ignore[arg-type]
+    assert kapot.pogingen == 2
