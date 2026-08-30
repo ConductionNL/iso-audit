@@ -6,6 +6,42 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-30 — bevindingen horen bij één audit
+
+Een schone audit toonde 247 bevindingen terwijl de run er zes had opgeleverd. De andere 241 kwamen
+uit de gedeelde `bevindingen`-tabel: die was niet per audit gescheiden, dus exporteerde élke audit
+alles wat er ooit in was beland. Archiveren van de vorige audit hielp niet — de bevindingen zitten
+in de database, niet in de auditmap. "Schoon beginnen" bestond dus niet.
+
+De kolom `audit_id` lost dat op: een run schrijft het id van zijn eigen audit, en de export
+filtert erop. Rijen van vóór deze wijziging hebben geen id en horen dus bij geen enkele audit —
+zichtbaar zonder filter, nooit in een nieuwe audit. Weggooien zou bewijs vernietigen, aan iedereen
+tonen is het probleem zelf.
+
+De classificatiecontext had al een veld `audit_id`, maar dat is een run-tijdstempel dat de
+`classifications`-rijen groepeert. Twee dingen met dezelfde naam is waar verwarring uit ontstaat;
+het nieuwe veld heet daarom `auditmap` en beide dragen nu uitleg over wat ze zijn.
+
+### Removed — 2026-08-30 — de achterhaalde per-repository gegevens zijn opgeruimd
+
+10.097 rijen verwijderd, met een backup ervoor: 1.283 bevindingen en 24 van de website, 6.423
+clausulekoppelingen en 2.391 documenten. Ze verwezen naar documenten die de bron niet meer levert
+— sinds de aggregatie bestaat `github:ConductionNL/iso-audit#LICENSE` niet meer als document.
+
+### Fixed — 2026-08-30 — de LICENSE-bevinding stelde de verkeerde vraag
+
+Het aggregaat op A.5.32 leverde een NC op: *"303 van 386 repositories missen een LICENSE-bestand"*.
+De auditor wees erop dat dit hooguit een verbeterpunt is, en had gelijk: **A.5.32 gaat over het
+respecteren van andermans intellectuele eigendom** en het beheren van propriëtaire software —
+legale licenties, naleving van voorwaarden. Hoe de organisatie haar eigen code licenseert is iets
+anders.
+
+De fout zat in de koppeling, niet in het model: die gaf de vraag "toets dit tegen A.5.32" zonder
+te zeggen wat die eis inhoudt. Een bewijssoort kan nu een **duiding** meedragen die met het
+document meegaat naar de classificatie. Dat is de interpretatie van de eis, niet de gewenste
+uitkomst — het oordeel blijft aan het model en daarna aan de auditor; wat verandert is dat de
+vraag klopt.
+
 ### Fixed — 2026-08-30 — één netwerkhikje gooide zeven minuten werk weg
 
 De eerste run met de aggregerende repobron brak af: *"Bron(nen) leverden niets: repo: De bron was

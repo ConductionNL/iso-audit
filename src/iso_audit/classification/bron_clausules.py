@@ -120,3 +120,28 @@ def alle_koppelingen() -> set[tuple[str, str]]:
     paren.update(REPO_WORKFLOWS)
     paren.update(REPO_INSTELLINGEN)
     return paren
+
+
+DUIDING: Final[dict[str, str]] = {
+    "LICENSE": (
+        "Let op wat deze eis wél vraagt: §A.5.32 gaat over het respecteren van andermans "
+        "intellectuele eigendom en het beheren van propriëtaire software — legale licenties, "
+        "naleving van voorwaarden, begrip van open-sourcevoorwaarden. Hoe de organisatie haar "
+        "éigen code licenseert is iets anders. Een ontbrekend licentiebestand in een eigen "
+        "repository is daarom hooguit een verbeterpunt en geen schending van deze eis."
+    ),
+}
+"""Uitleg die met een bewijssoort meegaat naar de classificatie.
+
+Op 2026-08-30 leverde het aggregaat op A.5.32 een NC op: "303 van 386 repositories missen een
+LICENSE-bestand". Dat is de verkeerde vraag — de eis gaat over andermans rechten, niet over de
+eigen licentiekeuze. De auditor merkte het op; het model had de norm-interpretatie niet.
+
+Wat hier staat is de **interpretatie van de eis**, niet de gewenste uitkomst. Het oordeel blijft
+aan het model en daarna aan de auditor; wat verandert is dat de vraag klopt. Alleen paden waar de
+koppeling om uitleg vraagt staan erin — de rest spreekt voor zich."""
+
+
+def duiding_voor(pad: str) -> str:
+    """De uitleg bij een bewijssoort, of een lege string als die er niet is."""
+    return DUIDING.get(pad, "")

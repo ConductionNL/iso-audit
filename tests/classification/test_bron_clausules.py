@@ -186,3 +186,31 @@ def test_de_readme_telt_als_gedocumenteerde_informatie() -> None:
 
 def test_de_over_ons_pagina_hangt_aan_context() -> None:
     assert voor_webpagina("https://www.conduction.nl/about/") == (("4.1", "9001"),)
+
+
+# --- duiding: wat het bewijs wél en niet zegt -------------------------------
+
+
+def test_een_bewijspad_kan_een_duiding_dragen() -> None:
+    """Zonder duiding kreeg het model de verkeerde vraag.
+
+    De aggregaatbevinding op A.5.32 luidde: "303 van 386 repositories missen een LICENSE-bestand"
+    — geclassificeerd als NC. Maar A.5.32 gaat over het respecteren van **andermans**
+    intellectuele eigendom en het beheren van propriëtaire software. Hoe je je eigen code
+    licenseert is iets anders, en het ontbreken daarvan is hooguit een verbeterpunt.
+
+    De duiding geeft de norm-interpretatie mee, niet de gewenste uitkomst. Het oordeel blijft aan
+    het model en daarna aan de auditor; wat verandert is dat de vraag klopt.
+    """
+    from iso_audit.classification.bron_clausules import duiding_voor
+
+    tekst = duiding_voor("LICENSE")
+    assert "eigen" in tekst.lower()
+    assert "5.32" in tekst or "propriëtaire" in tekst.lower()
+
+
+def test_een_pad_zonder_duiding_geeft_niets() -> None:
+    """Alleen waar de koppeling om uitleg vraagt; de rest spreekt voor zich."""
+    from iso_audit.classification.bron_clausules import duiding_voor
+
+    assert duiding_voor("CONTRIBUTING.md") == ""

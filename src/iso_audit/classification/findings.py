@@ -541,7 +541,10 @@ def _gedaan_miro(conn: sqlite3.Connection, norm: str) -> set[str]:
 
 
 def _upsert_bevindingen(
-    conn: sqlite3.Connection, bevindingen: list[dict[str, Any]], norm: str
+    conn: sqlite3.Connection,
+    bevindingen: list[dict[str, Any]],
+    norm: str,
+    audit_id: str | None = None,
 ) -> None:
     """UPSERT: overschrijft bestaande rij bij conflict op composite key.
 
@@ -556,8 +559,9 @@ def _upsert_bevindingen(
             """
             INSERT INTO bevindingen
                 (doc_id, herkomst, clausule_id, norm, classificatie, ernst, beschrijving,
-                 onderbouwing, onbruikbaar, pre_classificatie, document_naam, classified_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
+                 onderbouwing, onbruikbaar, pre_classificatie, document_naam, audit_id,
+                 classified_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
             ON CONFLICT(doc_id, herkomst, clausule_id, norm) DO UPDATE SET
                 classificatie    = excluded.classificatie,
                 ernst            = excluded.ernst,
@@ -566,6 +570,7 @@ def _upsert_bevindingen(
                 onbruikbaar      = excluded.onbruikbaar,
                 pre_classificatie= excluded.pre_classificatie,
                 document_naam    = excluded.document_naam,
+                audit_id         = excluded.audit_id,
                 classified_at    = excluded.classified_at
             """,
             (
@@ -580,6 +585,7 @@ def _upsert_bevindingen(
                 1 if bev.get("onbruikbaar") else 0,
                 bev.get("pre_classificatie"),
                 bev["document_naam"],
+                audit_id,
             ),
         )
     conn.commit()
@@ -717,6 +723,12 @@ class _ClassifyContext:
     scherpte: float
     rehash: bool
     audit_id: str = ""
+    """Tijdstempel dat de `classifications`-rijen van één run groepeert. **Niet** het id van de
+    audit uit de registry — dat is `auditmap`. Twee dingen die `audit_id` heten is precies waar
+    verwarring uit ontstaat; deze naam stond er al en de betekenis is niet veranderd."""
+    auditmap: str = ""
+    """Het id van de audit uit de registry (`27001-2026-H4`), zodat een bevinding weet bij welke
+    audit ze hoort. Zonder dit exporteerde elke audit alles wat er ooit in de tabel stond."""
     gedaan: dict[str, set[str]] = field(default_factory=dict)
     gedaan_miro_ids: set[str] = field(default_factory=set)
 
@@ -735,6 +747,7 @@ def classificeer_alle_bevindingen(
     rehash: bool = False,
     model: str | None = None,
     audit_id: str | None = None,
+    auditmap: str = "",
     op_kosten: Callable[[Kostenteller], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Classificeer Drive-docs en Miro-notities; UPSERT in `bevindingen`-tabel.
@@ -764,6 +777,7 @@ def classificeer_alle_bevindingen(
         scherpte=scherpte,
         rehash=rehash,
         audit_id=audit_id or _maak_audit_id(),
+        auditmap=auditmap,
         gedaan=_gedaan_per_doc(conn, norm),
         gedaan_miro_ids=_gedaan_miro(conn, norm),
     )
@@ -851,7 +865,9 @@ def _titel(clausule: str, norm: str, samengevoegd: dict[str, Any]) -> str:
     return str(titel) if titel else clausule
 
 
-def _bevindingen_query(norm: str, hoofdstuk: str | None = None) -> tuple[str, tuple[str, ...]]:
+def _bevindingen_query(
+    norm: str, hoofdstuk: str | None = None, audit_id: str | None = None
+) -> tuple[str, tuple[str, ...]]:
     """De query die de bevindingen binnen de run-scope teruggeeft.
 
     Bij `beide` zijn dat de rijen van **beide** normen én de oude rijen die letterlijk `beide`
@@ -867,6 +883,12 @@ def _bevindingen_query(norm: str, hoofdstuk: str | None = None) -> tuple[str, tu
     De `A.`-prefix van Bijlage A telt mee in het filter: hoofdstuk `8` levert §8.1 t/m §8.3 en
     níet A.8.16, want dat is een maatregel en geen managementclausule. Wie de maatregelen wil,
     typt `A.8`.
+
+    `audit_id` begrenst tot wat déze audit heeft opgeleverd. Zonder die begrenzing exporteerde
+    elke audit alles wat er ooit in de tabel was beland — op 2026-08-30 toonde een schone audit
+    247 bevindingen terwijl de run er zes had opgeleverd. Rijen van vóór deze kolom hebben geen
+    id en horen dus bij geen enkele audit: zichtbaar zonder filter, niet in een nieuwe audit.
+    Weggooien zou bewijs vernietigen, aan iedereen tonen is het probleem zelf.
     """
     from iso_audit.classification.clause_mapping import normen_van
 
@@ -877,6 +899,9 @@ def _bevindingen_query(norm: str, hoofdstuk: str | None = None) -> tuple[str, tu
         kop = hoofdstuk.rstrip(".")
         waar += " AND (clausule_id = ? OR clausule_id LIKE ?)"
         waarden = (*waarden, kop, f"{kop}.%")
+    if audit_id:
+        waar += " AND audit_id = ?"
+        waarden = (*waarden, audit_id)
     return (
         f"SELECT * FROM bevindingen WHERE {waar} ORDER BY clausule_id",  # nosec B608
         waarden,
@@ -1013,7 +1038,7 @@ def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:
             resultaten=resultaten,
             clausule_titels=ctx.clausules,
         )
-        _upsert_bevindingen(ctx.conn, bevs, ctx.norm)
+        _upsert_bevindingen(ctx.conn, bevs, ctx.norm, ctx.auditmap)
 
 
 def _classify_miro(ctx: _ClassifyContext, miro_notities: list[dict[str, Any]]) -> None:
@@ -1074,7 +1099,7 @@ def _classify_miro(ctx: _ClassifyContext, miro_notities: list[dict[str, Any]]) -
                 skip_teller,
                 mistag_teller,
             )
-        _upsert_bevindingen(ctx.conn, bevs, ctx.norm)
+        _upsert_bevindingen(ctx.conn, bevs, ctx.norm, ctx.auditmap)
 
 
 # ---------------------------------------------------------------------------

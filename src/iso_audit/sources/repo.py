@@ -298,8 +298,13 @@ def bewijspad_tekst(pad: str, per_repo: dict[str, str], alle: list[str]) -> str:
     for naam, inhoud in per_repo.items():
         varianten.setdefault(inhoud.strip(), []).append(naam)
 
-    regels = [
-        f"{pad} over {len(alle)} repository(s).",
+    from iso_audit.classification.bron_clausules import duiding_voor
+
+    regels = [f"{pad} over {len(alle)} repository(s)."]
+    uitleg = duiding_voor(pad)
+    if uitleg:
+        regels += ["", uitleg]
+    regels += [
         "",
         f"Aanwezig in {len(aanwezig)} van de {len(alle)}.",
         f"  Ontbreekt in: {_noem(ontbreekt)}.",

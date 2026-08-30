@@ -125,7 +125,7 @@ def _migreer_clause_matches_norm(conn: sqlite3.Connection) -> None:
 
 
 def _migreer_bevindingen_kolommen(conn: sqlite3.Connection) -> None:
-    """Voeg `ernst` en `onbruikbaar` toe aan een bestaande `bevindingen`.
+    """Voeg `audit_id`, `ernst` en `onbruikbaar` toe aan een bestaande `bevindingen`.
 
     `CREATE TABLE IF NOT EXISTS` raakt een bestaande tabel niet aan, dus zonder deze migratie
     zouden de nieuwe velden alleen in een verse database bestaan — en dan is de prompt wel
@@ -138,6 +138,8 @@ def _migreer_bevindingen_kolommen(conn: sqlite3.Connection) -> None:
     kolommen = {r[1] for r in conn.execute("PRAGMA table_info(bevindingen)")}
     if not kolommen:
         return
+    if "audit_id" not in kolommen:
+        conn.execute("ALTER TABLE bevindingen ADD COLUMN audit_id TEXT")
     if "ernst" not in kolommen:
         conn.execute("ALTER TABLE bevindingen ADD COLUMN ernst TEXT")
         logger.info("bevindingen gemigreerd: kolom ernst toegevoegd")
@@ -207,6 +209,11 @@ def initialiseer(conn: sqlite3.Connection) -> None:
             pre_classificatie TEXT,
             document_naam    TEXT,
             classified_at    TEXT NOT NULL,
+            -- Welke audit deze bevinding heeft opgeleverd. Zonder deze kolom exporteerde élke
+            -- audit alles wat er ooit in de tabel was beland: op 2026-08-30 toonde een schone
+            -- audit 247 bevindingen terwijl de run er zes had opgeleverd. Archiveren van de
+            -- vorige audit hielp niet — de bevindingen zitten hier, niet in de auditmap.
+            audit_id         TEXT,
             UNIQUE(doc_id, herkomst, clausule_id, norm)
         );
 

@@ -606,6 +606,9 @@ class AuditSession:
                 sources=sources,
                 chapter=chapter,
                 on_log=_on_log,
+                # Het id van deze audit, zodat elke bevinding weet waar ze bij hoort. Zonder dat
+                # exporteerde een schone audit alles wat er ooit in de database stond.
+                auditmap=self.dir.name,
                 review=review,
                 review_steekproef=review_steekproef,
                 auto_triage=auto_triage,
@@ -617,6 +620,7 @@ class AuditSession:
                 language="nl",
                 top_n=top_n,
                 hoofdstuk=chapter,
+                auditmap=self.dir.name,
             )
             # AANVULLEN, niet overschrijven. Eerder deed dit `self._save(drafted)` en
             # daarmee gooide een tweede run alle triage van de eerste weg — precies

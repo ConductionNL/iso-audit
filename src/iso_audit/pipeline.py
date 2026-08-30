@@ -411,6 +411,7 @@ def run_audit(
     dry_run_cost: bool = False,
     mode: Mode | None = None,
     audit_id: str | None = None,
+    auditmap: str = "",
     sources: list[str] | None = None,
     alleen_ingest: bool = False,
     op_kosten: Callable[[Any], None] | None = None,
@@ -671,6 +672,9 @@ def run_audit(
         norm=norm,
         scherpte=scherpte,
         rehash=rehash,
+        # Het id van de audit uit de registry, zodat elke bevinding weet bij welke audit ze
+        # hoort. Zonder dat exporteerde een schone audit alles wat er ooit in de tabel stond.
+        auditmap=auditmap,
         op_kosten=op_kosten,
     )
 
