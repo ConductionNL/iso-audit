@@ -521,10 +521,20 @@ def _gedaan_per_doc(conn: sqlite3.Connection, norm: str) -> dict[str, set[str]]:
     Alle niet-Miro-bronnen (Drive, Jira, Planning, …) gaan via het document-pad
     en delen deze dedup; Miro heeft een eigen pad (`_gedaan_miro`).
     """
+    # Dezelfde normkeuze als `_bevindingen_query`: bij `beide` tellen de rijen van béíde normen
+    # mee, plus de oude rijen die letterlijk `beide` dragen. Zocht hier alleen op de
+    # run-parameter, en dan vond een gecombineerde run niets — want bevindingen worden opgeslagen
+    # met hun eigen norm. Een hervatte run begon daardoor van voren af aan, bij precies het
+    # runtype waarvoor hervatten bedoeld is.
+    from iso_audit.classification.clause_mapping import normen_van
+
+    normen = (*normen_van(norm), norm)
+    plaatshouders = ",".join("?" for _ in normen)
     result: dict[str, set[str]] = defaultdict(set)
     rows = conn.execute(
-        "SELECT doc_id, clausule_id FROM bevindingen WHERE herkomst != 'Miro' AND norm=?",
-        (norm,),
+        "SELECT doc_id, clausule_id FROM bevindingen "  # nosec B608
+        f"WHERE herkomst != 'Miro' AND norm IN ({plaatshouders})",
+        normen,
     ).fetchall()
     for doc_id, cid in rows:
         result[doc_id].add(cid)
@@ -532,10 +542,15 @@ def _gedaan_per_doc(conn: sqlite3.Connection, norm: str) -> dict[str, set[str]]:
 
 
 def _gedaan_miro(conn: sqlite3.Connection, norm: str) -> set[str]:
-    """Set van Miro-item-IDs die al een bevinding hebben voor deze norm."""
+    """Set van Miro-item-IDs die al een bevinding hebben. Zelfde normkeuze als `_gedaan_per_doc`."""
+    from iso_audit.classification.clause_mapping import normen_van
+
+    normen = (*normen_van(norm), norm)
+    plaatshouders = ",".join("?" for _ in normen)
     rows = conn.execute(
-        "SELECT DISTINCT doc_id FROM bevindingen WHERE herkomst='Miro' AND norm=?",
-        (norm,),
+        "SELECT DISTINCT doc_id FROM bevindingen "  # nosec B608
+        f"WHERE herkomst='Miro' AND norm IN ({plaatshouders})",
+        normen,
     ).fetchall()
     return {r[0] for r in rows}
 
@@ -1014,31 +1029,57 @@ def _classify_drive(ctx: _ClassifyContext, docs: list[dict[str, Any]]) -> None:
     for i, (doc_id, cids) in enumerate(todo_pairs, 1):
         doc = doc_map[doc_id]
         logger.info("[%d/%d] %s (%d clausules)", i, len(todo_pairs), doc["naam"][:50], len(cids))
-        resultaten = _classificeer_doc(
-            doc,
-            cids,
-            ctx.clausules,
-            ctx.client,
-            ctx.teller,
-            scherpte=ctx.scherpte,
-            conn=ctx.conn,
-            audit_id=ctx.audit_id,
-        )
-        bevs = bouw_bevindingen(
-            # `clausule_normen` moet mee: daar staat uit welke norm elke koppeling komt. Een
-            # minimale dict liet dat vallen, en dan kreeg elke bevinding de run-parameter
-            # (`beide`) — gemeten in de run van 2026-08-25 21:40.
-            doc={
-                "id": doc_id,
-                "naam": doc["naam"],
-                "herkomst": doc.get("herkomst") or "Drive",
-                "clausule_normen": doc.get("clausule_normen") or [],
-            },
-            clausules=cids,
-            resultaten=resultaten,
-            clausule_titels=ctx.clausules,
-        )
-        _upsert_bevindingen(ctx.conn, bevs, ctx.norm, ctx.auditmap)
+        try:
+            _classificeer_en_bewaar(ctx, doc_id, doc, cids)
+        except Exception as fout:
+            # Wat hiervóór is geclassificeerd, staat al in de database: elk document wordt apart
+            # opgeslagen en gecommit. Deze melding zegt hoeveel dat er zijn, want zonder dat
+            # getal weet niemand of een hervatting nog iets te doen heeft — en de vraag die dit
+            # oplevert ("raken we de stand kwijt als het tegoed opraakt?") verdient een antwoord
+            # in het log en niet in de broncode.
+            logger.warning(
+                "Classificatie gestopt bij document %d van %d (%s). De %d eerder verwerkte "
+                "documenten staan in de database; een nieuwe run gaat verder waar deze stopte.",
+                i,
+                len(todo_pairs),
+                type(fout).__name__,
+                i - 1,
+            )
+            raise
+
+
+def _classificeer_en_bewaar(
+    ctx: _ClassifyContext, doc_id: str, doc: dict[str, Any], cids: list[str]
+) -> None:
+    """Classificeer één document en sla het meteen op.
+
+    Meteen opslaan en niet aan het eind: een fout op document 500 mag geen 499 eerdere kosten.
+    """
+    resultaten = _classificeer_doc(
+        doc,
+        cids,
+        ctx.clausules,
+        ctx.client,
+        ctx.teller,
+        scherpte=ctx.scherpte,
+        conn=ctx.conn,
+        audit_id=ctx.audit_id,
+    )
+    bevs = bouw_bevindingen(
+        # `clausule_normen` moet mee: daar staat uit welke norm elke koppeling komt. Een
+        # minimale dict liet dat vallen, en dan kreeg elke bevinding de run-parameter
+        # (`beide`) — gemeten in de run van 2026-08-25 21:40.
+        doc={
+            "id": doc_id,
+            "naam": doc["naam"],
+            "herkomst": doc.get("herkomst") or "Drive",
+            "clausule_normen": doc.get("clausule_normen") or [],
+        },
+        clausules=cids,
+        resultaten=resultaten,
+        clausule_titels=ctx.clausules,
+    )
+    _upsert_bevindingen(ctx.conn, bevs, ctx.norm, ctx.auditmap)
 
 
 def _classify_miro(ctx: _ClassifyContext, miro_notities: list[dict[str, Any]]) -> None:

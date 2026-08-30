@@ -6,6 +6,26 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-30 — een afgebroken run begint niet opnieuw
+
+Vóór de volledige run vroeg de auditor: wat als het API-tegoed opraakt halverwege? Het antwoord
+was half goed, en de helft die niet klopte zat precies bij het runtype dat hij wilde draaien.
+
+**Wat al werkte:** elk document wordt apart geclassificeerd, opgeslagen en gecommit. Een fout op
+document 500 kost geen 499 eerdere.
+
+**Wat niet werkte:** `_gedaan_per_doc` bepaalt wat er kan worden overgeslagen, en zocht op de
+run-parameter. Bij een gecombineerde run is dat `beide`, terwijl bevindingen worden opgeslagen
+met hun eigen norm (`9001` of `27001`). Hij vond dus niets, en een hervatte run begon van voren
+af aan — bij precies het runtype waarvoor hervatten bedoeld is. Nu telt hij, net als
+`_bevindingen_query`, de rijen van beide normen mee plus de oude rijen die letterlijk `beide`
+dragen.
+
+**En de melding.** Stopt de classificatie, dan staat er nu in het log hoeveel documenten er wél
+zijn verwerkt en dat een nieuwe run verdergaat waar deze stopte. Zonder dat getal weet niemand of
+hervatten nog iets te doen heeft, en dan is "we raken de stand niet kwijt" een bewering in plaats
+van iets wat je kunt zien.
+
 ### Added — 2026-08-30 — bevindingen horen bij één audit
 
 Een schone audit toonde 247 bevindingen terwijl de run er zes had opgeleverd. De andere 241 kwamen
