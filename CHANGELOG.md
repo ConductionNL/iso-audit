@@ -6,6 +6,21 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-30 — bandit-gate weer groen
+
+De CI-stap "Faal op medium en hoger" stond rood sinds de sitemap-wijziging: `_wortel()` roept
+`ElementTree.fromstring` aan en bandit markeert dat als B314. De check dekt een echt risico —
+entity-expansie — maar die is hier al afgevangen: een sitemap met een DOCTYPE wordt geweigerd
+vóór het parsen.
+
+Nu voorzien van `# nosec B314` mét reden, dezelfde afweging als bij `sources/tekst.py` voor ODF:
+`defusedxml` erbij halen voor één aanroep met een expliciete DOCTYPE-check ervoor is een
+afhankelijkheid zonder winst.
+
+**Wat dit blootlegt in mijn eigen werkwijze:** ik draaide lokaal ruff, mypy en de testsuite, maar
+niet bandit. De gate stond daardoor twee pushes lang rood zonder dat ik het zag. `uv run
+pre-commit run --all-files` draait ze alle vier tegelijk en staat niet voor niets in CLAUDE.md.
+
 ### Fixed — 2026-08-30 — een afgebroken run begint niet opnieuw
 
 Vóór de volledige run vroeg de auditor: wat als het API-tegoed opraakt halverwege? Het antwoord

@@ -22,7 +22,7 @@ import re
 from collections.abc import Iterator
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
-from xml.etree import ElementTree
+from xml.etree import ElementTree  # nosec B405 — zie `_wortel`
 
 import requests
 
@@ -102,7 +102,10 @@ def _wortel(xml: str) -> ElementTree.Element:
     if "<!DOCTYPE" in xml[:2000].upper():
         raise ValueError("sitemap met DOCTYPE wordt niet gelezen")
     try:
-        return ElementTree.fromstring(xml)
+        # nosec B314 — DOCTYPE wordt hierboven geweigerd, dus entity-expansie kan niet. Zelfde
+        # afweging als bij `sources/tekst.py` voor ODF: `defusedxml` erbij halen voor één
+        # aanroep met een expliciete DOCTYPE-check ervoor is een afhankelijkheid zonder winst.
+        return ElementTree.fromstring(xml)  # nosec B314
     except ElementTree.ParseError as fout:
         raise ValueError(f"sitemap is geen geldige XML: {fout}") from fout
 
