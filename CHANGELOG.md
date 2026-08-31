@@ -6,6 +6,46 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-31 — clausule-context in het profiel: het auditoordeel blijft staan
+
+Na de volledige run (715 bevindingen, 68 NC) wees de auditor twee NC's terug die het niet zijn:
+
+- **A.8.14 redundantie** — Conduction haalt data bij de bron op; er valt weinig te dupliceren
+  wat niet bij ons staat.
+- **A.8.9 configuratiebeheer** — de versies staan in Git, met commit, auteur en geschiedenis.
+
+Beide keren ís er een beheersmaatregel, alleen niet gedocumenteerd of gecentraliseerd. Zonder
+vastlegging velt het model elke run opnieuw hetzelfde oordeel en sleept de auditor elke run
+dezelfde bevindingen met de hand naar OFI.
+
+Wat er nu gebeurt, in `clausule_context` in het profiel (klantspecifiek, dus niet in code):
+
+1. **`context`** gaat mee in de classificatie-prompt als feitelijke toelichting — het model
+   beantwoordt de vraag met kennis die anders alleen de auditor had. Geen gewenste uitkomst.
+2. **`hoogste_klasse`** legt een plafond op het oordeel. Alleen verlagen: `NC` wordt geweigerd,
+   want ophogen is een auditoordeel dat in de triage hoort met een mens-account eronder. Een
+   plafond zonder `motivering` laadt niet — een stille uitzondering is precies waar een externe
+   auditor op doorvraagt. De verlaging komt mét motivering in de onderbouwing van de bevinding
+   te staan; het ruwe modeloordeel verdwijnt niet.
+3. **`thema`** bundelt de clausules die hetzelfde verhaal vertellen. A.8.14 en A.8.9 vielen in
+   `Back-up & continuïteit` en `Ontwikkeling & wijzigingsbeheer` — uit elkaar getrokken zijn het
+   twee losse opmerkingen, bij elkaar één verbeteradvies over documenteren. Daarvoor is
+   `Vastlegging van bestaande beheersing` aan de taxonomie toegevoegd (26 → 27), bewust **zonder**
+   keyword-regel: aan de tekst is niet te zien of iets bestaat maar ongedocumenteerd is. Voorrang
+   bij het toekennen: profiel > LLM-verfijning > heuristiek.
+
+**Bestanden:** `classification/grenzen.py` (nieuw), `classification/findings.py`,
+`classification/thema.py`, `memo/theme/profile.py`, `pipeline.py`,
+`examples/auditmemo/conduction.profile.yaml`, `tests/memo/test_clausulecontext.py` (nieuw),
+`tests/classification/test_thema.py`.
+
+**Wat de tests blootlegden:** de eerste versie wireerde de grens tot in `bouw_bevindingen` maar
+niet tot in `_classificeer_en_bewaar` — de regel bestond en deed in een echte run niets. De
+losse eenheden waren groen. Er staat nu een ketentest van profielregel tot bevinding.
+
+1833 tests groen; `pre-commit run --all-files` (ruff, format, mypy --strict, secrets, bandit)
+groen.
+
 ### Fixed — 2026-08-30 — bandit-gate weer groen
 
 De CI-stap "Faal op medium en hoger" stond rood sinds de sitemap-wijziging: `_wortel()` roept

@@ -50,6 +50,7 @@ import anthropic
 from dotenv import load_dotenv
 
 from iso_audit import modellen
+from iso_audit.classification.grenzen import pas_grens_toe, verlagingsnotitie
 from iso_audit.classification.respons import GEEN_THINKING, OnleesbaarAntwoordError, tekst_uit
 
 load_dotenv()
@@ -232,16 +233,50 @@ def _systeem_voor(scherpte: float, herkomst: str = "Drive") -> str:
 
 
 def _bouw_doc_user_prompt(
-    doc: dict[str, Any], clausule_ids: list[str], clausules: dict[str, Any]
+    doc: dict[str, Any],
+    clausule_ids: list[str],
+    clausules: dict[str, Any],
+    clausule_context: dict[str, Any] | None = None,
 ) -> str:
     clausules_lijst = "\n".join(
         f"- {cid}: {clausules.get(cid, {}).get('titel', cid)}" for cid in clausule_ids
     )
-    return (
+    prompt = (
         f"Document: {doc['naam']}\n\n"
         f"Tekst:\n---\n{doc['tekst'][:MAX_TEKST]}\n---\n\n"
         f"Clausules:\n{clausules_lijst}\n"
     )
+    context = _contextblok(clausule_ids, clausule_context)
+    return f"{prompt}\n{context}" if context else prompt
+
+
+def _contextblok(clausule_ids: list[str], clausule_context: dict[str, Any] | None) -> str:
+    """Organisatiecontext bij de clausules die er een hebben, of een lege string.
+
+    Dit is feitelijke context over hoe de organisatie werkt — "wij halen data bij de bron op" —
+    en geen gewenste uitkomst. Het oordeel blijft aan het model; wat verandert is dat het model
+    de vraag beantwoordt met kennis die anders alleen de auditor had. De bovengrens uit dezelfde
+    profielregel is een aparte stap: die grijpt ná de classificatie in, zichtbaar in de
+    onderbouwing. Zie `classification/grenzen.py`.
+    """
+    if not clausule_context:
+        return ""
+    regels = []
+    for cid in clausule_ids:
+        tekst = _veld_context(clausule_context.get(cid))
+        if tekst:
+            regels.append(f"- {cid}: {tekst}")
+    if not regels:
+        return ""
+    return "Organisatiecontext (feitelijk, geen oordeel):\n" + "\n".join(regels) + "\n"
+
+
+def _veld_context(regel: Any) -> str:
+    """De contexttekst uit een profielregel; werkt op zowel een model als een dict."""
+    if regel is None:
+        return ""
+    waarde = regel.get("context") if isinstance(regel, dict) else getattr(regel, "context", "")
+    return str(waarde or "").strip()
 
 
 def _bouw_miro_user_prompt(notities: list[dict[str, Any]], clausules: dict[str, Any]) -> str:
@@ -367,6 +402,7 @@ def _classificeer_doc(
     scherpte: float = 1.0,
     conn: sqlite3.Connection | None = None,
     audit_id: str = "",
+    clausule_context: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Eén API-call per doc (alle opgegeven clausules in één response).
 
@@ -374,7 +410,7 @@ def _classificeer_doc(
     JSON-parsing gepersisteerd in `classifications` (§2.6.4).
     """
     system = _systeem_voor(scherpte, herkomst="Drive")
-    user = _bouw_doc_user_prompt(doc, clausule_ids, clausules)
+    user = _bouw_doc_user_prompt(doc, clausule_ids, clausules, clausule_context)
     t0 = time.time()
     try:
         resp = _vraag_model(
@@ -741,6 +777,9 @@ class _ClassifyContext:
     """Tijdstempel dat de `classifications`-rijen van één run groepeert. **Niet** het id van de
     audit uit de registry — dat is `auditmap`. Twee dingen die `audit_id` heten is precies waar
     verwarring uit ontstaat; deze naam stond er al en de betekenis is niet veranderd."""
+    clausule_context: dict[str, Any] = field(default_factory=dict)
+    """Organisatiecontext per clausule uit het profiel: uitleg voor de classificatie en een
+    bovengrens op het oordeel. Zie `memo/theme/profile.ClausuleContext`."""
     auditmap: str = ""
     """Het id van de audit uit de registry (`27001-2026-H4`), zodat een bevinding weet bij welke
     audit ze hoort. Zonder dit exporteerde elke audit alles wat er ooit in de tabel stond."""
@@ -763,6 +802,7 @@ def classificeer_alle_bevindingen(
     model: str | None = None,
     audit_id: str | None = None,
     auditmap: str = "",
+    clausule_context: dict[str, Any] | None = None,
     op_kosten: Callable[[Kostenteller], None] | None = None,
 ) -> list[dict[str, Any]]:
     """Classificeer Drive-docs en Miro-notities; UPSERT in `bevindingen`-tabel.
@@ -793,6 +833,7 @@ def classificeer_alle_bevindingen(
         rehash=rehash,
         audit_id=audit_id or _maak_audit_id(),
         auditmap=auditmap,
+        clausule_context=clausule_context or {},
         gedaan=_gedaan_per_doc(conn, norm),
         gedaan_miro_ids=_gedaan_miro(conn, norm),
     )
@@ -935,6 +976,7 @@ def bouw_bevindingen(
     clausules: list[str],
     resultaten: list[dict[str, Any]],
     clausule_titels: dict[str, Any],
+    clausule_context: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Zet modelantwoorden om in bevindingen — zonder oordeel geen bevinding.
 
@@ -969,7 +1011,9 @@ def bouw_bevindingen(
             continue  # geen oordeel is geen bevinding
         for match_norm in normen_per_clausule.get(cid) or [""]:
             bevindingen.append(
-                _bevinding(doc, cid, match_norm, res, classificatie, clausule_titels)
+                _bevinding(
+                    doc, cid, match_norm, res, classificatie, clausule_titels, clausule_context
+                )
             )
     return bevindingen
 
@@ -981,10 +1025,23 @@ def _bevinding(
     res: dict[str, Any],
     classificatie: str,
     clausule_titels: dict[str, Any],
+    clausule_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Eén bevindingsrij; `match_norm` leeg betekent: de aanroeper beslist, zoals voorheen."""
+    """Eén bevindingsrij; `match_norm` leeg betekent: de aanroeper beslist, zoals voorheen.
+
+    Een profielregel kan het oordeel verlagen — nooit ophogen. Het ruwe modeloordeel verdwijnt
+    daarbij niet: de verlaging komt met motivering in de onderbouwing te staan, zodat in de
+    bevinding zelf te lezen is dát er een regel gold en waarom. Zie `classification/grenzen.py`.
+    """
     beschrijving = res.get("beschrijving") or ""
     onderbouwing = res.get("onderbouwing") or ""
+    regel = (clausule_context or {}).get(cid)
+    verlaagd = pas_grens_toe(classificatie, regel)
+    if verlaagd != classificatie:
+        onderbouwing = (
+            f"{onderbouwing}\n\n{verlagingsnotitie(classificatie, verlaagd, regel)}".strip()
+        )
+        classificatie = verlaagd
     return {
         "_doc_id": doc["id"],
         # Bron van de bevinding (Drive/Jira/Planning/…) — terugvoerbaar.
@@ -1064,6 +1121,7 @@ def _classificeer_en_bewaar(
         scherpte=ctx.scherpte,
         conn=ctx.conn,
         audit_id=ctx.audit_id,
+        clausule_context=ctx.clausule_context,
     )
     bevs = bouw_bevindingen(
         # `clausule_normen` moet mee: daar staat uit welke norm elke koppeling komt. Een
@@ -1078,6 +1136,7 @@ def _classificeer_en_bewaar(
         clausules=cids,
         resultaten=resultaten,
         clausule_titels=ctx.clausules,
+        clausule_context=ctx.clausule_context,
     )
     _upsert_bevindingen(ctx.conn, bevs, ctx.norm, ctx.auditmap)
 

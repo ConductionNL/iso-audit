@@ -18,9 +18,15 @@ def test_thema_lijst_is_finite() -> None:
     Het getal groeit alleen met een reden. 25 -> 26 op 2026-08-26: "Ontwikkeling &
     wijzigingsbeheer" erbij, omdat §8.9, §8.25 en §8.33 nergens anders in pasten en daardoor
     elk een eigen memo-blok kregen. Zie `tests/classification/test_thema_hiaten.py`.
+
+    26 -> 27 op 2026-08-31: "Vastlegging van bestaande beheersing" erbij. De auditor zette
+    A.8.14 en A.8.9 met dezelfde reden terug van NC naar OFI — de maatregel bestaat, hij is
+    alleen niet opgeschreven — terwijl de heuristiek ze in twee ongerelateerde thema's zette.
+    Dit thema heeft bewust geen keyword-regel: aan de tekst is niet te zien of iets bestaat maar
+    ongedocumenteerd is, dus kent het profiel het per clausule toe.
     """
     assert thema.THEMA_LIJST[-1] == "Overig"
-    assert len(thema.THEMA_LIJST) == 26
+    assert len(thema.THEMA_LIJST) == 27
     # Geen duplicates.
     assert len(set(thema.THEMA_LIJST)) == len(thema.THEMA_LIJST)
 

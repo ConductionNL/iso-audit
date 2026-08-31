@@ -78,6 +78,44 @@ class Defaults(BaseModel):
     include_independence_caveat: bool = False
 
 
+class ClausuleContext(BaseModel):
+    """Wat er over déze organisatie bekend is bij één clausule.
+
+    Na de volledige run van 2026-08-31 wees de auditor twee NC's aan die het niet zijn: A.8.14
+    (redundantie) omdat Conduction data bij de bron ophaalt in plaats van zelf te bewaren, en
+    A.8.9 (configuratiebeheer) omdat de versies in Git staan. Beide keren ís er een maatregel,
+    alleen niet gedocumenteerd of gecentraliseerd — een verbeterkans, geen non-conformiteit.
+
+    Zonder deze context velt het model elke run opnieuw hetzelfde verkeerde oordeel.
+
+    In het profiel en niet in de code, want het is klantspecifiek: een cachende dienstverlener
+    heeft een ander antwoord op A.8.14 dan een partij die zelf data bewaart.
+    """
+
+    context: str = ""
+    """Wat de auditor over deze organisatie weet en het model niet. Gaat mee naar de
+    classificatie als toelichting, niet als gewenste uitkomst."""
+
+    hoogste_klasse: str | None = None
+    """`OFI` of `POSITIVE`: hoger dan dit mag een bevinding op deze clausule niet uitvallen.
+
+    Alleen verlagen. Ophogen naar NC is een auditoordeel dat een mens hoort te vellen, in de
+    triage, met zijn naam eronder — zie `MACHINE_ACTOREN` in `api/session.py`."""
+
+    thema: str = ""
+    """Onder welk memo-thema bevindingen op deze clausule vallen. Moet in `THEMA_LIJST` staan.
+
+    A.8.14 en A.8.9 zijn hetzelfde verhaal — de beheersmaatregel bestáát, hij is alleen niet
+    vastgelegd — maar de heuristiek zet ze in `Back-up & continuïteit` en `Ontwikkeling &
+    wijzigingsbeheer`. Uit elkaar getrokken worden het twee losse opmerkingen; bij elkaar is het
+    één verbeteradvies over documenteren, en dat is wat de directie kan oppakken."""
+
+    motivering: str = ""
+    """Waarom die grens er is. Verplicht zodra `hoogste_klasse` is gezet: een klasse verlagen
+    zonder reden is precies het soort stille uitzondering waar een externe auditor op doorvraagt.
+    Het profiel is versiebeheerd, dus deze zin is later na te lezen."""
+
+
 class Profile(BaseModel):
     schema_version: int
     slug: str
@@ -86,6 +124,45 @@ class Profile(BaseModel):
     brand: Brand
     standards: list[str] = Field(default_factory=list)
     defaults: Defaults = Field(default_factory=Defaults)
+    clausule_context: dict[str, ClausuleContext] = Field(default_factory=dict)
+    """Per clausule-id de organisatiecontext. Leeg in bestaande profielen; die blijven werken."""
+
+
+TOEGESTANE_GRENZEN = ("OFI", "POSITIVE")
+"""Klassen waarnaar een profiel mag verlagen. `NC` staat er bewust niet bij."""
+
+
+def _valideer_clausule_context(profiel: Profile) -> None:
+    """Een grens vraagt een motivering en mag alleen verlagen; een thema moet bestaan."""
+    from iso_audit.classification.thema import THEMA_LIJST
+
+    for clausule, regel in profiel.clausule_context.items():
+        if regel.thema and regel.thema not in THEMA_LIJST:
+            # Vrije tekst zou per profiel een eigen thema opleveren, en dan bundelt de memo niets
+            # meer: twee spellingen van hetzelfde thema zijn twee blokken.
+            raise ProfileError(
+                f"Profiel '{profiel.slug}', clausule {clausule}: onbekend thema "
+                f"{regel.thema!r}. Kies er een uit THEMA_LIJST in classification/thema.py."
+            )
+        if not regel.hoogste_klasse:
+            continue
+        if regel.hoogste_klasse == "NC":
+            raise ProfileError(
+                f"Profiel '{profiel.slug}', clausule {clausule}: `hoogste_klasse` verlaagt "
+                "alleen. Een bevinding ophogen naar NC is een auditoordeel dat in de triage "
+                "hoort, met een mens-account eronder."
+            )
+        if regel.hoogste_klasse not in TOEGESTANE_GRENZEN:
+            raise ProfileError(
+                f"Profiel '{profiel.slug}', clausule {clausule}: onbekende `hoogste_klasse` "
+                f"{regel.hoogste_klasse!r}; kies uit {', '.join(TOEGESTANE_GRENZEN)}."
+            )
+        if not regel.motivering.strip():
+            raise ProfileError(
+                f"Profiel '{profiel.slug}', clausule {clausule}: `hoogste_klasse` vraagt een "
+                "motivering. Een klasse verlagen zonder reden is niet te verantwoorden tegenover "
+                "een externe auditor."
+            )
 
 
 def _valideer_policy(profiel: Profile) -> None:
@@ -94,6 +171,7 @@ def _valideer_policy(profiel: Profile) -> None:
     Bewust buiten de pydantic-validator: een ValueError dáár wordt verpakt in een
     ValidationError en is niet als ProfileError vangbaar.
     """
+    _valideer_clausule_context(profiel)
     if profiel.schema_version != SCHEMA_VERSION:
         msg = (
             f"Profiel '{profiel.slug}' heeft schema_version {profiel.schema_version}; "

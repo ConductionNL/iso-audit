@@ -68,8 +68,14 @@ THEMA_LIJST: list[str] = [
     "Wettelijke & contractuele eisen",
     "Privacy & persoonsgegevens",
     "Context-analyse & belanghebbenden",
+    "Vastlegging van bestaande beheersing",
     "Overig",
 ]
+
+# `Vastlegging van bestaande beheersing` staat bewust **niet** in `THEMA_REGELS`: het is niet aan
+# een woord in de tekst te zien of een maatregel wel bestaat maar niet is opgeschreven. Dat weet
+# alleen de auditor, en die legt het per clausule vast in het profiel (`clausule_context.thema`).
+# Een keyword-regel op "documentatie" zou juist alles vangen wat er níet is.
 
 # Keyword-gedreven thema-regels (route A). First-match-wins — specifieker eerst.
 # Geen match → `"Overig"`.
@@ -199,6 +205,22 @@ SYSTEM_PROMPT = (
     '  {"toewijzingen": [{"id": "<id>", "thema": "<thema>"}]}\n'
     "Geen uitleg buiten de JSON."
 )
+
+
+def thema_uit_profiel(bev: dict[str, Any], clausule_context: dict[str, Any] | None) -> str:
+    """Het thema dat het profiel aan deze clausule geeft, of een lege string.
+
+    Gaat vóór de heuristiek en vóór de LLM-verfijning: de auditor die vastlegde dát A.8.9 over
+    vastlegging gaat en niet over configuratiebeheer, weet dat beter dan een woordenlijst. De
+    volgorde staat op de aanroepplek in `pipeline.py`, zodat de voorrang leesbaar is.
+    """
+    if not clausule_context:
+        return ""
+    regel = clausule_context.get(str(bev.get("clausule") or ""))
+    if regel is None:
+        return ""
+    waarde = regel.get("thema") if isinstance(regel, dict) else getattr(regel, "thema", "")
+    return str(waarde or "").strip()
 
 
 def bepaal_thema(bevinding: dict[str, Any]) -> str:

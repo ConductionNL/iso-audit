@@ -23,3 +23,37 @@ standards:
 defaults:
   language: nl
   include_independence_caveat: true
+
+# Wat de auditor over déze organisatie weet en het model niet.
+#
+# Vastgelegd na de volledige run van 2026-08-31, waarin twee NC's opdoken die het niet zijn.
+# Zonder deze context velt het model elke run opnieuw hetzelfde oordeel, en sleept de auditor
+# elke run dezelfde bevindingen met de hand naar OFI.
+#
+# `hoogste_klasse` verlaagt alleen en vraagt een motivering; ophogen naar NC is een auditoordeel
+# dat in de triage hoort, met een mens-account eronder. Elke verlaging komt zichtbaar in de
+# bevinding te staan — een stille uitzondering is precies wat een externe auditor niet accepteert.
+#
+# Beide clausules hieronder zijn hetzelfde patroon: de beheersmaatregel bestáát, hij is alleen
+# niet opgeschreven. Daarom delen ze een `thema` — dan bundelt de memo ze tot één verbeteradvies
+# over documenteren in plaats van twee losse opmerkingen onder ongerelateerde koppen.
+clausule_context:
+  "A.8.14":
+    context: >-
+      Conduction werkt volgens een caching-model: data wordt bij de bron opgehaald en niet
+      zelfstandig bewaard. Redundantie van eigen informatieverwerkende systemen is daarmee
+      grotendeels niet van toepassing; de beschikbaarheid volgt die van de bronsystemen.
+    thema: Vastlegging van bestaande beheersing
+    hoogste_klasse: OFI
+    motivering: >-
+      Voor de beperkte eigen data is redundantie een verbeterpunt, geen ontbrekende
+      beheersmaatregel — er valt weinig te dupliceren wat niet bij de bron staat.
+  "A.8.9":
+    context: >-
+      Configuratie en versiebeheer lopen via Git (GitHub en Codeberg). Elke wijziging heeft een
+      commit, een auteur en een geschiedenis.
+    thema: Vastlegging van bestaande beheersing
+    hoogste_klasse: OFI
+    motivering: >-
+      De maatregel bestaat; wat ontbreekt is centralisatie en documentatie ervan. Dat is een
+      verbeterkans en geen non-conformiteit.

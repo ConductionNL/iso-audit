@@ -191,7 +191,7 @@ _LOKALE_TEST_ONTBREKEND: list[dict[str, Any]] = [
 
 def run_local_only(norm: str) -> str:
     """Dry-run: synthetische data → lokale Markdown + CSV + Excel."""
-    from iso_audit.classification.thema import bepaal_thema
+    from iso_audit.classification.thema import bepaal_thema, thema_uit_profiel
     from iso_audit.reporting.local_report import schrijf_rapport
     from iso_audit.reporting.tabular_report import schrijf_csv, schrijf_excel
 
@@ -205,8 +205,9 @@ def run_local_only(norm: str) -> str:
         "van de rapportage-logica."
     )
 
+    profiel_context = _clausule_context()
     for bev in _LOKALE_TEST_BEVINDINGEN:
-        bev.setdefault("thema", bepaal_thema(bev))
+        bev.setdefault("thema", thema_uit_profiel(bev, profiel_context) or bepaal_thema(bev))
 
     lokaal_pad = schrijf_rapport(
         _LOKALE_TEST_BEVINDINGEN,
@@ -366,6 +367,25 @@ def _bewaar_ingest(documenten: list[dict[str, Any]], norm: str, bronnen: list[st
         logger.warning("Documenten vastleggen mislukt (run gaat door): %s", exc)
 
 
+def _clausule_context() -> dict[str, Any]:
+    """De clausule-context uit het actieve profiel, of leeg als er geen profiel is.
+
+    Leeg is een geldige uitkomst: een installatie zonder profiel classificeert zoals altijd. Een
+    onleesbaar profiel mag een run niet stilleggen — dan valt het terug op geen context, en dat
+    is zichtbaar doordat de verlagingen uitblijven.
+    """
+    import os
+
+    from iso_audit.memo.theme.profile import ProfileError, laad_profiel
+
+    pad = os.environ.get("ISO_AUDIT_PROFIEL") or "examples/auditmemo/conduction.profile.yaml"
+    try:
+        return dict(laad_profiel(pad).clausule_context)
+    except (ProfileError, OSError) as fout:
+        logger.warning("Profiel-context niet geladen (%s); classificatie zonder context", fout)
+        return {}
+
+
 def splits_op_leeftijd(
     documenten: list[dict[str, Any]], cutoff: str
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
@@ -455,7 +475,7 @@ def run_audit(
         review_en_bevestig,
         schat_kosten,
     )
-    from iso_audit.classification.thema import bepaal_thema
+    from iso_audit.classification.thema import bepaal_thema, thema_uit_profiel
     from iso_audit.config.verbinding import log_veilig
     from iso_audit.miro.ingest import (
         haal_notities_op,
@@ -675,6 +695,9 @@ def run_audit(
         # Het id van de audit uit de registry, zodat elke bevinding weet bij welke audit ze
         # hoort. Zonder dat exporteerde een schone audit alles wat er ooit in de tabel stond.
         auditmap=auditmap,
+        # Organisatiecontext uit het profiel: een bovengrens op het oordeel met de motivering
+        # erbij, zodat de auditor niet elke run dezelfde bevindingen met de hand verlaagt.
+        clausule_context=_clausule_context(),
         op_kosten=op_kosten,
     )
 
@@ -709,6 +732,7 @@ def run_audit(
             f"{nc} NC, {ofi} OFI."
         )
 
+    profiel_context = _clausule_context()
     llm_themas: dict[str, str] = {}
     if thema_llm:
         try:
@@ -721,7 +745,10 @@ def run_audit(
     for i, bev in enumerate(bevestigde_bevindingen):
         bev_id = str(bev.get("id") or bev.get("_bev_id") or i)
         bev["_bev_id"] = bev_id
-        bev["thema"] = llm_themas.get(bev_id) or bepaal_thema(bev)
+        # Voorrang: profiel (auditor-oordeel) > LLM-verfijning > heuristiek.
+        bev["thema"] = (
+            thema_uit_profiel(bev, profiel_context) or llm_themas.get(bev_id) or bepaal_thema(bev)
+        )
 
     lokaal_pad = schrijf_rapport(
         bevestigde_bevindingen,
@@ -925,7 +952,7 @@ def run_report_only(norm: str, scherpte: float = 1.0, thema_llm: bool = False) -
     `output/audit_*.db` staan van een eerdere run.
     """
     from iso_audit.classification.clause_mapping import laad_clause_map
-    from iso_audit.classification.thema import bepaal_thema
+    from iso_audit.classification.thema import bepaal_thema, thema_uit_profiel
     from iso_audit.reporting.local_report import schrijf_rapport
     from iso_audit.reporting.report_generation import _genereer_management_summary
     from iso_audit.reporting.sheets_gws import sla_op_in_sheets
@@ -962,6 +989,7 @@ def run_report_only(norm: str, scherpte: float = 1.0, thema_llm: bool = False) -
 
     bevindingen, _ = _filter_ruis(bevindingen)
 
+    profiel_context = _clausule_context()
     llm_themas: dict[str, str] = {}
     if thema_llm:
         try:
@@ -974,7 +1002,10 @@ def run_report_only(norm: str, scherpte: float = 1.0, thema_llm: bool = False) -
     for i, bev in enumerate(bevindingen):
         bev_id = str(bev.get("id") or i)
         bev["_bev_id"] = bev_id
-        bev["thema"] = llm_themas.get(bev_id) or bepaal_thema(bev)
+        # Voorrang: profiel (auditor-oordeel) > LLM-verfijning > heuristiek.
+        bev["thema"] = (
+            thema_uit_profiel(bev, profiel_context) or llm_themas.get(bev_id) or bepaal_thema(bev)
+        )
 
     logger.info("Management summary genereren via Claude...")
     try:
