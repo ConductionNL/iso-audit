@@ -6,6 +6,50 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-31 — 0.2.0a87 — 186 NC's terug naar iets wat te wegen is
+
+De externe audit vond nul non-conformiteiten; de run van 2026-08-31 vond er 186. Dat verschil is
+gemeten, niet geraden, en het bleek uit drie stapelende oorzaken te bestaan — geen ervan een
+kwestie van te scherp afstellen.
+
+**Eerst wat het níet was.** `--scherpte` kiest tussen twee prompts; de run draaide op 1.0 en dus
+op `v2-scherp`, de prompt mét de rem erop (drie secties "wat géén NC is"). `v2-genuanceerd`
+definieert een NC als "een expliciete deliverable ontbreekt aantoonbaar" — makkelijker te raken.
+De knop stond al op de veiligste stand; lager zetten had er waarschijnlijk méér opgeleverd.
+
+**1. De categoriefout (130 van de 186).** De documenten met de meeste NC's waren incidentrapporten,
+NC-memo's, afwijkingsregistraties en auditreacties: 130 NC's uit 34 van zulke documenten. Het tool
+las de daarin beschreven — en afgehandelde — problemen als nieuwe non-conformiteiten. "Reactie en
+acties nav 2e controle audits" (17 NC's) *is* de corrigerende actie op een eerdere audit, dus
+bewijs voor §10.2. Beide prompts hebben nu een regel: beoordeel zo'n document op de afhandeling
+(oorzaakanalyse, maatregel, eigenaar, verificatie), niet op het probleem. Alleen als de afhandeling
+zelf tekortschiet is er een NC, en dan op de clausule over afwijkingen. Een organisatie die haar
+problemen opschrijft, mag daar niet zwaarder voor beoordeeld worden dan een die dat niet doet.
+
+**2. De eenheid van tellen.** De classificatie oordeelt per (document, clausule) — juist om te
+meten, verkeerd om te tellen. "Memo NC-2025 Onvolledige evaluatie Q3/Q4" legt één afwijking vast
+en leverde tien NC's op, over §5.3, §7.4, §7.5, §9.2, A.5.35 en de 9001-tegenhangers. Nieuw:
+`classification/bundeling.py` bundelt op (document, klasse, thema) tot één bevinding per afwijking;
+de overige clausules blijven als `extra_clauses` staan en komen in de memo als citaat terug. Twee
+ongerelateerde problemen in één document blijven twee afwijkingen — het thema houdt ze uit elkaar.
+`gebundeld_uit` bewaart de weg terug naar elke onderliggende beoordeling; de database houdt die
+allemaal, want dat is het bewijs.
+
+**3. Dubbeltelling over normen.** Drieëntwintig Annex SL-nummers bestaan in beide normen, en
+`bouw_bevindingen` maakte van één modeloordeel twee rijen. Dat is een kopie, geen tweede
+beoordeling: §7.5 heet in beide normen "Gedocumenteerde informatie" en §5.3 gaat in beide over
+rollen en bevoegdheden — het verschil is de scope, niet het onderwerp. In de bundel staat zo'n
+clausule één keer, met beide normen erbij. Twee comments in de code beweerden het tegendeel (§7.5
+zou in 27001 over fysieke bedreigingen gaan — dat is A.7.5 uit Bijlage A); die zijn rechtgezet.
+
+**Gemeten effect van de bundeling alleen**, op de bestaande 833 rijen: NC 186 → 128, OFI 137 → 111,
+positief 510 → 336. Het effect van de promptregel is pas na een nieuwe run te meten; die raakt de
+130 aan de bron.
+
+**Bestanden:** `classification/bundeling.py` (nieuw), `classification/prompts/v2-scherp.md`,
+`classification/prompts/v2-genuanceerd.md`, `memo/models.py` (`gebundeld_uit`, `normen`),
+`api/run_job.py`, `tests/classification/test_bundeling.py` (nieuw).
+
 ### Fixed — 2026-08-31 — het portaal leest het profiel uit git, niet van de PVC
 
 Bij het verifiëren van de uitrol van a86 bleek het portaal te starten met

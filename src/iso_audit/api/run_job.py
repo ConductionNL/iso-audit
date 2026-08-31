@@ -33,6 +33,8 @@ class RunUitkomst:
 
 
 _NORM_SLUG = {"9001": "iso-9001-2015", "27001": "iso-27001-2022"}
+logger = logging.getLogger(__name__)
+
 _SEV = {"NC": "NC", "OFI": "OFI", "positief": "POSITIVE"}
 
 
@@ -222,9 +224,12 @@ def export_db_findings(
     findings: list[Finding] = []
     for r in rows:
         clausule = r["clausule_id"]
-        # De titel van de norm van de bevinding, niet die van de samenvoeging: §7.5 is in 9001
-        # "Gedocumenteerde informatie" en in 27001 "Bescherming tegen fysieke en
-        # omgevingsbedreigingen", en de samenvoeging zet 27001 bovenaan.
+        # De titel van de norm van de bevinding, niet die van de samenvoeging: de samenvoeging
+        # zet 27001 bovenaan, en dan krijgt een 9001-bevinding een 27001-titel.
+        #
+        # (Het voorbeeld dat hier stond — §7.5 zou in 27001 over fysieke bedreigingen gaan —
+        # klopte niet: dat is A.7.5 uit Bijlage A. Sinds de A.-prefix zijn die twee uit elkaar
+        # te houden, en §7.5 heet in beide normen "Gedocumenteerde informatie".)
         rij_norm = str(r["norm"] or "")
         if rij_norm in ("9001", "27001"):
             titel = titel_voor(clausule, rij_norm)
@@ -266,6 +271,23 @@ def export_db_findings(
                 ],
             )
         )
+    # Eén bevinding per afwijking, niet per raakvlak. De database houdt elke (document,
+    # clausule)-beoordeling — dat is het bewijs — maar de werkset is wat de auditor telt en
+    # trieert, en daar hoort een afwijking één keer te staan. Op de run van 2026-08-31 leverde
+    # één NC-memo tien NC's op omdat de afwijking tien clausules raakte. Zie
+    # `classification/bundeling.py`.
+    from iso_audit.classification.bundeling import bundel
+
+    voor = len(findings)
+    findings = bundel(findings)
+    if len(findings) != voor:
+        logger.info(
+            "Bundeling: %d bevindingen op (document, klasse, thema) teruggebracht tot %d "
+            "afwijkingen; de onderliggende beoordelingen staan in de database",
+            voor,
+            len(findings),
+        )
+
     # De kernzin en de voorgestelde acties uit de autonome review erbij, als die heeft
     # gedraaid. Zonder deze stap blijft de review een logregel.
     from iso_audit.store import initialiseer as _init

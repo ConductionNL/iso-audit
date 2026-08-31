@@ -78,6 +78,17 @@ class Finding(BaseModel):
     # Bij follow_up: LLM-suggestie met wie het bewijs te verifiëren (voorstel
     # tot uitsluiting). Auditor maakt de afspraak.
     verify_with: str | None = None
+    gebundeld_uit: list[str] = Field(default_factory=list)
+    """De ids van de bevindingsrijen die in deze bevinding zijn gebundeld.
+
+    Leeg bij een bevinding die op zichzelf staat. Zie `classification/bundeling.py`: de database
+    houdt elke (document, clausule)-beoordeling als bewijs, en dit is de weg terug van wat de
+    auditor trieert naar wat het model per clausule oordeelde."""
+    normen: list[str] = Field(default_factory=list)
+    """De normen waaronder deze afwijking is beoordeeld, als het er meer dan één is.
+
+    Drieëntwintig Annex SL-nummers bestaan in beide normen; dan is één afwijking onder beide
+    beoordeeld. Leeg betekent: alleen `standard`."""
 
 
 class HistoricalNC(BaseModel):

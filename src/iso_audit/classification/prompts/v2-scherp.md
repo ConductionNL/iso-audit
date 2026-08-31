@@ -36,6 +36,20 @@ NC.
 zwijgt, is dat geen bewezen tekortkoming — tenzij het document zelf laat zien dat het deel dat
 ontbreekt er ook in de praktijk niet is.
 
+**Een document dat een afwijking vastlegt of afhandelt.** Een incidentrapport, een NC-memo,
+een afwijkingsregistratie, een reactie op een eerdere audit, een "rode draad"-analyse: dat zijn
+bewijsstukken dát de organisatie afwijkingen signaleert, onderzoekt en opvolgt. De afwijking die
+erin beschreven staat, is niet opnieuw een NC — hij is al gevonden en vastgelegd, en dat is
+precies wat §10.2 (afwijkingen en corrigerende maatregelen) van de organisatie vraagt.
+
+Beoordeel zo'n document dus op de **afhandeling**, niet op het probleem: staan de oorzaakanalyse,
+de maatregel, de verantwoordelijke en de verificatie van doeltreffendheid erin? Zo ja, dan is dat
+bewijs (positief of OFI). Alleen als de afhandeling zelf aantoonbaar tekortschiet, is er een NC —
+en dan op de clausule over afwijkingen, niet op de clausules die het beschreven probleem raakte.
+
+Een organisatie die haar problemen opschrijft, mag daar niet zwaarder voor beoordeeld worden dan
+een organisatie die dat niet doet. Dat is precies de verkeerde prikkel.
+
 ## Wat een NC-onderbouwing moet bevatten
 
 Bij `classificatie: "NC"` is `onderbouwing` verplicht en moet die drie dingen benoemen:
