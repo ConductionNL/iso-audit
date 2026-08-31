@@ -308,13 +308,26 @@ def create_app(
     # --- audit-onafhankelijke configuratie ----------------------------------
 
     @app.get("/instellingen/options")
-    def config_options() -> dict[str, list[str]]:
-        """Beschikbare normen (norm-DB) en geregistreerde bronnen."""
+    def config_options() -> dict[str, object]:
+        """Beschikbare normen (norm-DB), geregistreerde bronnen en de omgevings-standaarden.
+
+        De standaarden staan erbij omdat de UI voor review en auto-triage een harde `true` of
+        `false` meestuurt — een vinkje kent geen "laat de omgeving beslissen". Zonder deze
+        waarden overrulet een uitgevinkt vakje stilletjes `ISO_AUDIT_REVIEW`, en dan draait de
+        review niet terwijl het manifest zegt van wel. Gemeten op 2026-08-31: de run had 833
+        bevindingen en nul review-adviezen.
+        """
+        from iso_audit.classification.review import ReviewInstelling
         from iso_audit.ingest import beschikbare_bronnen
+        from iso_audit.pipeline import AUTO_TRIAGE_ENV
 
         return {
             "norms": laad_norm_db(norms_dir).standards(),
             "sources": beschikbare_bronnen(),
+            "standaarden": {
+                "review": ReviewInstelling.bepaal(None).aan,
+                "auto_triage": ReviewInstelling.bepaal(None, env_var=AUTO_TRIAGE_ENV).aan,
+            },
         }
 
     @app.get("/instellingen/bronnen")

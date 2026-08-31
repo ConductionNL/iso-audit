@@ -401,6 +401,7 @@ async function boot(){
     document.getElementById("uitloggen").hidden = false;
   }catch(e){ /* geen identiteit: de gate heeft het request al geweigerd */ }
   window.addEventListener("hashchange", veiligeRoute);
+  zetRunStandaarden();
   veiligeRoute();
 }
 
@@ -475,6 +476,22 @@ function normLabel(n){
   const m = String(n).match(/(\d{4,5})/);
   return m ? `ISO ${m[1]}` : String(n);
 }
+// De vinkjes voor review en auto-triage sturen een harde true/false; ze kennen geen stand
+// "laat de omgeving beslissen". Daarom zetten we ze één keer op wat de omgeving zegt. Zonder
+// dit overrulet een uitgevinkt vakje stilletjes ISO_AUDIT_REVIEW en draait de review niet,
+// terwijl het manifest zegt van wel — precies wat er op 2026-08-31 gebeurde.
+async function zetRunStandaarden(){
+  const wrap = document.getElementById("review-mode");
+  if(!wrap || wrap.dataset.standaard) return;
+  try{
+    const st = (await j("/instellingen/options")).standaarden || {};
+    if(st.review) wrap.checked = true;
+    const at = document.getElementById("auto-triage");
+    if(at && st.auto_triage) at.checked = true;
+  }catch(e){ /* geen standaard is geen blokkade: de vinkjes blijven bedienbaar */ }
+  wrap.dataset.standaard = "1";
+}
+
 async function loadNormKeuze(){
   const el = document.getElementById("na-norm");
   if(el.dataset.loaded) return;

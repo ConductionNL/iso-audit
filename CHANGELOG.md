@@ -6,6 +6,37 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Changed — 2026-08-31 — review en auto-triage staan in het portaal altijd aan
+
+De run van 2026-08-31 leverde 833 bevindingen op en nul review-adviezen: `decisions` en
+`review_adviezen` waren allebei leeg. De autonome review had niet gedraaid, en auto-triage hangt
+daarachter — zonder advies is er geen groen licht.
+
+Twee oorzaken, allebei stil:
+
+1. **`ISO_AUDIT_REVIEW` stond niet in het manifest.** Leeg telt als uit, en dat is de juiste
+   standaard voor een schakelaar die geld kost. Nu staat de keuze expliciet in
+   `deploy/deployment.yaml`, mét de reden erbij. De code-standaard blijft uit; het portaal is
+   een omgeving die er zelf voor kiest, en de review logt zijn herkomst ("omgeving").
+2. **De UI zou het manifest alsnog overrulen.** Het portaal stuurt per run een harde `true` of
+   `false` mee, want een vinkje kent geen stand "laat de omgeving beslissen". Een uitgevinkt
+   vakje overrulet daarmee `ISO_AUDIT_REVIEW`, en niemand ziet dat gebeuren. Env zetten alleen
+   was dus niet genoeg geweest.
+
+`/instellingen/options` geeft nu ook `standaarden` terug (`review`, `auto_triage`), en de UI
+vult de vinkjes daar één keer mee bij het laden. Daarmee is in het portaal te zien wat de
+omgeving zegt, in plaats van dat het verschil onzichtbaar blijft.
+
+Ook expliciet gezet: `ISO_AUDIT_PROFIEL`. De clausule-context viel anders terug op een relatief
+pad en hing daarmee aan de werkdirectory.
+
+**Wat auto-triage wel en niet doet** (ongewijzigd, maar hier de vindplaats): alleen
+`bevestigen`, alleen op positief en OFI, nooit een NC en nooit een verlaging, en altijd via
+`apply_triage` met actor `auto-triage` in de trail.
+
+**Bestanden:** `deploy/deployment.yaml`, `api/app.py`, `api/ui.html`,
+`tests/api/test_run_standaarden.py` (nieuw).
+
 ### Added — 2026-08-31 — clausule-context in het profiel: het auditoordeel blijft staan
 
 Na de volledige run (715 bevindingen, 68 NC) wees de auditor twee NC's terug die het niet zijn:

@@ -128,6 +128,27 @@ spec:
             # de auditor na elke herstart weer uitgelogd.
             - name: ANTHROPIC_CONFIG_DIR
               value: /var/lib/iso-audit/anthropic
+            # Autonome review en auto-triage staan in het portaal standaard aan. In de code
+            # is de standaard uit — dat blijft zo, want het zijn stappen die geld kosten en
+            # een stil aanstaande schakelaar is erger dan een stil uitstaande. Hier staat de
+            # keuze expliciet in het manifest, en de review logt zijn herkomst ("omgeving")
+            # zodat achteraf te zien is waarom de stap draaide.
+            #
+            # Waarom aan: zonder review blijven alle bevindingen ongetrieerd liggen. Op de run
+            # van 2026-08-31 waren dat 833 stuks, en een lijst die te lang is om te wegen wordt
+            # niet gewogen — dat is precies hoe op 2026-08-24 902 bevindingen in vier bulkacties
+            # op `valide` belandden. Auto-triage doet alleen het onbetwiste voorwerk: bevestigen,
+            # en alleen op positief en OFI. NC's en verlagingen blijven bij de auditor, met een
+            # mens-account in de trail. Zie `classification/auto_triage.py`.
+            - name: ISO_AUDIT_REVIEW
+              value: "true"
+            - name: ISO_AUDIT_AUTO_TRIAGE
+              value: "true"
+            # Het klantprofiel met de clausule-context: wat de auditor over deze organisatie
+            # weet en het model niet, plus de plafonds die daaruit volgen. Expliciet en niet
+            # via de terugval op een relatief pad — anders hangt het aan de werkdirectory.
+            - name: ISO_AUDIT_PROFIEL
+              value: /app/examples/auditmemo/conduction.profile.yaml
             # Optioneel pad naar een config.yaml met niet-geheime defaults. Precedence:
             # omgeving > config.yaml > UI. Niet gezet = alleen omgeving en UI.
             - name: ISO_AUDIT_CONFIG
