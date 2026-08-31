@@ -154,6 +154,22 @@ class ImprovementBlock(BaseModel):
     bronnen: list[BronRef] = Field(default_factory=list)  # brondocumenten met links
 
 
+class PositiveBlock(BaseModel):
+    """Eén positief thema in de memo: wat er aantoonbaar op orde is, in één zin.
+
+    Bewust smaller dan een NC- of verbeterblok. Er is geen afwijking te beschrijven, geen
+    aanbeveling te doen en geen bijlage-verwijzing nodig per waarneming — de bewijslast draagt
+    het detail. Wat de memo toevoegt is dat het benoemd is, met een code eronder zodat er naar
+    verwezen kan worden.
+    """
+
+    code: str = ""  # "POS 1", "POS 2", … — zie NCBlock.code
+    title: str
+    citations: list[ClauseCitation]
+    kern: str  # de ene zin
+    aantal: int = 0  # hoeveel waarnemingen dit thema draagt
+
+
 class Bronaanduiding(BaseModel):
     """Eén geraadpleegde bron, met de aanduiding waarmee je hem terugvindt.
 
@@ -215,6 +231,8 @@ class AuditMemo(BaseModel):
     bevestigd; de memo toont er minder."""
     improvements: list[ImprovementBlock]
     improvements_note: str = ""
+    positives: list[PositiveBlock] = Field(default_factory=list)
+    positives_note: str = ""
     """Welke thema's het niet in de memo haalden, en waar ze staan.
 
     Een cap zonder melding leest als "dit was alles". Als eigen regel onder de sectie en niet

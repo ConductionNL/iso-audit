@@ -1,0 +1,10 @@
+{#- Eén positief thema (variabele `pos`). Bewust één zin en geen blok: de memo benoemt dat het
+    op orde is, de bewijslast draagt het detail. Geen bijlage-verwijzing per thema — er valt hier
+    niets uit te zoeken, alleen na te lezen. -#}
+<p class="positief">
+  <strong>{{ pos.code }}{% if pos.code %} — {% endif %}{{ pos.title }}</strong>
+  {%- if pos.citations %}
+  <span class="norm-ref">({% for c in pos.citations %}{% if not loop.first %} · {% endif %}{{ c.standard }} §{{ c.clause }}{% endfor %})</span>
+  {%- endif %}
+  <br>{{ pos.kern }}
+</p>

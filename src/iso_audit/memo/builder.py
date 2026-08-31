@@ -18,6 +18,7 @@ from iso_audit.memo.groepering import (
     Themagroep,
     groepeer_ncs,
     groepeer_ofis,
+    groepeer_positief,
 )
 from iso_audit.memo.models import (
     ActionRow,
@@ -29,6 +30,7 @@ from iso_audit.memo.models import (
     ImprovementBlock,
     MemoInput,
     NCBlock,
+    PositiveBlock,
 )
 from iso_audit.memo.norm_lookup import NormDatabase
 from iso_audit.memo.pattern_detection import DefaultPatternDetector
@@ -157,6 +159,40 @@ def _improvement_block(
     )
 
 
+def _positieve_zin(groep: Themagroep) -> str:
+    """De ene zin onder een positief thema.
+
+    De kernzin van de review als die er is; dat is een oordeel dat gewogen is. Anders een
+    feitelijke zin uit wat er telbaar is — hoeveel waarnemingen, over hoeveel clausules. Een
+    lovende zin verzinnen zou hier het makkelijkst zijn en het minst waard: "de organisatie
+    beheerst dit uitstekend" is niet na te rekenen, "14 waarnemingen op 6 clausules, geen
+    afwijkingen" wel.
+    """
+    if groep.kern:
+        return groep.kern
+    n = len(groep.bevindingen)
+    c = len(groep.clausules)
+    waarnemingen = "waarneming" if n == 1 else "waarnemingen"
+    clausules = "clausule" if c == 1 else "clausules"
+    return (
+        f"{n} bevestigde {waarnemingen} op {c} {clausules}; geen afwijkingen aangetroffen. "
+        f"De onderbouwing per waarneming staat in de bewijslast."
+    )
+
+
+def _positive_block(
+    groep: Themagroep, norm_db: NormDatabase, language: str, code: str
+) -> PositiveBlock:
+    """Eén positief thema, één zin. Geen afwijking, geen aanbeveling, geen bijlage-verwijzing."""
+    return PositiveBlock(
+        code=code,
+        title=groep.thema,
+        citations=_groep_citations(groep, norm_db, language),
+        kern=_positieve_zin(groep),
+        aantal=len(groep.bevindingen),
+    )
+
+
 MAX_VERBETERBLOKKEN = 3
 """Hoeveel verbeterthema's er ten hoogste in de memo komen.
 
@@ -194,6 +230,35 @@ def _findings_hash(findings: list[Finding]) -> str:
         [f.model_dump() for f in findings], sort_keys=True, ensure_ascii=False, default=str
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _positieve_notitie(findings: list[Finding], groepen: list[Themagroep]) -> str:
+    """Wat er buiten de positieve blokken viel, in getallen.
+
+    Twee groepen vallen weg: waarnemingen zonder thema (die clusteren niet) en waarnemingen die
+    nog niet bevestigd zijn. Allebei benoemen, want een sectie die zwijgt over wat er niet in
+    staat, leest als "dit was alles" — dezelfde regel als bij `improvements_note`.
+    """
+    alle = [f for f in findings if f.severity == "POSITIVE"]
+    if not alle:
+        return ""
+    in_blokken = sum(len(g.bevindingen) for g in groepen)
+    open_nog = sum(1 for f in alle if f.triage_status != "valide")
+    delen = []
+    if open_nog:
+        delen.append(
+            f"{open_nog} positieve waarneming(en) zijn nog niet bevestigd in de triage en "
+            f"staan daarom niet hierboven"
+        )
+    zonder_thema = len(alle) - open_nog - in_blokken
+    if zonder_thema > 0:
+        delen.append(f"{zonder_thema} bevestigde waarneming(en) vielen buiten een thema")
+    if not delen:
+        return (
+            f"Alle {len(alle)} positieve waarnemingen staan met hun onderbouwing in de bewijslast."
+        )
+    # Geen `.capitalize()`: die verlaagt de rest van de zin, en de zin begint hier met een getal.
+    return "; ".join(delen) + ". Alle waarnemingen staan in de bewijslast."
 
 
 def build_memo(
@@ -250,6 +315,18 @@ def build_memo(
         else ""
     )
 
+    # Positieve waarnemingen ook benoemen: een memo die alleen gebreken opsomt, geeft een
+    # scheef beeld van een organisatie en is voor een externe auditor minder bruikbaar — die wil
+    # zien wát werkt, niet alleen wat niet werkt. Eén zin per thema is genoeg; wie meer wil
+    # weten, heeft de bewijslast. Geen bovengrens: dezelfde reden als bij de NC-blokken —
+    # afkappen op omvang laat iets uit de memo vallen zonder dat een mens erover besliste.
+    positief_groepen = groepeer_positief(findings)
+    positives = [
+        _positive_block(groep, norm_db, lang, f"POS {i}")
+        for i, groep in enumerate(positief_groepen, start=1)
+    ]
+    positives_note = _positieve_notitie(findings, positief_groepen)
+
     stamp = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
     metadata = {
         "profile": profile.slug,
@@ -271,6 +348,8 @@ def build_memo(
         nc_note=nc_note,
         improvements=improvements,
         improvements_note=improvements_note,
+        positives=positives,
+        positives_note=positives_note,
         historical_ncs=historical_ncs,
         detail_report_ref=memo_input.detail_report_ref,
         metadata=metadata,

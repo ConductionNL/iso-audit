@@ -41,6 +41,10 @@
   .detailref { color: var(--muted); font-size: 8.5pt; margin: 2mm 0 6mm 0; }
   .kern { margin: 2mm 0 3mm 0; }
   .rationale { font-size: 9.5pt; margin: 2mm 0 2mm 0; }
+  /* Compacter dan een NC- of verbeterblok: één alinea per thema, geen kop. Een positief thema
+     dat evenveel ruimte krijgt als een non-conformiteit zet de memo op het verkeerde been. */
+  .positief { font-size: 9.5pt; margin: 0 0 3mm 0; }
+  .positief .norm-ref { margin: 0; }
   .lead { background: var(--soft-bg); border-left: 3px solid var(--primary); padding: 3mm 4mm; margin: 3mm 0 5mm 0; font-size: 10pt; }
   .recommendation { margin: 3mm 0 2mm 0; padding: 2mm 3mm; background: var(--soft-bg); border-left: 3px solid var(--primary); font-size: 10pt; }
   .recommendation strong { color: var(--primary); }
@@ -80,6 +84,16 @@
 {% endfor %}
 {% if memo.improvements_note %}
 <p class="detailref">{{ memo.improvements_note }}</p>
+{% endif %}
+
+{% if memo.positives or memo.positives_note %}
+<h2>Wat aantoonbaar op orde is</h2>
+{% for pos in memo.positives %}
+{% include "management-memo/partials/positive.html.j2" %}
+{% endfor %}
+{% if memo.positives_note %}
+<p class="detailref">{{ memo.positives_note }}</p>
+{% endif %}
 {% endif %}
 
 {% include "management-memo/partials/historical.html.j2" %}

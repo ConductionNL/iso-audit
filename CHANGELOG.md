@@ -6,6 +6,36 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Added — 2026-08-31 — positieve waarnemingen gebundeld in de memo
+
+De memo somde alleen gebreken op. Dat geeft een scheef beeld van een organisatie, en voor een
+externe auditor is het minder bruikbaar: die wil zien wát werkt, niet alleen wat niet werkt.
+
+Nieuwe sectie "Wat aantoonbaar op orde is", na de verbeterpunten. Eén zin per thema, met een
+`POS n`-code zodat er in een vergadering naar te verwijzen valt. Wie meer wil weten, heeft de
+bewijslast — daar staat elke waarneming met zijn brondocument.
+
+Drie keuzes die het verschil maken tussen een sectie en een sier-alinea:
+
+- **Alleen bevestigde waarnemingen.** "Toegangsbeheer is op orde" is een uitspraak waar de
+  organisatie op wordt aangesproken; die hoort te rusten op een triage-bevestiging en niet op
+  een modeloordeel dat niemand woog. Sinds auto-triage het onbetwiste deel (positief en OFI)
+  afdoet, is dat geen lege eis.
+- **De zin is natrekbaar of hij komt uit de review.** Is er een kernzin, dan die. Anders een
+  feitelijke zin: "12 bevestigde waarnemingen op 5 clausules; geen afwijkingen aangetroffen."
+  Een lovende zin verzinnen zou het makkelijkst zijn en het minst waard — "uitstekend beheerst"
+  is niet na te rekenen. Een test bewaakt dat er geen lofzang in sluipt.
+- **De notitie zegt wat er buiten viel**, in getallen: hoeveel nog niet bevestigd zijn en
+  hoeveel er buiten een thema vielen. Zwijgen daarover leest als "dit was alles".
+
+Geen bovengrens op het aantal thema's, dezelfde reden als bij de NC-blokken: afkappen op omvang
+laat iets uit de memo vallen zonder dat een mens erover besliste. `Overig` levert geen losse
+regels op — die maken een memo langer zonder hem beter te maken; het aantal staat in de notitie.
+
+**Bestanden:** `memo/groepering.py` (`groepeer_positief`), `memo/models.py` (`PositiveBlock`),
+`memo/builder.py`, `memo/templates/management-memo/memo.html.j2` + `partials/positive.html.j2`,
+`tests/memo/test_positieven.py` (nieuw).
+
 ### Changed — 2026-08-31 — review en auto-triage staan in het portaal altijd aan
 
 De run van 2026-08-31 leverde 833 bevindingen op en nul review-adviezen: `decisions` en

@@ -117,6 +117,33 @@ def groepeer_ofis(findings: list[Finding], drempel: int) -> list[Themagroep]:
     return groepen + los
 
 
+def groepeer_positief(findings: list[Finding]) -> list[Themagroep]:
+    """Bundel bevestigde positieve waarnemingen tot thema-blokken, grootste eerst.
+
+    Wat hier in de memo hoort is één zin per thema: dat de organisatie op dit punt levert. Wie
+    meer wil weten, heeft de bewijslast — daar staat elke waarneming met zijn brondocument.
+
+    Alleen `valide`, net als bij de NC's. Een memo die zegt "toegangsbeheer is op orde" doet een
+    uitspraak waar de organisatie op wordt aangesproken; die hoort te rusten op een bevestiging
+    en niet op een modeloordeel dat niemand heeft gewogen. Sinds auto-triage bevestigt het
+    onbetwiste deel (positief en OFI) vanzelf, dus dit is geen lege eis — draait die niet, dan
+    blijft de sectie leeg en zegt de memo hoeveel waarnemingen nog wachten.
+
+    `Overig` clustert niet en krijgt ook geen losse blokken: een positieve waarneming zonder
+    thema is precies het soort regel dat een memo langer maakt zonder hem beter te maken. Het
+    aantal komt in de notitie te staan, zodat er niets stilletjes verdwijnt.
+    """
+    bevestigd = [f for f in findings if f.severity == "POSITIVE" and f.triage_status == "valide"]
+    per_thema: dict[str, list[Finding]] = defaultdict(list)
+    for f in bevestigd:
+        thema = f.thema or GEEN_THEMA
+        if thema != GEEN_THEMA:
+            per_thema[thema].append(f)
+    groepen = [Themagroep(thema=t, bevindingen=b) for t, b in per_thema.items()]
+    groepen.sort(key=lambda g: (-len(g.bevindingen), g.thema))
+    return groepen
+
+
 def _groepeer(findings: list[Finding], *, los_bij_geen_thema: bool) -> list[Themagroep]:
     """Bundel op thema, grootste eerst; `Overig` als losse blokken achteraan."""
     per_thema: dict[str, list[Finding]] = defaultdict(list)
