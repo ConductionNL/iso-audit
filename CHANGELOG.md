@@ -6,6 +6,13 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Release — 2026-08-31 — 0.2.0a86
+
+Versie en `newTag` meebewogen met de image-inhoud van de drie changes hierboven (clausule-context,
+review/auto-triage standaard aan, positieve waarnemingen in de memo). De image-workflow weigerde
+de build op a85: dezelfde tag met andere inhoud is een mutable tag, en dan weet niemand meer welke
+code er in productie draait.
+
 ### Added — 2026-08-31 — positieve waarnemingen gebundeld in de memo
 
 De memo somde alleen gebreken op. Dat geeft een scheef beeld van een organisatie, en voor een
