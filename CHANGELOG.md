@@ -6,6 +6,28 @@ Versionering volgt [Semantic Versioning](https://semver.org/lang/nl/).
 
 ## [Unreleased]
 
+### Fixed — 2026-08-31 — het portaal leest het profiel uit git, niet van de PVC
+
+Bij het verifiëren van de uitrol van a86 bleek het portaal te starten met
+`--profile=/var/lib/iso-audit/conduction.profile.yaml` — een kopie op het volume van 12 augustus,
+818 bytes, zonder `clausule_context`. De classificatie las ondertussen het profiel uit het image.
+Twee profielen dus, en het verschil was onzichtbaar.
+
+Waarom dat meer is dan slordig: de hele constructie rust op het argument dat een verlaging later
+na te lezen is. Een auditor die vraagt op grond waarvan A.8.14 van NC naar OFI ging, moet dat
+kunnen terugvinden in een bestand met een geschiedenis. Voor het PVC-exemplaar gold dat niet — dat
+versiebeheerde niemand.
+
+Vóór het omzetten veld voor veld vergeleken: het PVC-bestand bevatte geen enkel veld dat niet ook
+in git stond; git had alleen méér (de `clausule_context`). Er gaat dus niets verloren. Audits,
+rapporten en de database blijven op de PVC — dit gaat alleen over het profiel.
+
+Een test bewaakt nu dat `--profile` en `ISO_AUDIT_PROFIEL` hetzelfde bestand aanwijzen en dat dat
+bestand in de repo staat. Geen versie-bump: `deploy/` valt buiten de image-paden, dus Argo synct
+het manifest zonder rebuild.
+
+**Bestanden:** `deploy/deployment.yaml`, `tests/api/test_run_standaarden.py`.
+
 ### Release — 2026-08-31 — 0.2.0a86
 
 Versie en `newTag` meebewogen met de image-inhoud van de drie changes hierboven (clausule-context,

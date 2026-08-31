@@ -92,3 +92,30 @@ def test_de_ui_vult_de_vinkjes_met_de_standaard() -> None:
     ui = Path("src/iso_audit/api/ui.html").read_text(encoding="utf-8")
     assert "zetRunStandaarden()" in ui, "de standaard wordt nergens toegepast"
     assert "st.review) wrap.checked = true" in ui
+
+
+def test_het_portaal_leest_het_profiel_uit_git_en_niet_van_het_volume() -> None:
+    """Eén profiel, met een geschiedenis. Zie `deploy/deployment.yaml` voor de reden.
+
+    Het `--profile`-argument en `ISO_AUDIT_PROFIEL` moeten hetzelfde bestand aanwijzen: anders
+    rendert de memo met een ander profiel dan de classificatie gebruikt, en dat verschil is
+    onzichtbaar tot iemand zich afvraagt waarom een verlaging niet terug te vinden is.
+    """
+    import yaml
+
+    docs = [d for d in yaml.safe_load_all(Path("deploy/deployment.yaml").read_text()) if d]
+    app = next(
+        c
+        for d in docs
+        if d.get("kind") == "Deployment"
+        for c in d["spec"]["template"]["spec"]["containers"]
+        if c["name"] == "app"
+    )
+    profielen = [a.split("=", 1)[1] for a in app["args"] if a.startswith("--profile=")]
+    assert len(profielen) == 1, app["args"]
+    env = {e["name"]: e.get("value") for e in app["env"]}
+    assert profielen[0] == env["ISO_AUDIT_PROFIEL"], "twee profielen is één te veel"
+    assert not profielen[0].startswith("/var/lib/"), (
+        "het profiel hoort in het image, niet op de PVC"
+    )
+    assert Path(profielen[0].replace("/app/", "", 1)).exists(), "profiel ontbreekt in de repo"

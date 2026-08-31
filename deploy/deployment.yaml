@@ -103,7 +103,17 @@ spec:
             # het portaal kent nu meerdere audits, elk met eigen memo-input in hun
             # directory. Eén globale sessie-vlag zou daar tegen werken.
             - "--audits=/var/lib/iso-audit/audits"
-            - "--profile=/var/lib/iso-audit/conduction.profile.yaml"
+            # Het profiel uit het image, niet van de PVC. Tot 2026-08-31 stond hier een kopie op
+            # het volume die niemand versiebeheerde en die inhoudelijk was achtergelopen: de
+            # `clausule_context` — waarin staat waarom A.8.14 en A.8.9 hooguit een verbeterpunt
+            # zijn — ontbrak erin. Daarmee viel het argument onder die vastlegging weg: een
+            # auditor die vraagt op grond waarvan een oordeel is verlaagd, moet dat kunnen
+            # nalezen in een bestand met een geschiedenis. Git is de bron van waarheid.
+            #
+            # Vergeleken vóór het omzetten: het PVC-bestand bevatte geen enkel veld dat niet ook
+            # in git stond. De audits, rapporten en de database blijven wél op de PVC — dit gaat
+            # alleen over het profiel.
+            - "--profile=/app/examples/auditmemo/conduction.profile.yaml"
             - "--norms=/app/examples/norms"
             - "--host=127.0.0.1"
             - "--port=8081"
